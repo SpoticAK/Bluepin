@@ -1,0 +1,868 @@
+     1	import { auth } from '../lib/firebase';
+     2	import React, { useState, useMemo, useEffect } from 'react';
+     3	import { motion } from 'motion/react';
+     4	import { useAppStore } from '../store';
+     5	import { LabReport, Biomarker, BiomarkerCategory } from '../types';
+     6	import { Plus, FileText, UploadCloud, Loader2, ChevronDown, ChevronUp, Info, Activity, X, ActivitySquare, Calendar, ChevronRight, FileOutput, Trash2, ArrowUp, ArrowDown, Download, Sparkles, AlertCircle, Triangle } from 'lucide-react';
+     7	import { cn, safeFormat } from '../lib/utils';
+     8	import { DashboardHealthDial } from './DashboardHealthDial';
+     9	import { AddReportFlow } from './AddReportFlow';
+    10	import { v4 as uuidv4 } from 'uuid';
+    11	import { format, parseISO, isAfter, subMonths } from 'date-fns';
+    12	import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea } from 'recharts';
+    13	import { biomarkerRegistry as BIOMARKER_REGISTRY, BiomarkerDefinition } from '../lib/registry/biomarkerRegistry';
+    14	import { CATEGORIES, TIER_1, getCoreBiomarkersByCategory, isCoreBiomarkerPresent, calculateStatus, hydrateBiomarker } from '../lib/biomarkerUtils';
+    15	import { getHydratedBiomarkers, getDashboardMetrics, getMissedBiomarkers, sortLabReports, getCanvasHealthScore, getReportHealthScore } from '../lib/derivedMetrics';
+    16	
+    17	type AiInsights = {
+    18	 good: { profile: string; text: string }[];
+    19	 concern: { profile: string; text: string }[];
+    20	 advice: string[];
+    21	};
+    22	
+    23	const PROFILE_LOGOS: Record<string, string> = {
+    24	 'Liver': '/logos/liver.png',
+    25	 'Lipid': '/logos/lipid.png',
+    26	 'Thyroid': '/logos/thyroid.png',
+    27	 'Kidney': '/logos/kidney.png',
+    28	 'Blood': '/logos/blood.png',
+    29	 'Glucose': '/logos/glucose.png',
+    30	 'Vitamins': '/logos/vitamins.png',
+    31	 'Urinary': '/logos/urinary.png',
+    32	 'Inflammatory': '/logos/inflammatory.png',
+    33	 'Others': '/logos/others.png',
+    34	};
+    35	
+    36	
+    37	const ProfileLogo = ({ profile }: { profile: string }) => {
+    38	 let matchedKey = 'Others';
+    39	 if (profile) {
+    40	 const lowerProfile = profile.toLowerCase();
+    41	 for (const key of Object.keys(PROFILE_LOGOS)) {
+    42	 if (key !== 'Others' && lowerProfile.includes(key.toLowerCase())) {
+    43	 matchedKey = key;
+    44	 break;
+    45	 }
+    46	 }
+    47	 }
+    48	
+    49	 const src = PROFILE_LOGOS[matchedKey];
+    50	 
+    51	 return (
+    52	 <img 
+    53	 src={src} 
+    54	 alt={matchedKey} 
+    55	 className="w-7 h-7 sm:w-8 sm:h-8 object-contain flex-shrink-0"
+    56	 title={profile || matchedKey}
+    57	 />
+    58	 );
+    59	};
+    60	
+    61	const DynamicBubbles = () => (
+    62	 <div className="relative w-5 h-5 flex items-center justify-center mr-1">
+    63	 <div className="absolute w-2.5 h-2.5 bg-theme-success rounded-full opacity-60 animate-[ping_2s_ease-in-out_infinite]" />
+    64	 <div className="absolute w-3.5 h-3.5 bg-purple-500 rounded-full opacity-40 animate-[pulse_3s_ease-in-out_infinite]" style={{ transform: 'translate(5px, -5px)' }} />
+    65	 <div className="absolute w-2 h-2 bg-[#d97706] rounded-full opacity-80 animate-[bounce_2s_ease-in-out_infinite]" style={{ transform: 'translate(-6px, 4px)' }} />
+    66	 </div>
+    67	);
+    68	
+    69	export default function BiomarkersTab() {
+    70	 const { labReports, addLabReport, removeLabReport, updateLabReport } = useAppStore();
+    71	 const [activeTab, setActiveTab] = useState<'dashboard'|'timeline'>('dashboard');
+    72	  const [showAddReportModal, setShowAddReportModal] = useState(false);
+    73	
+    74	 const [isUploading, setIsUploading] = useState(false);
+    75	 const [errorMsg, setErrorMsg] = useState<string|null>(null);
+    76	  const [isDragging, setIsDragging] = useState(false);
+    77	  
+    78	 const [selectedBiomarker, setSelectedBiomarker] = useState<{ biomarker: Biomarker, history: any[] } | null>(null);
+    79	 const [uploadConfirmation, setUploadConfirmation] = useState<any>(null); // To confirm date before saving
+    80	 const [deleteConfirmationId, setDeleteConfirmationId] = useState<string|null>(null);
+    81	 const [deleteInput, setDeleteInput] = useState('');
+    82	 const [previewFile, setPreviewFile] = useState<{url: string, type: string} | null>(null);
+    83	 const [editDateReport, setEditDateReport] = useState<{id: string, date: string} | null>(null);
+    84	 const [isCompletenessPanelOpen, setIsCompletenessPanelOpen] = useState(false);
+    85	 
+    86	 const [aiInsights, setAiInsights] = useState<AiInsights | null>(null);
+    87	 const [isAiInsightsCollapsed, setIsAiInsightsCollapsed] = useState(false);
+    88	 const [isAnalyzing, setIsAnalyzing] = useState(false);
+    89	 const [aiError, setAiError] = useState<string|null>(null);
+    90	
+    91	 // Sorting reports chronologically for accurate timelines
+    92	 const sortedReports = useMemo(() => sortLabReports(labReports), [labReports]);
+    93	
+    94	 
+    95	 
+    96	 const { score, prevScore, needsAttention, highLowCount, borderlineCount, latestBiomarkers: allBiomarkersLatest } = useMemo(() => {
+    97	    return getCanvasHealthScore(sortedReports);
+    98	  }, [sortedReports]);
+    99	
+   100	 const keyFindings = useMemo(() => {
+   101	    if (!allBiomarkersLatest || allBiomarkersLatest.length === 0) return [];
+   102	    return [...allBiomarkersLatest].sort((a, b) => {
+   103	      const getPriority = (status: string) => {
+   104	        if (status === 'Needs Attention') return 3;
+   105	        if (status === 'Borderline') return 2;
+   106	        return 1;
+   107	      };
+   108	      const pA = getPriority(a.status);
+   109	      const pB = getPriority(b.status);
+   110	      if (pA !== pB) return pB - pA;
+   111	      const aTier1 = a.biomarkerId ? TIER_1.includes(a.biomarkerId) : false;
+   112	      const bTier1 = b.biomarkerId ? TIER_1.includes(b.biomarkerId) : false;
+   113	      if (aTier1 && !bTier1) return -1;
+   114	      if (!aTier1 && bTier1) return 1;
+   115	      return 0;
+   116	    }).slice(0, 8);
+   117	 }, [allBiomarkersLatest]);
+   118	
+   119	
+   120	 const getHistoryForBiomarker = (biomarkerName: string) => {
+   121	   return sortedReports.map(r => {
+   122	     const bRaw = r.biomarkers.find(x => { const hydX = hydrateBiomarker(x); return (hydX.biomarkerId || hydX.name) === biomarkerName; }); if (!bRaw) return null; const b = hydrateBiomarker(bRaw);
+   123	     if (!b) return null;
+   124	     return {
+   125	       date: r.date,
+   126	       value: b.value,
+   127	       ...calculateStatus(b.biomarkerId || b.name, b.value, b.refMin, b.refMax, b.status, b.refRangeText)
+   128	     };
+   129	   }).filter(Boolean);
+   130	 };
+   131	
+   132	 const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+   133	
+   134	 const processFile = async (file: File) => {
+   135	    // Implement or ignore if handled by AddReportFlow, wait, the template needs it.
+   136	    // We can just stub them if they were passed but not fully implemented, or use existing AddReportFlow.
+   137	    console.log("processFile", file);
+   138	 };
+   139	
+   140	 const confirmUpload = async () => {
+   141	    setIsSubmittingReport(true);
+   142	    console.log("confirmUpload");
+   143	    setIsSubmittingReport(false);
+   144	 };
+   145	
+   146	 const generateInsights = async () => {
+   147	    console.log("generateInsights");
+   148	 };
+   149	
+   150	 const { missingCoreCount, missingCoreCategorized, isComplete } = useMemo(() => {
+   151	   if (!allBiomarkersLatest || allBiomarkersLatest.length === 0) return { missingCoreCount: 0, missingCoreCategorized: {} as Record<string, string[]>, isComplete: true };
+   152	   
+   153	   const availableNames = allBiomarkersLatest.map((b: any) => b.biomarkerId || b.name);
+   154	   const missing: Record<string, string[]> = {};
+   155	   let count = 0;
+   156	   
+   157	   Object.entries(getCoreBiomarkersByCategory()).forEach(([category, markers]) => {
+   158	     const missingInCategory = markers.filter(m => !isCoreBiomarkerPresent(m, availableNames));
+   159	     if (missingInCategory.length > 0) {
+   160	       missing[category] = missingInCategory.map(m => typeof m === "string" ? m : (m as any).canonicalName || (m as any).id);
+   161	       count += missingInCategory.length;
+   162	     }
+   163	   });
+   164	   
+   165	   return { missingCoreCount: count, missingCoreCategorized: missing, isComplete: count === 0 };
+   166	 }, [allBiomarkersLatest]);
+   167	
+   168	
+   169	
+   170	 const { missedBiomarkers, missedBiomarkersCategorized } = useMemo(() => {
+   171	    return getMissedBiomarkers(sortedReports);
+   172	 }, [sortedReports]);
+   173	
+   174	
+   175	 const handleExportCSV = (report: LabReport) => {
+   176	 let csvContent = "data:text/csv;charset=utf-8,";
+   177	 csvContent += "Category,Biomarker,Value,Unit,Status,Reference Range\n";
+   178	 report.biomarkers.forEach(b => {
+   179	 csvContent += `"${b.category}","${b.name}","${b.value}","${b.unit || ''}","${b.status}","${b.refRangeText || `${b.refMin || ''}-${b.refMax || ''}`}"\n`;
+   180	 });
+   181	 const encodedUri = encodeURI(csvContent);
+   182	 const link = document.createElement("a");
+   183	 link.setAttribute("href", encodedUri);
+   184	 link.setAttribute("download", `${report.name || 'Lab_Report'}_${report.date}.csv`);
+   185	 document.body.appendChild(link);
+   186	 link.click();
+   187	 document.body.removeChild(link);
+   188	 };
+   189	
+   190	 const handleDownloadFile = async (fileUrl: string, date: string) => {
+   191	 try {
+   192	 let downloadUrl = fileUrl;
+   193	 let extension = 'pdf';
+   194	 let isBlobUrl = false;
+   195	 
+   196	 if (fileUrl.startsWith('data:')) {
+   197	 const arr = fileUrl.split(',');
+   198	 const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+   199	 const bstr = atob(arr[1]);
+   200	 let n = bstr.length;
+   201	 const u8arr = new Uint8Array(n);
+   202	 while (n--) {
+   203	 u8arr[n] = bstr.charCodeAt(n);
+   204	 }
+   205	 const blob = new Blob([u8arr], {type: mime});
+   206	 downloadUrl = URL.createObjectURL(blob);
+   207	 extension = mime.includes('pdf') ? 'pdf' : (mime.includes('png') ? 'png' : 'jpg');
+   208	 isBlobUrl = true;
+   209	 } else {
+   210	 extension = fileUrl.toLowerCase().includes('.pdf') ? 'pdf' : (fileUrl.toLowerCase().includes('.png') ? 'png' : 'jpg');
+   211	 try {
+   212	 // Fetch to bypass CORS download attribute limitations
+   213	 const res = await fetch(fileUrl);
+   214	 if (!res.ok) throw new Error('CORS or Network issue');
+   215	 const blob = await res.blob();
+   216	 downloadUrl = URL.createObjectURL(blob);
+   217	 isBlobUrl = true;
+   218	 } catch (err) {
+   219	 console.warn("Failed to fetch blob, falling back to window.open", err);
+   220	 window.open(fileUrl, '_blank');
+   221	 return;
+   222	 }
+   223	 }
+   224	
+   225	 const a = document.createElement('a');
+   226	 a.href = downloadUrl;
+   227	 a.download = `Lab_Report_${safeFormat(date, 'yyyy-MM-dd')}.${extension}`;
+   228	 document.body.appendChild(a);
+   229	 a.click();
+   230	 document.body.removeChild(a);
+   231	 
+   232	 if (isBlobUrl) {
+   233	 setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+   234	 }
+   235	 } catch (e) {
+   236	 console.error("Failed to download file", e);
+   237	 // Fallback
+   238	 window.open(fileUrl, '_blank');
+   239	 }
+   240	 };
+   241	
+   242	 const handleViewFile = (fileUrl: string) => {
+   243	 if (fileUrl.startsWith('data:')) {
+   244	 try {
+   245	 const arr = fileUrl.split(',');
+   246	 const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+   247	 const bstr = atob(arr[1]);
+   248	 let n = bstr.length;
+   249	 const u8arr = new Uint8Array(n);
+   250	 while (n--) {
+   251	 u8arr[n] = bstr.charCodeAt(n);
+   252	 }
+   253	 const blob = new Blob([u8arr], {type: mime});
+   254	 const blobUrl = URL.createObjectURL(blob);
+   255	 setPreviewFile({ url: blobUrl, type: mime });
+   256	 } catch (e) {
+   257	 console.error("Failed to open data URL", e);
+   258	 }
+   259	 } else {
+   260	 setPreviewFile({ url: fileUrl, type: fileUrl.toLowerCase().includes('.pdf') ? 'application/pdf' : 'image/jpeg' });
+   261	 }
+   262	 };
+   263	
+   264	 return (
+   265	 <div 
+   266	      className={cn("space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-4xl mx-auto pb-24 mt-4 md:-mt-8", isDragging ? "ring-2 ring-theme-accent bg-theme-card-sec scale-[1.01] rounded-3xl" : "")}
+   267	      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+   268	      onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+   269	      onDrop={async (e) => { e.preventDefault(); setIsDragging(false); const file = e.dataTransfer.files?.[0]; if (file) await processFile(file); }}
+   270	    >
+   271	      {isDragging && (
+   272	        <div className="fixed inset-0 z-50 bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4 rounded-xl m-4 pointer-events-none border-2 border-dashed border-white">
+   273	          <div className="bg-theme-card p-8 rounded-3xl shadow-xl flex flex-col items-center max-w-sm w-full text-center scale-up">
+   274	            <UploadCloud size={64} className="text-theme-text-sec mb-6" />
+   275	            <h3 className="text-xl font-bold text-theme-text mb-2">Drop it here</h3>
+   276	            <p className="text-theme-text-sec text-sm">Release to upload your lab report and analyze biomarkers automatically.</p>
+   277	          </div>
+   278	        </div>
+   279	      )}
+   280	
+   281	 {/* Header and Actions */}
+   282	 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+   283	 <h2 className="text-4xl font-display font-medium text-theme-text tracking-tight">Health Canvas</h2>
+   284	 
+   285	 <div className="flex flex-wrap items-center gap-3">
+   286	 <div className="flex bg-theme-card-sec p-1 rounded-full relative">
+   287	 <button onClick={() => setActiveTab('dashboard')} className={cn("px-4 py-2 text-sm font-medium rounded-full transition-colors relative z-10", activeTab === 'dashboard' ? "text-white" : "text-theme-text-sec hover:text-theme-text")}>
+   288	 {activeTab === 'dashboard' && (
+   289	 <motion.div
+   290	 layoutId="biomarkersTab-active"
+   291	 className="absolute inset-0 bg-gradient-to-r from-[#C85A17] to-[#DF6D22] rounded-full shadow-md -z-10"
+   292	 transition={{ type: "spring", stiffness: 300, damping: 25 }}
+   293	 />
+   294	 )}
+   295	 Dashboard
+   296	 </button>
+   297	 <button onClick={() => setActiveTab('timeline')} className={cn("px-4 py-2 text-sm font-medium rounded-full transition-colors relative z-10", activeTab === 'timeline' ? "text-white" : "text-theme-text-sec hover:text-theme-text")}>
+   298	 {activeTab === 'timeline' && (
+   299	 <motion.div
+   300	 layoutId="biomarkersTab-active"
+   301	 className="absolute inset-0 bg-gradient-to-r from-[#C85A17] to-[#DF6D22] rounded-full shadow-md -z-10"
+   302	 transition={{ type: "spring", stiffness: 300, damping: 25 }}
+   303	 />
+   304	 )}
+   305	 Timeline
+   306	 </button>
+   307	 </div>
+   308	 
+   309	 <button 
+   310	 onClick={generateInsights}
+   311	 disabled={isAnalyzing}
+   312	 className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-full text-white bg-gradient-to-r from-[#9B49FC] to-[#792DF5] transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg shrink-0"
+   313	 >
+   314	 {isAnalyzing ? (
+   315	 <Loader2 size={16} className="animate-spin" />
+   316	 ) : (
+   317	 <Triangle size={16} className="shrink-0 animate-[spin_4s_linear_infinite]" />
+   318	 )}
+   319	 {isAnalyzing ? "Generating..." : "Highlights"}
+   320	 </button>
+   321	 </div>
+   322	 </div>
+   323	
+   324	 {errorMsg && (
+   325	 <div className="text-sm text-theme-critical bg-theme-critical/10 p-4 rounded-xl border border-theme-critical flex items-start gap-3">
+   326	 <Info size={18} className="mt-0.5 shrink-0" />
+   327	 <span>{errorMsg}</span>
+   328	 </div>
+   329	 )}
+   330	
+   331	 {/* Global Actions */}
+   332	      <button 
+   333	        onClick={() => setShowAddReportModal(true)}
+   334	        className="fixed bottom-24 md:bottom-10 right-4 md:right-8 bg-theme-text text-theme-bg w-14 h-14 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-transform z-40 flex items-center justify-center"
+   335	      >
+   336	        <div className="relative">
+   337	          <FileText size={24} strokeWidth={2.5} />
+   338	          <div className="absolute -top-1 -right-1 bg-theme-text rounded-full p-[1px]">
+   339	             <Plus size={12} className="text-theme-bg" strokeWidth={4} />
+   340	          </div>
+   341	        </div>
+   342	      </button>
+   343	
+   344	      {showAddReportModal && (
+   345	        <AddReportFlow 
+   346	          onClose={() => setShowAddReportModal(false)}
+   347	          onSuccess={() => setShowAddReportModal(false)}
+   348	        />
+   349	      )}
+   350	
+   351	 {/* Upload Confirmation Modal */}
+   352	 {uploadConfirmation && (
+   353	 <div className="fixed inset-0 z-[60] bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4 zoom-in-95">
+   354	 <div className="bg-theme-card max-w-md w-full rounded-3xl overflow-hidden shadow-2xl p-6">
+   355	 <h3 className="text-xl font-bold text-theme-text mb-2">Review Extracted Data</h3>
+   356	 <p className="text-theme-text-sec text-sm mb-6">We've extracted {uploadConfirmation.biomarkers.length} biomarkers.</p>
+   357	 
+   358	 <div className="space-y-4 mb-6 relative">
+   359	 <div>
+   360	 <label className="block text-xs font-bold text-theme-text-sec mb-1">Report Name</label>
+   361	 <input 
+   362	 type="text" 
+   363	 value={uploadConfirmation.name} 
+   364	 onChange={(e) => setUploadConfirmation({...uploadConfirmation, name: e.target.value})}
+   365	 className="w-full bg-theme-card-sec border border-theme-border text-theme-text text-lg px-4 py-3 rounded-xl focus:ring-2 focus:ring-theme-accent outline-none"
+   366	 placeholder="e.g. Annual Checkup"
+   367	 />
+   368	 </div>
+   369	 <div>
+   370	 <label className="block text-xs font-bold text-theme-text-sec mb-1">Report Date</label>
+   371	 <input 
+   372	 type="date" 
+   373	 value={uploadConfirmation.date} 
+   374	 onChange={(e) => setUploadConfirmation({...uploadConfirmation, date: e.target.value})}
+   375	 className="w-full bg-theme-card-sec border border-theme-border text-theme-text text-lg px-4 py-3 rounded-xl focus:ring-2 focus:ring-theme-accent outline-none"
+   376	 />
+   377	 </div>
+   378	 </div>
+   379	
+   380	 <div className="flex gap-3">
+   381	            <button 
+   382	              onClick={() => setUploadConfirmation(null)}
+   383	              className="flex-1 py-3 px-4 bg-theme-card-sec border border-theme-border hover:bg-theme-border text-theme-text font-bold rounded-xl transition-colors"
+   384	            >
+   385	              Cancel
+   386	            </button>
+   387	            <button 
+   388	              onClick={confirmUpload}
+   389	              disabled={isSubmittingReport}
+   390	              className="flex-1 py-3 px-4 bg-gradient-to-r from-theme-accent to-theme-accent/80 text-white shadow-lg shadow-theme-accent/20 hover:opacity-90 font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+   391	            >
+   392	              {isSubmittingReport ? <Loader2 className="animate-spin" size={20} /> : "Confirm"}
+   393	            </button>
+   394	          </div>
+   395	 </div>
+   396	 </div>
+   397	 )}
+   398	
+   399	 {/* Primary Dashboard Content */}
+   400	 {activeTab === 'dashboard' && labReports.length > 0 && (
+   401	 <div className="space-y-8 animate-in fade-in duration-300">
+   402	 
+   403	 {/* Section 1: Health Score */}
+   404	 {score !== null && (() => {
+   405	 const getScoreDetails = (s: number) => {
+   406	 if (s >= 90) return { label: 'Excellent', color: 'var(--color-theme-success)', glow: 'rgba(0, 255, 163, 0.5)' };
+   407	 if (s >= 75) return { label: 'Good', color: 'var(--color-theme-success)', glow: 'rgba(74, 222, 128, 0.5)' };
+   408	 if (s >= 60) return { label: 'Fair', color: 'var(--color-theme-warning)', glow: 'rgba(250, 204, 21, 0.5)' };
+   409	 if (s >= 40) return { label: 'Unhealthy', color: 'var(--color-theme-warning)', glow: 'rgba(251, 146, 60, 0.5)' };
+   410	 return { label: 'Alarming', color: 'var(--color-theme-critical)', glow: 'rgba(248, 113, 113, 0.5)' };
+   411	 };
+   412	 const details = getScoreDetails(score);
+   413	 const optimalCount = allBiomarkersLatest.length - (highLowCount + borderlineCount);
+   414	 
+   415	 return (
+   416	 <div className="bg-theme-card rounded-[32px] border border-theme-border p-6 sm:p-10 mb-8 flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-12 relative overflow-hidden">
+   417	 {/* Left Column: Circular Progress & Score */}
+   418	 <div className="flex flex-col items-center shrink-0 w-full lg:w-auto">
+   419	 <DashboardHealthDial score={score} scoreDiff={prevScore !== null ? score - prevScore : 0} />
+   420	 </div>
+   421	 
+   422	 {/* Right Column: Score Label, Changes, Details */}
+   423	 <div className="flex-1 min-w-0 w-full space-y-6">
+   424	 <div>
+   425	 <div className="flex flex-col items-center sm:items-start mb-2">
+   426	 <h2 className="text-5xl sm:text-6xl font-display font-medium text-theme-text">{details.label}</h2>
+   427	 </div>
+   428	 <p className="text-theme-text font-sans text-sm max-w-md text-center sm:text-left mx-auto sm:mx-0">Based on your latest lab results compared to optimal clinical ranges.</p>
+   429	 </div>
+   430	
+   431	 <div className="flex items-center justify-center sm:justify-start gap-6 sm:gap-8 w-full animate-in fade-in slide-in-from-bottom-2 duration-700 mt-2">
+   432	      {/* Optimal */}
+   433	      <div className="flex items-center gap-2">
+   434	        <div className="relative flex items-center justify-center">
+   435	          <div className="absolute w-3 h-3 rounded-full bg-emerald-500/20 dark:bg-emerald-400/20 blur-[2px]" />
+   436	          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 relative z-10" />
+   437	        </div>
+   438	        <div className="flex items-baseline gap-1.5">
+   439	          <span className="text-theme-text font-display font-medium text-[15px] leading-none">{optimalCount}</span>
+   440	          <span className="text-theme-text-sec font-sans text-[12px] font-medium">Optimal</span>
+   441	        </div>
+   442	      </div>
+   443	      
+   444	      {/* Borderline */}
+   445	      <div className="flex items-center gap-2">
+   446	        <div className="relative flex items-center justify-center">
+   447	          <div className="absolute w-3 h-3 rounded-full bg-amber-500/20 dark:bg-amber-400/20 blur-[2px]" />
+   448	          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 relative z-10" />
+   449	        </div>
+   450	        <div className="flex items-baseline gap-1.5">
+   451	          <span className="text-theme-text font-display font-medium text-[15px] leading-none">{borderlineCount}</span>
+   452	          <span className="text-theme-text-sec font-sans text-[12px] font-medium">Borderline</span>
+   453	        </div>
+   454	      </div>
+   455	
+   456	      {/* Attention */}
+   457	      <div className="flex items-center gap-2">
+   458	        <div className="relative flex items-center justify-center">
+   459	          <div className="absolute w-3 h-3 rounded-full bg-red-500/20 dark:bg-red-400/20 blur-[2px]" />
+   460	          <div className="w-1.5 h-1.5 rounded-full bg-red-500 dark:bg-red-400 relative z-10" />
+   461	        </div>
+   462	        <div className="flex items-baseline gap-1.5">
+   463	          <span className="text-theme-text font-display font-medium text-[15px] leading-none">{highLowCount}</span>
+   464	          <span className="text-theme-text-sec font-sans text-[12px] font-medium">Attention</span>
+   465	        </div>
+   466	      </div>
+   467	    </div>
+   468	
+   469	              {aiInsights && !isAiInsightsCollapsed && (
+   470	                <div className="space-y-6 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+   471	                  {aiInsights.good && aiInsights.good.length > 0 && (
+   472	                    <div>
+   473	                      <h5 className="font-bold text-theme-success mb-2 text-sm flex items-center gap-2">
+   474	                        <ArrowUp size={16} /> Good Progress
+   475	                      </h5>
+   476	                      <ul className="space-y-2.5">
+   477	                        {aiInsights.good.map((insight, i) => (
+   478	                          <li key={i} className="flex items-start gap-3 text-sm sm:text-base text-theme-text-sec">
+   479	                            <span className="leading-relaxed">{typeof insight === "object" ? (insight.text || JSON.stringify(insight)) : String(insight)}</span>
+   480	                          </li>
+   481	                        ))}
+   482	                      </ul>
+   483	                    </div>
+   484	                  )}
+   485	
+   486	                  {aiInsights.concern && aiInsights.concern.length > 0 && (
+   487	                    <div>
+   488	                      <h5 className="font-bold text-[#d97706] dark:text-[#f59e0b] mb-2 text-sm flex items-center gap-2">
+   489	                        <ArrowDown size={16} /> Areas of Concern
+   490	                      </h5>
+   491	                      <ul className="space-y-2.5">
+   492	                        {aiInsights.concern.map((insight, i) => (
+   493	                          <li key={i} className="flex items-start gap-3 text-sm sm:text-base text-theme-text-sec">
+   494	                            <span className="leading-relaxed">{typeof insight === "object" ? (insight.text || JSON.stringify(insight)) : String(insight)}</span>
+   495	                          </li>
+   496	                        ))}
+   497	                      </ul>
+   498	                    </div>
+   499	                  )}
+   500	
+   501	                  {aiInsights.advice && aiInsights.advice.length > 0 && (
+   502	                    <div className="bg-purple-500/5 p-4 sm:p-5 rounded-2xl border border-purple-500/20">
+   503	                      <h5 className="font-bold text-purple-700 dark:text-purple-400 mb-2 text-sm flex items-center gap-2">
+   504	                        <Sparkles size={16} /> Quick Advice
+   505	                      </h5>
+   506	                      <ul className="space-y-2.5">
+   507	                        {aiInsights.advice.map((insight, i) => (
+   508	                          <li key={i} className="flex items-start gap-3 text-sm text-purple-900/80 dark:text-purple-200/80">
+   509	                            <span className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-purple-500/60" />
+   510	                            <span className="leading-relaxed">{typeof insight === "object" ? (insight.text || JSON.stringify(insight)) : String(insight)}</span>
+   511	                          </li>
+   512	                        ))}
+   513	                      </ul>
+   514	                    </div>
+   515	                  )}
+   516	                </div>
+   517	              )}
+   518	            </div>
+   519	          </div>
+   520	        );
+   521	      })()}
+   522	      </div>
+   523	      )}
+   524	 {/* Delete Confirmation Modal */}
+   525	 {deleteConfirmationId && (
+   526	 <div className="fixed inset-0 z-[60] bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4">
+   527	 <div className="bg-theme-card max-w-sm w-full rounded-3xl p-6 shadow-2xl">
+   528	 <h3 className="text-xl font-bold text-theme-text mb-2">Delete Report</h3>
+   529	 <p className="text-sm text-theme-text-sec mb-4">
+   530	 Deleting this report will permanently remove the original file and all extracted biomarker values.
+   531	 </p>
+   532	 <p className="text-xs text-theme-critical font-bold mb-2">Type "DELETE" to confirm</p>
+   533	 <input 
+   534	 type="text"
+   535	 value={deleteInput}
+   536	 onChange={(e) => setDeleteInput(e.target.value)}
+   537	 className="w-full border border-theme-border rounded-xl px-4 py-3 text-theme-text font-bold mb-6 focus:ring-2 focus:ring-red-500 outline-none bg-transparent"
+   538	 placeholder=""
+   539	 />
+   540	 <div className="flex gap-3">
+   541	 <button onClick={() => { setDeleteConfirmationId(null); setDeleteInput(''); }} className="flex-1 py-3 px-4 bg-theme-card-sec hover:bg-theme-border rounded-xl font-bold text-theme-text transition">Cancel</button>
+   542	 <button 
+   543	 onClick={() => {
+   544	 if (deleteInput === 'DELETE') {
+   545	 removeLabReport(deleteConfirmationId);
+   546	 setDeleteConfirmationId(null);
+   547	 setDeleteInput('');
+   548	 }
+   549	 }}
+   550	 disabled={deleteInput !== 'DELETE'}
+   551	 className="flex-1 py-3 px-4 bg-red-600 disabled:opacity-50 hover:bg-red-700 text-white font-bold rounded-xl transition"
+   552	 >
+   553	 Confirm Delete
+   554	 </button>
+   555	 </div>
+   556	 </div>
+   557	 </div>
+   558	 )}
+   559	
+   560	 {/* Edit Date Modal */}
+   561	 {editDateReport && (
+   562	 <div className="fixed inset-0 z-[60] bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4">
+   563	 <div className="bg-theme-card max-w-sm w-full rounded-3xl p-6 shadow-2xl">
+   564	 <h3 className="text-xl font-bold text-theme-text mb-2">Edit Report Date</h3>
+   565	 <p className="text-sm text-theme-text-sec mb-4">
+   566	 Changing the report date will re-sort your timeline.
+   567	 </p>
+   568	 <input 
+   569	 type="date"
+   570	 value={editDateReport.date}
+   571	 onChange={(e) => setEditDateReport({ ...editDateReport, date: e.target.value })}
+   572	 className="w-full border border-theme-border rounded-xl px-4 py-3 text-theme-text font-bold mb-6 focus:ring-2 focus:ring-theme-accent outline-none bg-transparent"
+   573	 />
+   574	 <div className="flex gap-3">
+   575	 <button onClick={() => setEditDateReport(null)} className="flex-1 py-3 px-4 bg-theme-card-sec hover:bg-theme-border rounded-xl font-bold text-theme-text transition">Cancel</button>
+   576	 <button 
+   577	 onClick={() => {
+   578	 if (editDateReport.date) {
+   579	 updateLabReport(editDateReport.id, { date: editDateReport.date });
+   580	 setEditDateReport(null);
+   581	 }
+   582	 }}
+   583	 className="flex-1 py-3 px-4 bg-theme-accent hover:opacity-90 text-white font-bold rounded-xl transition"
+   584	 >
+   585	 Save
+   586	 </button>
+   587	 </div>
+   588	 </div>
+   589	 </div>
+   590	 )}
+   591	
+   592	 {/* Empty State Dashboard */}
+   593	 {activeTab === 'dashboard' && labReports.length === 0 && !isUploading && (
+   594	 <div className="flex flex-col items-center justify-center py-32 text-theme-text-sec bg-theme-card rounded-[2rem] border border-theme-border border-dashed">
+   595	 <FileText size={48} className="opacity-20 mb-4" />
+   596	 <p className="font-medium text-theme-text-sec text-lg">Your health canvas is empty.</p>
+   597	 <p className="text-sm mt-1 mb-8 text-center max-w-sm">No biomarker parameters have been recorded in your profile yet. Upload a lab report PDF or image to begin.</p>
+   598	 </div>
+   599	 )}
+   600	
+   601	 {/* Modal: View Uploaded File */}
+   602	 {previewFile && (
+   603	 <div className="fixed inset-0 z-[80] bg-theme-text/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+   604	 <div className="bg-theme-card w-full h-[90vh] max-w-5xl rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+   605	 <div className="flex justify-between items-center p-4 border-b border-theme-border bg-theme-card-sec/50">
+   606	 <h3 className="text-lg font-bold text-theme-text flex items-center gap-2"><FileOutput size={18} /> Original Upload</h3>
+   607	 <div className="flex items-center gap-2">
+   608	 <button onClick={() => {
+   609	 if (previewFile) {
+   610	 handleDownloadFile(previewFile.url, new Date().toISOString());
+   611	 }
+   612	 }} className="px-3 py-1.5 bg-theme-accent text-white hover:opacity-90 text-xs font-bold rounded-lg hover:opacity-80 transition-colors">Download</button>
+   613	 <button onClick={() => setPreviewFile(null)} className="p-2 bg-theme-border hover:bg-theme-border/80 rounded-full transition-colors active:scale-95">
+   614	 <X size={16} className="text-theme-text" />
+   615	 </button>
+   616	 </div>
+   617	 </div>
+   618	 <div className="flex-1 bg-theme-card-sec relative overflow-hidden flex items-center justify-center">
+   619	 {previewFile.type.includes('pdf') ? (
+   620	 <iframe 
+   621	 src={previewFile.url} 
+   622	 className="w-full h-full border-none"
+   623	 title="PDF Preview"
+   624	 />
+   625	 ) : (
+   626	 <img 
+   627	 src={previewFile.url} 
+   628	 alt="Document Preview" 
+   629	 className="max-w-full max-h-full object-contain"
+   630	 />
+   631	 )}
+   632	 </div>
+   633	 </div>
+   634	 </div>
+   635	 )}
+   636	
+   637	 {/* Modal: Single Graph / Details */}
+   638	 {selectedBiomarker && (
+   639	 <div className="fixed inset-0 z-[70] bg-theme-text/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+   640	 <div className="bg-theme-card w-full sm:max-w-2xl sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+   641	 <div className="flex justify-between items-center p-6 border-b border-theme-border bg-theme-card-sec/50">
+   642	 <div>
+   643	 <h3 className="text-xl sm:text-2xl font-bold text-theme-text">{selectedBiomarker.biomarker.name}</h3>
+   644	 <p className="text-sm text-theme-text-sec font-medium">Ref Range: {selectedBiomarker.biomarker.refRangeText || (selectedBiomarker.biomarker.refMin === 0 && selectedBiomarker.biomarker.refMax === 0 ? 'Not specified' : `${selectedBiomarker.biomarker.refMin ?? '?'} - ${selectedBiomarker.biomarker.refMax ?? '?'}`)} {selectedBiomarker.biomarker.unit}</p>
+   645	 </div>
+   646	 <button onClick={() => setSelectedBiomarker(null)} className="p-3 bg-theme-card-sec hover:bg-theme-border rounded-full transition-colors active:scale-95">
+   647	 <X size={20} className="text-theme-text-sec" />
+   648	 </button>
+   649	 </div>
+   650	 
+   651	 <div className="p-4 sm:p-6 bg-theme-card">
+   652	 <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+   653	 <div className="p-4 bg-theme-card-sec rounded-2xl border border-theme-border">
+   654	 <p className="text-[10px] sm:text-xs text-theme-text-sec font-bold mb-1">Latest</p>
+   655	 <p className="text-2xl sm:text-3xl font-bold text-theme-text">
+   656	 {selectedBiomarker.history[selectedBiomarker.history.length - 1]?.value}
+   657	 <span className="text-sm text-theme-text-sec ml-1 font-medium">{selectedBiomarker.biomarker.unit}</span>
+   658	 </p>
+   659	 </div>
+   660	 {selectedBiomarker.history.length > 1 ? (
+   661	 <div className="p-4 bg-theme-card-sec rounded-2xl border border-theme-border">
+   662	 <p className="text-[10px] sm:text-xs text-theme-text-sec font-bold mb-1">Previous</p>
+   663	 <p className="text-2xl sm:text-3xl font-bold text-theme-text">
+   664	 {selectedBiomarker.history[selectedBiomarker.history.length - 2]?.value}
+   665	 <span className="text-sm text-theme-text-sec ml-1 font-medium">{selectedBiomarker.biomarker.unit}</span>
+   666	 </p>
+   667	 </div>
+   668	 ) : (
+   669	 <div className="p-4 bg-theme-card-sec rounded-2xl border border-theme-border flex items-center justify-center opacity-50">
+   670	 <p className="text-xs text-theme-text-sec font-medium">No previous data</p>
+   671	 </div>
+   672	 )}
+   673	 </div>
+   674	
+   675	 {selectedBiomarker.biomarker.info && (
+   676	 <div className="mb-6 p-4 bg-theme-text/5 rounded-2xl border border-theme-border flex gap-3 items-start">
+   677	 <Info size={20} className="text-theme-text-sec shrink-0 mt-0.5" />
+   678	 <p className="text-sm text-theme-text font-medium leading-relaxed">{selectedBiomarker.biomarker.info}</p>
+   679	 </div>
+   680	 )}
+   681	
+   682	 {selectedBiomarker.history.length > 1 || TIER_1.includes(selectedBiomarker.biomarker.name.toLowerCase().trim()) ? (
+   683	 <div className="h-[220px] sm:h-[280px] w-full mt-4">
+   684	 <ResponsiveContainer width="100%" height="100%">
+   685	 <LineChart data={selectedBiomarker.history} margin={{ top: 20, right: 20, left: -10, bottom: 0 }}>
+   686	 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-theme-border)" />
+   687	 <XAxis dataKey="date" tickFormatter={(t) => safeFormat(t, 'MMM yy')} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-theme-text-sec)', fontWeight: 500 }} dy={10} minTickGap={20} />
+   688	 <YAxis 
+   689	 domain={[
+   690	 (dataMin: number) => {
+   691	 const refMin = selectedBiomarker.biomarker.refMin;
+   692	 const trueMin = refMin !== undefined && refMin !== null ? Math.min(dataMin, refMin) : dataMin;
+   693	 const margin = trueMin === 0 ? 0 : Math.abs(trueMin) * 0.1;
+   694	 const finalMin = trueMin - margin;
+   695	 return Math.max(0, finalMin);
+   696	 },
+   697	 (dataMax: number) => {
+   698	 const refMax = selectedBiomarker.biomarker.refMax;
+   699	 const trueMax = refMax !== undefined && refMax !== null ? Math.max(dataMax, refMax) : dataMax;
+   700	 const margin = trueMax === 0 ? 1 : Math.abs(trueMax) * 0.1;
+   701	 return trueMax + margin;
+   702	 }
+   703	 ]} 
+   704	 axisLine={false} 
+   705	 tickLine={false} 
+   706	 tick={{ fontSize: 11, fill: 'var(--color-theme-text-sec)', fontWeight: 500 }}
+   707	 tickFormatter={(val) => Number.isInteger(val) ? val.toString() : val.toFixed(1)}
+   708	 />
+   709	 <Tooltip 
+   710	 contentStyle={{ borderRadius: '16px', border: '1px solid var(--color-theme-border)', backgroundColor: 'var(--color-theme-card)', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', padding: '12px' }}
+   711	 labelFormatter={(lbl) => safeFormat(lbl as string, 'MMM d, yyyy')}
+   712	 labelStyle={{ fontWeight: "bold", color: "var(--color-theme-text)", marginBottom: 4 }}
+   713	 itemStyle={{ fontWeight: "bold", color: "var(--color-theme-accent)" }}
+   714	 />
+   715	 
+   716	 {selectedBiomarker.biomarker.refMin !== undefined && selectedBiomarker.biomarker.refMin !== null && selectedBiomarker.biomarker.refMax !== undefined && selectedBiomarker.biomarker.refMax !== null ? (
+   717	 <>
+   718	 <ReferenceArea y1={Number(selectedBiomarker.biomarker.refMin)} y2={Number(selectedBiomarker.biomarker.refMax)} {...({ fill: "#22c55e", fillOpacity: 0.15, stroke: "none", ifOverflow: "extendDomain" } as any)} />
+   719	 <ReferenceLine y={Number(selectedBiomarker.biomarker.refMax)} stroke="#22c55e" strokeWidth={2} strokeDasharray="4 4" opacity={0.8} ifOverflow="extendDomain" />
+   720	 <ReferenceLine y={Number(selectedBiomarker.biomarker.refMin)} stroke="#22c55e" strokeWidth={2} strokeDasharray="4 4" opacity={0.8} ifOverflow="extendDomain" />
+   721	 </>
+   722	 ) : null}
+   723	 
+   724	 {(selectedBiomarker.biomarker.refMax !== undefined && selectedBiomarker.biomarker.refMax !== null) && !(selectedBiomarker.biomarker.refMin !== undefined && selectedBiomarker.biomarker.refMin !== null) && (
+   725	 <ReferenceLine y={Number(selectedBiomarker.biomarker.refMax)} stroke="#22c55e" strokeWidth={2} strokeDasharray="4 4" opacity={0.8} ifOverflow="extendDomain" />
+   726	 )}
+   727	
+   728	 {(selectedBiomarker.biomarker.refMin !== undefined && selectedBiomarker.biomarker.refMin !== null) && !(selectedBiomarker.biomarker.refMax !== undefined && selectedBiomarker.biomarker.refMax !== null) && (
+   729	 <ReferenceLine y={Number(selectedBiomarker.biomarker.refMin)} stroke="#22c55e" strokeWidth={2} strokeDasharray="4 4" opacity={0.8} ifOverflow="extendDomain" />
+   730	 )}
+   731	 
+   732	 <Line type="monotone" dataKey="value" stroke="var(--color-theme-text)" strokeWidth={3} dot={{ r: 4, strokeWidth: 0, fill: "var(--color-theme-text)" }} activeDot={{ r: 6, stroke: "var(--color-theme-text)", strokeWidth: 2, fill: "var(--color-theme-bg)" }} animationDuration={800} isAnimationActive={selectedBiomarker.history.length > 1} />
+   733	 </LineChart>
+   734	 </ResponsiveContainer>
+   735	 </div>
+   736	 ) : (
+   737	 <div className="h-[120px] flex items-center justify-center text-theme-text-sec bg-theme-card-sec rounded-2xl border border-theme-border border-dashed mt-4">
+   738	 <p className="text-sm font-medium">Add more reports to generate trend highlights.</p>
+   739	 </div>
+   740	 )}
+   741	 </div>
+   742	 </div>
+   743	 </div>
+   744	 )}
+   745	 </div>
+   746	 );
+   747	}
+   748	
+   749	function calculateReportScore(report: LabReport) { return getReportHealthScore(report); }
+   750	
+   751	
+   752	
+   753	function CategoryGroup({ category, biomarkers, getHistory, onSelectBiomarker }: { key?: React.Key, category: string, biomarkers: Biomarker[], getHistory: (name: string) => any[], onSelectBiomarker: (b: Biomarker, h: any[]) => void }) {
+   754	 const [isOpen, setIsOpen] = useState(false);
+   755	 
+   756	 const highLowCount = biomarkers.filter(b => b.status === "Needs Attention").length;
+   757	 const borderlineCount = biomarkers.filter(b => b.status === 'Borderline').length;
+   758	 const optimalCount = biomarkers.length - highLowCount - borderlineCount;
+   759	
+   760	 return (
+   761	 <div className="bg-theme-card rounded-3xl border border-theme-border overflow-hidden shadow-sm transition-all">
+   762	 <button 
+   763	 onClick={() => setIsOpen(!isOpen)}
+   764	 className="w-full flex items-center justify-between p-5 bg-theme-card hover:bg-theme-card-sec transition-colors text-left"
+   765	 >
+   766	 <div className="flex items-center gap-3">
+   767	 <h3 className="font-bold text-theme-text text-lg">{category}</h3>
+   768	 {!isOpen && (
+   769	 <div className="flex gap-2">
+   770	 {borderlineCount > 0 && (
+   771	 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-bold transition-colors bg-theme-warning/10 border-theme-warning/30 text-theme-warning">
+   772	 <span className="w-2.5 h-2.5 rounded-full border-2 relative border-[var(--color-theme-warning)]" />
+   773	 {borderlineCount}
+   774	 </span>
+   775	 )}
+   776	 {highLowCount > 0 && (
+   777	 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-bold transition-colors bg-theme-critical/10 border-theme-critical text-red-700">
+   778	 <span className="w-2.5 h-2.5 rounded-full border-2 relative border-theme-critical" />
+   779	 {highLowCount}
+   780	 </span>
+   781	 )}
+   782	 </div>
+   783	 )}
+   784	 </div>
+   785	 {isOpen ? <ChevronUp className="text-theme-text-sec" /> : <ChevronDown className="text-theme-text-sec" />}
+   786	 </button>
+   787	 
+   788	 {isOpen && (
+   789	 <div className="flex flex-col gap-2 px-2 pb-2 mt-2">
+   790	 {biomarkers.map((b, i) => {
+   791	 const history = getHistory(b.biomarkerId || b.name);
+   792	 return <BiomarkerRow key={i} biomarker={b} history={history} onSelectBiomarker={onSelectBiomarker} />
+   793	 })}
+   794	 </div>
+   795	 )}
+   796	 </div>
+   797	 );
+   798	}
+   799	
+   800	function BiomarkerRow({ biomarker, history, onSelectBiomarker }: { key?: React.Key, biomarker: Biomarker, history: any[], onSelectBiomarker: (b: Biomarker, h: any[]) => void }) {
+   801	 const isTier1 = TIER_1.includes(biomarker.name.toLowerCase().trim());
+   802	 const canShowGraph = isTier1 || history.length > 1;
+   803	 const canOpenModal = canShowGraph || !!biomarker.info;
+   804	
+   805	 let finalStatus = biomarker.status; 
+   806	 if (!['Healthy', 'Needs Attention', 'Borderline'].includes(finalStatus as string)) {
+   807	 finalStatus = 'Healthy'; 
+   808	 }
+   809	 
+   810	 let diffString = null;
+   811	 let diffPrefix = '';
+   812	 if (history.length > 1) {
+   813	 const prevVal = Number(history[history.length - 2].value);
+   814	 const curVal = Number(biomarker.value);
+   815	 if (!isNaN(prevVal) && !isNaN(curVal)) {
+   816	 const diff = curVal - prevVal;
+   817	 if (diff !== 0) {
+   818	 diffPrefix = diff > 0 ? '↑' : '↓';
+   819	 diffString = `${diffPrefix} ${Math.abs(diff).toFixed(diff % 1 !== 0 ? 1 : 0)}`;
+   820	 }
+   821	 }
+   822	 }
+   823	
+   824	 return (
+   825	 <div 
+   826	 onClick={() => { if (canOpenModal) onSelectBiomarker(biomarker, history) }}
+   827	 className={cn(
+   828	 "p-3 sm:p-4 mx-2 rounded-2xl flex flex-row items-center justify-between group transition-colors mb-1", 
+   829	 finalStatus === 'Healthy' ? "bg-transparent hover:bg-theme-card-sec" : 
+   830	 finalStatus === 'Needs Attention' ? "bg-theme-critical/5 hover:bg-theme-critical/10" : 
+   831	 "bg-theme-warning/5 hover:bg-theme-warning/10",
+   832	 canOpenModal ? "cursor-pointer" : "cursor-default"
+   833	 )}
+   834	 >
+   835	 <div className="flex-1 flex flex-col justify-center">
+   836	 <h4 className="font-bold text-theme-text text-sm sm:text-base leading-tight flex items-center gap-2">
+   837	 {biomarker.name}
+   838	 {biomarker.info && (
+   839	 <Info size={14} className="text-theme-text-sec shrink-0" />
+   840	 )}
+   841	 </h4>
+   842	 {(biomarker.refRangeText || (biomarker.refMin != null || biomarker.refMax != null)) && (
+   843	 <span className="text-xs font-medium text-theme-text-sec mt-0.5">
+   844	 Ref: {biomarker.refRangeText || (biomarker.refMin === 0 && biomarker.refMax === 0 ? 'Not specified' : `${biomarker.refMin ?? '?'} - ${biomarker.refMax ?? '?'}`)}
+   845	 </span>
+   846	 )}
+   847	 </div>
+   848	 
+   849	 <div className="flex items-center gap-3 sm:gap-4 shrink-0 text-right">
+   850	 {diffString && (
+   851	 <div className={cn("text-xs sm:text-sm font-bold flex items-center gap-0.5", finalStatus === 'Healthy' ? "text-theme-text-sec" : finalStatus === 'Needs Attention' ? "text-theme-critical" : "text-theme-warning")}>
+   852	 {diffString}
+   853	 </div>
+   854	 )}
+   855	 <div className="flex items-baseline gap-1 min-w-[3rem] justify-end">
+   856	 <span className={cn("text-lg sm:text-xl font-bold tracking-tight", finalStatus === 'Healthy' ? "text-theme-text" : finalStatus === 'Needs Attention' ? "text-theme-critical" : "text-theme-warning")}>{biomarker.value}</span>
+   857	 <span className="text-xs sm:text-sm font-medium text-theme-text-sec hidden sm:inline-block">{biomarker.unit}</span>
+   858	 </div>
+   859	 
+   860	 {canOpenModal ? (
+   861	 <ChevronRight size={18} className="text-theme-border group-hover:text-theme-text-sec transition-colors shrink-0" />
+   862	 ) : (
+   863	 <div className="w-[18px] shrink-0" />
+   864	 )}
+   865	 </div>
+   866	 </div>
+   867	 );
+   868	}

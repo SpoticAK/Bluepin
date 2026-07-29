@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Primitive Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    
+    // Family Sharing Helper
+    function isFamilyMember(targetUserId) {
+      let targetPath = /databases/$(database)/documents/users/$(targetUserId);
+      let currentPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(targetPath) && exists(currentPath) &&
+             get(targetPath).data.familyId != null && 
+             get(targetPath).data.familyId == get(currentPath).data.familyId;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /families/{familyId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.members[request.auth.uid] != null || (request.resource.data.members[request.auth.uid] != null && request.resource.data.lastUsedInvitation != null && getAfter(/databases/$(database)/documents/invitations/$(request.resource.data.lastUsedInvitation)).data.status == 'used' && get(/databases/$(database)/documents/invitations/$(request.resource.data.lastUsedInvitation)).data.familyId == familyId));
+      allow delete: if false;
+    }
+
+    match /invitations/{invitationId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.inviterId == request.auth.uid || (request.resource.data.status == 'used' && request.resource.data.usedBy == request.auth.uid));
+      allow delete: if isSignedIn() && resource.data.inviterId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      function getLimits() {
+        let path = /databases/$(database)/documents/users/$(userId)/stats/limits;
+        return exists(path) ? get(path).data : {};
+      }
+      function getLimitsAfter() {
+        let path = /databases/$(database)/documents/users/$(userId)/stats/limits;
+        return existsAfter(path) ? getAfter(path).data : {};
+      }
+      function isSameDay(y, m, d) {
+        return y == request.time.year() && m == request.time.month() && d == request.time.day();
+      }
+
+      allow get: if isOwner(userId) || isFamilyMember(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false;
+
+      match /stats/limits {
+        allow get: if isOwner(userId);
+        
+        allow create: if isOwner(userId) && 
+          request.resource.data.get('gCount', 0) <= 1 &&
+          request.resource.data.get('rCount', 0) <= 1 &&
+          request.resource.data.get('rTotal', 0) <= 1;
+          
+        allow update: if isOwner(userId) && (
+          // Case 1: Glucose Add
+          (
+            request.resource.data.get('gCount', 0) == (isSameDay(resource.data.get('gYear', 0), resource.data.get('gMonth', 0), resource.data.get('gDay', 0)) ? resource.data.get('gCount', 0) + 1 : 1) &&
+            request.resource.data.get('gCount', 0) <= 10 &&
+            isSameDay(request.resource.data.get('gYear', 0), request.resource.data.get('gMonth', 0), request.resource.data.get('gDay', 0)) &&
+            request.resource.data.get('rCount', 0) == resource.data.get('rCount', 0) &&
+            request.resource.data.get('rTotal', 0) == resource.data.get('rTotal', 0) &&
+            request.resource.data.get('rYear', 0) == resource.data.get('rYear', 0) &&
+            request.resource.data.get('rMonth', 0) == resource.data.get('rMonth', 0) &&
+            request.resource.data.get('rDay', 0) == resource.data.get('rDay', 0)
+          ) ||
+          // Case 2: Lab Report Add
+          (
+            request.resource.data.get('rCount', 0) == (isSameDay(resource.data.get('rYear', 0), resource.data.get('rMonth', 0), resource.data.get('rDay', 0)) ? resource.data.get('rCount', 0) + 1 : 1) &&
+            request.resource.data.get('rCount', 0) <= 20 &&
+            request.resource.data.get('rTotal', 0) == resource.data.get('rTotal', 0) + 1 &&
+            request.resource.data.get('rTotal', 0) <= 100 &&
+            isSameDay(request.resource.data.get('rYear', 0), request.resource.data.get('rMonth', 0), request.resource.data.get('rDay', 0)) &&
+            request.resource.data.get('gCount', 0) == resource.data.get('gCount', 0) &&
+            request.resource.data.get('gYear', 0) == resource.data.get('gYear', 0) &&
+            request.resource.data.get('gMonth', 0) == resource.data.get('gMonth', 0) &&
+            request.resource.data.get('gDay', 0) == resource.data.get('gDay', 0)
+          ) ||
+          // Case 3: Lab Report Delete
+          (
+            request.resource.data.get('rTotal', 0) == (resource.data.get('rTotal', 0) > 0 ? resource.data.get('rTotal', 0) - 1 : 0) &&
+            request.resource.data.get('rCount', 0) == resource.data.get('rCount', 0) &&
+            request.resource.data.get('rYear', 0) == resource.data.get('rYear', 0) &&
+            request.resource.data.get('rMonth', 0) == resource.data.get('rMonth', 0) &&
+            request.resource.data.get('rDay', 0) == resource.data.get('rDay', 0) &&
+            request.resource.data.get('gCount', 0) == resource.data.get('gCount', 0) &&
+            request.resource.data.get('gYear', 0) == resource.data.get('gYear', 0) &&
+            request.resource.data.get('gMonth', 0) == resource.data.get('gMonth', 0) &&
+            request.resource.data.get('gDay', 0) == resource.data.get('gDay', 0)
+          )
+        );
+      }
+
+      match /familySummary/{summaryId} {
+        allow get, list: if isOwner(userId) || isFamilyMember(userId);
+        allow create, update, delete: if isOwner(userId);
+      }
+      
+      match /glucoseReadings/{readingId} {
+        allow get, list: if isOwner(userId) || isFamilyMember(userId);
+        allow create: if isOwner(userId) && 
+          getLimitsAfter().get('gCount', 0) == (isSameDay(getLimits().get('gYear', 0), getLimits().get('gMonth', 0), getLimits().get('gDay', 0)) ? getLimits().get('gCount', 0) + 1 : 1);
+        allow update, delete: if isOwner(userId);
+      }
+      
+      match /biomarkers/{biomarkerId} {
+        allow get, list: if isOwner(userId) || isFamilyMember(userId);
+        allow create, update, delete: if isOwner(userId);
+      }
+      
+      match /labReports/{reportId} {
+        allow get, list: if isOwner(userId) || isFamilyMember(userId);
+        allow create: if isOwner(userId) && 
+          getLimitsAfter().get('rTotal', 0) == getLimits().get('rTotal', 0) + 1;
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId) &&
+          getLimitsAfter().get('rTotal', 0) == (getLimits().get('rTotal', 0) > 0 ? getLimits().get('rTotal', 0) - 1 : 0);
+      }
+      
+      match /goals/{goalId} {
+        allow get, list: if isOwner(userId) || isFamilyMember(userId);
+        allow create, update, delete: if isOwner(userId);
+      }
+      
+      match /dailyLogs/{logId} {
+        allow get, list: if isOwner(userId) || isFamilyMember(userId);
+        allow create, update, delete: if isOwner(userId);
+      }
+      
+      match /weightLogs/{logId} {
+        allow get, list: if isOwner(userId) || isFamilyMember(userId);
+        allow create, update, delete: if isOwner(userId);
+      }
+    }
+  }
+}

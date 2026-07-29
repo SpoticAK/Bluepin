@@ -1,0 +1,11 @@
+node_modules/
+dist-ssr/
+*.local
+.env
+.env.*
+.env.local
+.env.*.local
+coverage/
+.DS_Store
+*.log
+!.env.example

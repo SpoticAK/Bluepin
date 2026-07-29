@@ -1,0 +1,138 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile containing personal information and metrics",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "age": { "type": "number" },
+        "gender": { "type": "string" },
+        "height": { "type": "number" },
+        "weight": { "type": "number" },
+        "bmi": { "type": "number" },
+        "country": { "type": "string" },
+        "createdAt": { "type": "timestamp", "description": "Account creation date" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["name", "createdAt"]
+    },
+    "GlucoseReading": {
+      "title": "Glucose Reading",
+      "description": "User's glucose reading",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "value": { "type": "number" },
+        "readingType": { "type": "string", "enum": ["Fasting", "Post-Prandial", "Random"] },
+        "imageUrl": { "type": "string", "description": "URL of the uploaded glucometer image if any" },
+        "date": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["userId", "value", "readingType", "date", "createdAt"]
+    },
+    "Biomarker": {
+      "title": "Biomarker",
+      "description": "Extracted biomarker from lab reports",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "reportId": { "type": "string" },
+        "name": { "type": "string" },
+        "value": { "type": "number" },
+        "reportDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["Low", "Normal", "High"] },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["userId", "name", "value", "reportDate", "createdAt"]
+    },
+    "LabReport": {
+      "title": "Lab Report",
+      "description": "Uploaded lab report metadata",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "reportDate": { "type": "string" },
+        "uploadDate": { "type": "string" },
+        "biomarkerData": { "type": "string", "description": "JSON string or simplified summary of extracted data" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["userId", "fileUrl", "reportDate", "createdAt"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "Fitness goal tracked daily",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["checkbox", "number"] },
+        "targetValue": { "type": "number" },
+        "unit": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "archived"] },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["userId", "title", "category", "targetType", "status", "createdAt"]
+    },
+    "DailyLog": {
+      "title": "Daily Goal Log",
+      "description": "Log of a goal for a specific day",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "goalId": { "type": "string" },
+        "date": { "type": "string", "description": "YYYY-MM-DD" },
+        "completed": { "type": "boolean" },
+        "value": { "type": "number" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["userId", "goalId", "date", "createdAt"]
+    },
+    "WeightLog": {
+      "title": "Weight Log",
+      "description": "User's weight over time",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "weight": { "type": "number" },
+        "bmi": { "type": "number" },
+        "date": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["userId", "weight", "date", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "Stores user profiles"
+    },
+    "/users/{userId}/glucoseReadings/{readingId}": {
+      "schema": { "$ref": "GlucoseReading" },
+      "description": "Stores glucose readings for a user"
+    },
+    "/users/{userId}/biomarkers/{biomarkerId}": {
+      "schema": { "$ref": "Biomarker" },
+      "description": "Stores individual biomarkers"
+    },
+    "/users/{userId}/labReports/{reportId}": {
+      "schema": { "$ref": "LabReport" },
+      "description": "Stores lab report files metadata"
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": { "$ref": "Goal" },
+      "description": "Stores user fitness goals"
+    },
+    "/users/{userId}/dailyLogs/{logId}": {
+      "schema": { "$ref": "DailyLog" },
+      "description": "Stores daily goal completion logs"
+    },
+    "/users/{userId}/weightLogs/{logId}": {
+      "schema": { "$ref": "WeightLog" },
+      "description": "Stores weight logging history"
+    }
+  }
+}

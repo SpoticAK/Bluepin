@@ -1,0 +1,6 @@
+{
+  "name": "Bluepin",
+  "description": "A warm and easy-to-navigate daily health companion to track glucose levels, lab reports, and daily fitness routines. Built to feel friendly and non-intimidating.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
