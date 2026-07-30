@@ -1,5 +1,5 @@
 {
-  "name": "bluepin",
+  "name": "bluepin", "description": "Bluepin App",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -53,3 +53,4 @@
     "esbuild-register": "^3.6.0"
   }
 }
+
