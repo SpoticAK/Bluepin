@@ -276,7 +276,7 @@ async function startServer() {
       const base64Data = req.file.buffer.toString("base64");
       
       const response = await generateContentWithRetry({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.6-flash",
         contents: [
           {
             parts: [
@@ -349,7 +349,7 @@ async function startServer() {
       }
       
       const response = await generateContentWithRetry({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.6-flash",
         contents: [
           {
             parts: [
@@ -392,7 +392,7 @@ async function startServer() {
       const base64Data = req.file.buffer.toString("base64");
       
       const response = await generateContentWithRetry({
-        model: "gemini-2.0-flash", 
+        model: "gemini-3.6-flash", 
         contents: [
           {
             parts: [
@@ -454,7 +454,7 @@ async function startServer() {
       }
       
       const response = await generateContentWithRetry({
-        model: "gemini-2.0-flash", 
+        model: "gemini-3.6-flash", 
         contents: [
           {
             parts: [
@@ -551,7 +551,7 @@ async function startServer() {
               if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
             }
             response = await generateContentWithRetry({
-              model: "gemini-2.0-flash",
+              model: "gemini-3.6-flash",
               contents: [{
                 parts: [
                   { text: promptText },
@@ -565,7 +565,7 @@ async function startServer() {
             });
           } else {
             response = await generateContentWithRetry({
-              model: "gemini-2.0-flash",
+              model: "gemini-3.6-flash",
               contents: [{
                 parts: [
                   { text: promptText },
@@ -676,7 +676,7 @@ Here are the lab reports: ${JSON.stringify(reports)}`;
       };
 
       const response = await generateContentWithRetry({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.6-flash",
         contents: [{ role: "user", parts: [{ text: promptText }] }],
         config: {
           responseMimeType: "application/json",
