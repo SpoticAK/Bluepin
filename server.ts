@@ -546,7 +546,7 @@ async function startServer() {
             const tmpFilePath = path.join('/tmp', `${userScopedUploadId.replace(/[^a-zA-Z0-9_]/g, '')}.tmp`);
             fs.writeFileSync(tmpFilePath, Buffer.from(fullBase64, 'base64'));
             try {
-              fileInfo = await getAiClient().files.upload({ file: tmpFilePath, mimeType: mimeType });
+              fileInfo = await getAiClient().files.upload({ file: tmpFilePath, config: { mimeType: mimeType } });
             } finally {
               if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
             }
