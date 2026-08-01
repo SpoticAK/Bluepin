@@ -352,7 +352,7 @@ function AppContent() {
         try {
           const docRef = doc(db, "users", u.uid);
           const docSnap = await getDoc(docRef);
-          setNeedsOnboarding(!docSnap.exists());
+          setNeedsOnboarding(!docSnap.exists() || !docSnap.data()?.name);
         } catch (e) {
           console.error(e);
           setNeedsOnboarding(true);
