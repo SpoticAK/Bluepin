@@ -1137,26 +1137,18 @@ export function AddGlucoseModal({ onClose, onAdd }: { onClose: () => void, onAdd
  const [imageUrlData, setImageUrlData] = useState<string|undefined>(undefined);
   const [source, setSource] = useState<'Manual' | 'OCR'>('Manual');
  
- const [hoursAgo, setHoursAgo] = useState<string>('');
-
- const calculateTiming = (hoursStr: string): MealTiming => {
- const hours = parseFloat(hoursStr);
- if (isNaN(hours)) return 'Random';
- if (hours >= 8) return 'Fasting';
- if (hours <= 2) return 'Post-Prandial';
- return 'Random';
- };
+ const [timingSelection, setTimingSelection] = useState<MealTiming | null>(null);
 
  const { glucoseReadings } = useAppStore();
 
  const [isSubmitting, setIsSubmitting] = useState(false); const handleManualSubmit = async (e: React.FormEvent) => {
  e.preventDefault();
- if (!val || isNaN(Number(val)) || !hoursAgo || isNaN(Number(hoursAgo))) {
- setErrorObj("Please enter both a valid glucose value and hours after eating.");
+ if (!val || isNaN(Number(val)) || !timingSelection) {
+ setErrorObj("Please enter a valid glucose value and select when you performed the test.");
  return;
  }
 
- const timing = calculateTiming(hoursAgo);
+ const timing = timingSelection;
  const date = safeFormat(new Date(), 'yyyy-MM-dd');
  const existingReading = glucoseReadings.find(r => r.date === date && r.timing === timing);
 
@@ -1165,7 +1157,7 @@ export function AddGlucoseModal({ onClose, onAdd }: { onClose: () => void, onAdd
  value: Number(val),
  unit: 'mg/dL',
  timing,
- hoursAfterEating: Number(hoursAgo),
+ hoursAfterEating: timing === 'Post-Prandial' ? 2 : timing === 'Fasting' ? 8 : 5,
  source,
  imageUrl: imageUrlData,
  date,
@@ -1251,7 +1243,7 @@ export function AddGlucoseModal({ onClose, onAdd }: { onClose: () => void, onAdd
   
   
  
- const currentTiming = calculateTiming(hoursAgo);
+
 
   
 return (
@@ -1346,16 +1338,57 @@ return (
            />
          </div>
          
-         <div className="bg-theme-bg border border-theme-border p-4 rounded-xl">
-           <label className="block text-sm font-bold text-theme-text mb-3 leading-tight">How many hours after eating did you perform this test?</label>
-           <div className="flex items-center gap-3">
-             <input 
-               type="number" step="0.1" min="0" required
-               value={hoursAgo} onChange={e => setHoursAgo(e.target.value)}
-               placeholder="e.g. 2.5"
-               className="w-24 px-4 py-3 bg-theme-card border border-theme-border rounded-xl focus:ring-2 focus:ring-theme-accent outline-none font-bold text-center"
-             />
-             <span className="text-theme-text-sec font-medium">hours ago</span>
+         <div className="mt-6">
+           <div className="mb-4">
+             <label className="block text-sm font-bold text-theme-text leading-tight">Meal Timing</label>
+             <p className="text-[13px] text-theme-text-sec mt-1">Relative to your most recent meal.</p>
+           </div>
+           
+           <div className="flex flex-col gap-4">
+             <label className="flex items-center gap-3 cursor-pointer group">
+               <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
+                 <input 
+                   type="radio" 
+                   name="timing" 
+                   className="peer sr-only"
+                   checked={timingSelection === 'Post-Prandial'}
+                   onChange={() => setTimingSelection('Post-Prandial')}
+                 />
+                 <div className="w-5 h-5 border-2 border-theme-border rounded-full peer-checked:border-theme-text peer-checked:bg-theme-text transition-colors" />
+                 <div className="absolute w-2 h-2 bg-theme-bg rounded-full scale-0 peer-checked:scale-100 transition-transform" />
+               </div>
+               <span className="text-[14px] font-medium text-theme-text group-hover:opacity-80 transition-opacity">Less than 2 hours</span>
+             </label>
+             
+             <label className="flex items-center gap-3 cursor-pointer group">
+               <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
+                 <input 
+                   type="radio" 
+                   name="timing" 
+                   className="peer sr-only"
+                   checked={timingSelection === 'Random'}
+                   onChange={() => setTimingSelection('Random')}
+                 />
+                 <div className="w-5 h-5 border-2 border-theme-border rounded-full peer-checked:border-theme-text peer-checked:bg-theme-text transition-colors" />
+                 <div className="absolute w-2 h-2 bg-theme-bg rounded-full scale-0 peer-checked:scale-100 transition-transform" />
+               </div>
+               <span className="text-[14px] font-medium text-theme-text group-hover:opacity-80 transition-opacity">2–8 hours</span>
+             </label>
+             
+             <label className="flex items-center gap-3 cursor-pointer group">
+               <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
+                 <input 
+                   type="radio" 
+                   name="timing" 
+                   className="peer sr-only"
+                   checked={timingSelection === 'Fasting'}
+                   onChange={() => setTimingSelection('Fasting')}
+                 />
+                 <div className="w-5 h-5 border-2 border-theme-border rounded-full peer-checked:border-theme-text peer-checked:bg-theme-text transition-colors" />
+                 <div className="absolute w-2 h-2 bg-theme-bg rounded-full scale-0 peer-checked:scale-100 transition-transform" />
+               </div>
+               <span className="text-[14px] font-medium text-theme-text group-hover:opacity-80 transition-opacity">More than 8 hours</span>
+             </label>
            </div>
          </div>
          

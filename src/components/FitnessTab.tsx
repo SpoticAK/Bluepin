@@ -1,7 +1,7 @@
 import { ActivityCircle, emojiToStatus } from './ActivityCircle';
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { CheckCircle, Activity, Target, Circle, Plus, Settings2, Flame, RefreshCcw, X, Trash2, Sparkles, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Loader2, Check, Asterisk, Sparkle, Info } from 'lucide-react';
+import { CheckCircle, Activity, Target, Circle, Plus, Settings2, Flame, RefreshCcw, X, Trash2, Sparkles, Clock, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Loader2, Check, Asterisk, Sparkle, Info } from 'lucide-react';
 import { startOfDay, subDays, isSameDay } from 'date-fns';
 import { cn, calculateBMI, safeFormat } from '../lib/utils';
 import { calculateGoalsStreak, getActiveGoalsForDate as libGetActiveGoals } from '../lib/goalUtils';
@@ -94,7 +94,7 @@ export default function FitnessTab() {
  const yesterdayCompleted = yesterdayLogs 
  ? Object.entries(yesterdayLogs).some(([gid, l]: [string, any]) => l.completed && yesterdayActiveGoals.some(g => g.id === gid)) 
  : false;
- const showReminder = showYesterdayReminder && !yesterdayCompleted;
+ const showReminder = showYesterdayReminder && !yesterdayCompleted && yesterdayActiveGoals.length > 0;
 
  const dismissReminder = () => {
  localStorage.setItem('yesterdayReminderDismissedDate', yesterdayStr);
@@ -327,54 +327,52 @@ export default function FitnessTab() {
  </div>
 
  {showReminder && (
- <div className="bg-orange-50/80 border border-orange-200/60 rounded-[32px] p-6 sm:p-8 shadow-sm relative animate-in fade-in zoom-in-95 overflow-hidden">
- {/* Decorative background circle */}
- <div className="absolute -top-12 -right-12 w-32 h-32 bg-orange-200/30 rounded-full blur-2xl" />
- 
- <button onClick={dismissReminder} className="absolute top-4 right-4 text-orange-400 hover:text-orange-600 bg-white rounded-full p-2 shadow-sm transition-transform hover:scale-110 z-10">
- <X size={18} strokeWidth={3} />
- </button>
- <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 relative z-10">
- <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center shrink-0 border border-orange-100">
- <Activity className="w-8 h-8 text-orange-400" />
- </div>
- <div className="flex-1">
- <h3 className="font-display font-medium text-orange-900 text-2xl mb-1">Did you complete your goals yesterday?</h3>
- <p className="text-orange-800/80 text-sm font-medium mb-6">We noticed you didn't check off any goals yesterday. If you did them, don't lose your streak!</p>
- 
- <div className="space-y-2 bg-white/60 rounded-[24px] p-4 mb-6 border border-white">
- <p className="text-[10px] font-bold text-orange-800/60 mb-3 px-2">Check what you completed:</p>
- {getActiveGoalsForDate(yesterdayStr).map(goal => {
- const isGoalCompleted = yesterdayLogs?.[goal.id]?.completed || false;
- return (
- <button 
- key={goal.id} 
- onClick={async () => { try { await logGoal(yesterdayStr, goal.id, !isGoalCompleted); } catch(e: any) { alert(e.message || "Failed to log goal"); } }}
- className={cn("flex items-center gap-4 w-full text-left p-3 rounded-2xl transition-all border-2", isGoalCompleted ? "bg-white border-orange-200 shadow-sm" : "border-transparent hover:bg-white/40")}
- >
- {isGoalCompleted ? (
- <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
- <Check className="w-4 h-4 text-orange-600" /> 
- </div>
- ) : (
- <div className="w-6 h-6 rounded-full border-2 border-orange-200 shrink-0" />
- )}
- <span className={cn("text-sm font-medium transition-all", isGoalCompleted ? "text-orange-900" : "text-orange-800/70")}>{goal.title}</span>
- </button>
- );
- })}
- </div>
-
- <div className="flex flex-wrap gap-3">
- <button onClick={dismissReminder} className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
- Save & Update Streak
- </button>
- <button onClick={dismissReminder} className="px-6 py-3 bg-white hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-2xl text-sm font-bold transition-all">
- No, I didn't (Break streak)
- </button>
- </div>
- </div>
- </div>
+ <div className="bg-theme-card border border-theme-border/60 rounded-[28px] p-5 sm:p-6 shadow-sm relative animate-in fade-in zoom-in-95">
+   <button onClick={dismissReminder} className="absolute top-4 right-4 text-theme-text-sec hover:text-theme-text bg-theme-bg/50 hover:bg-theme-bg rounded-full p-1.5 transition-colors z-10">
+     <X size={16} strokeWidth={2.5} />
+   </button>
+   <div className="flex flex-col relative z-10">
+     <div className="flex items-center gap-3.5 mb-5 pr-8">
+       <div className="w-10 h-10 bg-theme-bg rounded-2xl flex items-center justify-center shrink-0 border border-theme-border/50">
+         <Clock className="w-5 h-5 text-theme-text-sec" />
+       </div>
+       <div>
+         <h3 className="font-bold text-theme-text text-[16px] leading-tight">Yesterday's Goals</h3>
+         <p className="text-theme-text-sec text-[13px] font-medium mt-0.5">Did you forget to log your progress?</p>
+       </div>
+     </div>
+     
+     <div className="space-y-1.5 mb-5 bg-theme-bg/30 p-2 rounded-[20px] border border-theme-border/30">
+       {yesterdayActiveGoals.map(goal => {
+         const isGoalCompleted = yesterdayLogs?.[goal.id]?.completed || false;
+         return (
+           <button 
+             key={goal.id} 
+             onClick={async () => { try { await logGoal(yesterdayStr, goal.id, !isGoalCompleted); } catch(e: any) { alert(e.message || "Failed to log goal"); } }}
+             className={cn("flex items-center gap-3.5 w-full text-left p-3 rounded-2xl transition-all border group", isGoalCompleted ? "bg-theme-card border-theme-border shadow-sm" : "border-transparent hover:bg-theme-card/50")}
+           >
+             {isGoalCompleted ? (
+               <div className="w-5 h-5 rounded-full bg-theme-text flex items-center justify-center shrink-0">
+                 <Check className="w-3.5 h-3.5 text-theme-bg" strokeWidth={3} /> 
+               </div>
+             ) : (
+               <div className="w-5 h-5 rounded-full border-2 border-theme-border shrink-0 group-hover:border-theme-text/40 transition-colors" />
+             )}
+             <span className={cn("text-[14px] font-medium transition-all", isGoalCompleted ? "text-theme-text" : "text-theme-text-sec group-hover:text-theme-text")}>{goal.title}</span>
+           </button>
+         );
+       })}
+     </div>
+     
+     <div className="flex items-center gap-3">
+       <button onClick={dismissReminder} className="flex-1 py-3 bg-theme-text text-theme-bg rounded-xl text-[14px] font-bold transition-all hover:opacity-90 shadow-sm">
+         Save
+       </button>
+       <button onClick={dismissReminder} className="flex-1 py-3 bg-theme-bg hover:bg-theme-border/50 text-theme-text-sec border border-theme-border rounded-xl text-[14px] font-bold transition-all">
+         Dismiss
+       </button>
+     </div>
+   </div>
  </div>
  )}
 

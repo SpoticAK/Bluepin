@@ -1,0 +1,309 @@
+   342	
+   343	 
+   344	        {/* GLUCOSE DASHBOARD CARDS */}
+   345	        {isGlucoseTracking && (
+   346	          <section 
+   347	            onClick={() => onNavigate('glucose')}
+   348	            className="bg-theme-card px-5 py-5 sm:px-6 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all group flex flex-col gap-4"
+   349	          >
+   350	            <div className="flex items-center justify-between">
+   351	              <h2 className="text-[17px] font-bold text-theme-text-sec">Glucose</h2>
+   352	            </div>
+   353	            <div className="flex min-h-[120px] relative overflow-hidden -mx-2">
+   354	              <div className="flex-1 px-2 sm:px-4 flex flex-col justify-between relative">
+   355	                <div className="absolute top-0 right-0 p-2 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+   356	                  <Droplet size={80} fill="currentColor" />
+   357	                </div>
+   358	                <div className="relative z-10 flex items-center justify-between mb-2">
+   359	                  <p className="text-[14px] font-semibold text-theme-text-sec">Today's Reading</p>
+   360	                  <div className="w-8 h-8 rounded-xl bg-theme-accent/10 border border-theme-accent/20 flex items-center justify-center">
+   361	                    <Droplet className="text-theme-accent" size={16} fill="currentColor" fillOpacity={0.2} />
+   362	                  </div>
+   363	                </div>
+   364	                
+   365	                <div className="relative z-10">
+   366	                  {todayUniqueReadings.length > 0 ? (
+   367	                    <div className="flex items-baseline gap-1.5">
+   368	                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{todayUniqueReadings[0].value}</span>
+   369	                      <span className="text-sm font-bold text-theme-text-sec">mg/dL</span>
+   370	                    </div>
+   371	                  ) : (
+   372	                    <div className="flex items-baseline gap-1.5">
+   373	                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
+   374	                      <span className="text-sm font-bold text-theme-text-sec opacity-20">mg/dL</span>
+   375	                    </div>
+   376	                  )}
+   377	                  <p className="text-xs font-medium text-theme-text-sec mt-1">
+   378	                    {todayUniqueReadings.length > 0 ? `${todayUniqueReadings.length} reading${todayUniqueReadings.length > 1 ? 's' : ''} today` : 'No readings today'}
+   379	                  </p>
+   380	                </div>
+   381	              </div>
+   382	
+   383	              <div className="w-[1px] bg-theme-border/50 my-2" />
+   384	
+   385	              <div className="flex-1 px-2 sm:px-4 flex flex-col justify-between relative">
+   386	                <div className="absolute top-0 right-0 p-2 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+   387	                  <Hexagon size={80} fill="currentColor" />
+   388	                </div>
+   389	                <div className="relative z-10 flex items-center justify-between mb-2">
+   390	                  <p className="text-[14px] font-semibold text-theme-text-sec">Latest HbA1c</p>
+   391	                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+   392	                    <Hexagon className="text-purple-500" size={16} fill="currentColor" fillOpacity={0.2} />
+   393	                  </div>
+   394	                </div>
+   395	
+   396	                <div className="relative z-10">
+   397	                  {latestHba1c ? (
+   398	                    <div className="flex items-baseline gap-1.5">
+   399	                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{latestHba1c.value}</span>
+   400	                      <span className="text-sm font-bold text-theme-text-sec">%</span>
+   401	                    </div>
+   402	                  ) : (
+   403	                    <div className="flex items-baseline gap-1.5">
+   404	                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
+   405	                      <span className="text-sm font-bold text-theme-text-sec opacity-20">%</span>
+   406	                    </div>
+   407	                  )}
+   408	                  <p className="text-xs font-medium text-theme-text-sec mt-1">
+   409	                    {latestHba1c ? `Tested ${safeFormat(latestHba1c.date, 'MMM d, yyyy')}` : 'Upload a lab report'}
+   410	                  </p>
+   411	                </div>
+   412	              </div>
+   413	            </div>
+   414	          </section>
+   415	        )}
+   416	
+   417	        {/* WEEKLY ACTIVITY STRIP */}
+   418	        <section 
+   419	          className="bg-theme-card px-5 py-5 sm:px-6 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all group flex flex-col gap-4"
+   420	          onClick={() => onNavigate('fitness')}
+   421	        >
+   422	          <div className="flex items-center justify-between">
+   423	            <h2 className="text-[17px] font-bold text-theme-text-sec">Fitness</h2>
+   424	          </div>
+   425	          <div className="flex flex-row items-center justify-between w-full">
+   426	            <div className="flex-1 flex justify-between items-center relative z-10 pr-4 sm:pr-6">
+   427	              {weeklyActivity.map((day, i) => {
+   428	                const hasNext = i < weeklyActivity.length - 1;
+   429	                const nextDay = hasNext ? weeklyActivity[i + 1] : null;
+   430	                const isLineRed = nextDay?.isBreak;
+   431	
+   432	                return (
+   433	                  <div key={i} className="relative flex-1 flex flex-col items-center min-w-0">
+   434	                    <div className="flex flex-col items-center gap-2 z-10 relative">
+   435	                      <div className="relative z-10 bg-theme-card rounded-full">
+   436	                         <ActivityCircle 
+   437	                           status={emojiToStatus(day.emoji)} 
+   438	                           isToday={day.isToday} 
+   439	                           size="md" 
+   440	                           className={!day.isToday ? "group-hover:scale-105" : ""} 
+   441	                         />
+   442	                      </div>
+   443	                      <span className={cn(
+   444	                        "text-[9px] sm:text-[10px] transition-colors duration-300 px-0.5 relative z-10 truncate", 
+   445	                        day.isToday ? "text-theme-text font-bold" : "text-theme-text-sec font-medium group-hover:text-theme-text"
+   446	                      )}>
+   447	                        {day.isToday ? 'TODAY' : safeFormat(day.date, 'EEEEE')}
+   448	                      </span>
+   449	                    </div>
+   450	                    {hasNext && (
+   451	                      <div className={cn(
+   452	                        "absolute top-[10px] sm:top-[14px] left-1/2 w-full h-[2px] sm:h-[3px] rounded-full z-0",
+   453	                        isLineRed ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-theme-border/60"
+   454	                      )} />
+   455	                    )}
+   456	                  </div>
+   457	                );
+   458	              })}
+   459	            </div>
+   460	            
+   461	            <div className="flex flex-col items-center justify-center pl-4 sm:pl-6 border-l border-theme-border/60 shrink-0 min-w-[70px] sm:min-w-[90px] relative z-10">
+   462	                <div className="flex items-center gap-1.5 sm:gap-2">
+   463	                  <Flame className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] text-theme-accent drop-shadow-[0_0_8px_rgba(232,122,93,0.4)] group-hover:scale-110 transition-transform duration-300" strokeWidth={2.5} />
+   464	                  <span className="text-[26px] sm:text-[34px] font-display font-bold leading-none bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-amber-500 drop-shadow-sm">{currentStreak}</span>
+   465	                </div>
+   466	                <span className="text-[10px] sm:text-[11px] font-medium text-theme-text-sec mt-1.5 uppercase tracking-wider">Day Streak</span>
+   467	            </div>
+   468	          </div>
+   469	        </section>
+   470	
+   471	        {/* 3. TODAY'S GOALS */}
+   472	 <section 
+   473	 onClick={() => onNavigate('fitness')}
+   474	 onMouseEnter={() => setIsHoveringGoals(true)}
+   475	 onMouseLeave={() => setIsHoveringGoals(false)}
+   476	 className="bg-theme-card p-4 sm:p-5 rounded-[24px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow flex flex-col gap-3"
+   477	 >
+   478	 <div className="flex items-center justify-between">
+   479	 <h2 className="text-[17px] font-bold text-theme-text-sec">Today's Goals</h2>
+   480	 <span className="text-[14px] font-bold text-theme-text-sec">{completedGoalsToday.length} of {activeGoalsToday.length}</span>
+   481	 </div>
+   482	
+   483	 {activeGoalsToday.length > 0 ? (
+   484	 <>
+   485	 <div className="flex gap-1.5">
+   486	 {activeGoalsToday.map((g) => {
+   487	 const isComplete = todayLogs[g.id]?.completed;
+   488	 const isNextUp = !isComplete && currentNextUpGoal?.id === g.id;
+   489	 return (
+   490	 <div 
+   491	 key={g.id} 
+   492	 className={cn(
+   493	 "flex-1 h-2 rounded-full transition-colors duration-500",
+   494	 isComplete ? "bg-emerald-500/80 dark:bg-emerald-600" : 
+   495	 isNextUp ? "bg-amber-400/80 dark:bg-amber-600/80" : 
+   496	 "bg-stone-200 dark:bg-stone-800"
+   497	 )} 
+   498	 />
+   499	 );
+   500	 })}
+   501	 </div>
+   502	 
+   503	 {incompleteGoals.length > 0 ? (
+   504	 <div className="flex items-center justify-between mt-0.5">
+   505	 <div className="flex flex-col overflow-hidden relative h-10 w-full pr-4">
+   506	 <p className="text-[14px] font-bold text-theme-text-sec mb-0.5 shrink-0">Next up</p>
+   507	 <div className="relative flex-1">
+   508	 {incompleteGoals.map((g, idx) => (
+   509	 <p 
+   510	 key={g.id}
+   511	 className={cn(
+   512	 "text-sm font-medium text-theme-text truncate absolute inset-0 transition-all duration-500",
+   513	 idx === nextUpIndex 
+   514	 ? "opacity-100 translate-y-0 pointer-events-auto" 
+   515	 : idx < nextUpIndex 
+   516	 ? "opacity-0 -translate-y-2 pointer-events-none" 
+   517	 : "opacity-0 translate-y-2 pointer-events-none"
+   518	 )}
+   519	 >
+   520	 {g.title}
+   521	 </p>
+   522	 ))}
+   523	 </div>
+   524	 </div>
+   525	 <div className="flex items-center justify-center shrink-0">
+   526	 <ChevronRight size={16} className="text-theme-text-sec" />
+   527	 </div>
+   528	 </div>
+   529	 ) : (
+   530	 <div className="flex items-center mt-0.5">
+   531	 <p className="text-sm font-medium text-theme-text-sec">All done for today.</p>
+   532	 </div>
+   533	 )}
+   534	 </>
+   535	 ) : (
+   536	 <div className="flex items-center justify-between mt-0.5">
+   537	 <p className="text-sm font-medium text-theme-text-sec">Set your first health goal.</p>
+   538	 <span className="text-xs font-bold text-theme-text-sec">
+   539	 Add Goal ›
+   540	 </span>
+   541	 </div>
+   542	 )}
+   543	 
+   544	          {/* Compact Weight Row within Today's Goals */}
+   545	          {weightSnapshot && (
+   546	            <>
+   547	              <div className="h-px bg-theme-border/50 my-3" />
+   548	              <div 
+   549	                className="flex items-center justify-between cursor-pointer group/weight"
+   550	                onClick={(e) => { e.stopPropagation(); onNavigate('fitness'); }}
+   551	              >
+   552	                <div className="flex items-end gap-3">
+   553	                  <div>
+   554	                    <h3 className="text-[10px] font-bold text-theme-text-sec mb-0.5 uppercase tracking-wider">Weight</h3>
+   555	                    <div className="flex items-baseline gap-1">
+   556	                      <span className="text-xl font-bold text-theme-text">{weightSnapshot.latest.weight}</span>
+   557	                      <span className="text-xs font-medium text-theme-text-sec">kg</span>
+   558	                    </div>
+   559	                  </div>
+   560	                  {weightSnapshot.trend && (
+   561	                    <div className="flex items-center text-[12px] font-bold text-theme-text mb-1">
+   562	                      {weightSnapshot.trend.direction === 'down' ? <ArrowDown size={14} className="text-emerald-500 mr-0.5" /> : <ArrowUp size={14} className="text-red-500 mr-0.5" />}
+   563	                      {weightSnapshot.trend.pct.toFixed(1)}%
+   564	                    </div>
+   565	                  )}
+   566	                </div>
+   567	                
+   568	                <div className="text-right">
+   569	                  {weightSnapshot.trend ? (
+   570	                    <span className="text-xs font-medium text-theme-text-sec">
+   571	                      Logged {safeFormat(weightSnapshot.latest.date, 'MMM d')}
+   572	                    </span>
+   573	                  ) : (
+   574	                    <span className="text-xs font-medium text-theme-text-sec">
+   575	                      Logged {safeFormat(weightSnapshot.latest.date, 'MMM d')}
+   576	                    </span>
+   577	                  )}
+   578	                </div>
+   579	              </div>
+   580	            </>
+   581	          )}
+   582	        </section>
+   583	
+   584	 {/* 4. CARE REMINDERS */}
+   585	        <section className="mt-8 relative">
+   586	          <div className="flex items-center justify-between px-2 mb-3">
+   587	            <div className="flex items-center gap-2">
+   588	              <div className="w-2 h-2 rounded-full bg-amber-400 dark:bg-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]" style={{ animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+   589	              <h2 className="text-[17px] font-bold text-theme-text">Care Reminders</h2>
+   590	            </div>
+   591	            {activeReminders.length > 0 && (
+   592	              <span className="text-[12px] font-medium text-theme-text-sec/60">{activeReminders.length}</span>
+   593	            )}
+   594	          </div>
+   595	          
+   596	          <div className="bg-theme-card border border-theme-border/50 rounded-[20px] overflow-hidden shadow-sm">
+   597	            {activeReminders.length > 0 ? (
+   598	              <div className="flex flex-col">
+   599	                {(showAllReminders ? activeReminders : activeReminders.slice(0, 3)).map((reminder, idx) => (
+   600	                  <div 
+   601	                    key={reminder.id}
+   602	                    onClick={() => {
+   603	                      if (reminder.action === 'log_glucose') onNavigate('glucose');
+   604	                      else if (reminder.action === 'log_weight') onNavigate('fitness');
+   605	                      else if (reminder.action === 'upload_report') onNavigate('biomarkers');
+   606	                    }}
+   607	                    className={cn(
+   608	                      "flex items-start sm:items-center justify-between p-3.5 sm:px-4 sm:py-3 cursor-pointer hover:bg-theme-bg/50 transition-colors group",
+   609	                      idx < (showAllReminders ? activeReminders.length : Math.min(activeReminders.length, 3)) - 1 ? "border-b border-theme-border/20" : ""
+   610	                    )}
+   611	                  >
+   612	                    <div className="flex flex-col pr-4">
+   613	                      <h3 className="text-[14px] font-semibold text-theme-text leading-tight mb-0.5">{reminder.title}</h3>
+   614	                      <p className="text-[12px] font-normal text-theme-text-sec/80 leading-snug">{reminder.message}</p>
+   615	                    </div>
+   616	                    <ChevronRight size={14} className="text-theme-text-sec/30 group-hover:text-theme-text-sec/60 transition-colors shrink-0 mt-0.5 sm:mt-0" />
+   617	                  </div>
+   618	                ))}
+   619	                
+   620	                {activeReminders.length > 3 && !showAllReminders && (
+   621	                  <button 
+   622	                    onClick={() => setShowAllReminders(true)}
+   623	                    className="w-full py-2.5 text-[12px] font-medium text-theme-text-sec hover:text-theme-text bg-theme-bg/20 hover:bg-theme-bg/40 transition-colors border-t border-theme-border/20"
+   624	                  >
+   625	                    View all {activeReminders.length} reminders
+   626	                  </button>
+   627	                )}
+   628	              </div>
+   629	            ) : (
+   630	              <div className="p-4 flex items-center justify-center text-center">
+   631	                <p className="text-[13px] font-medium text-theme-text-sec/70">Nothing needs your attention right now.</p>
+   632	              </div>
+   633	            )}
+   634	          </div>
+   635	        </section>
+   636	
+   637	        {/* 5. FAMILY */}
+   638	      <section 
+   639	        onClick={() => onNavigate('family')}
+   640	        className="bg-theme-card p-5 sm:p-6 rounded-[24px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+   641	      >
+   642	        <div className="flex items-center justify-between mb-4">
+   643	          <h2 className="text-[17px] font-bold text-theme-text-sec">Your Family</h2>
+   644	          <ChevronDown size={20} className="text-theme-text-sec" />
+   645	        </div>
+   646	
+   647	        {otherMembers.length > 0 ? (
+   648	          <div className="space-y-4">
+   649	            {otherMembers.slice(0, 2).map((member, idx) => {
+   650	              const { recentStreak, currentStreak } = getAdjustedMemberStreak(member);

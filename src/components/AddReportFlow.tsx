@@ -1,4 +1,5 @@
-import { auth } from '../lib/firebase';
+import { auth, storage } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import React, { useState, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '../store';
@@ -66,14 +67,14 @@ export function AddReportFlow({ onClose, onSuccess }: { onClose: () => void, onS
         reader.onerror = e => reject(e);
       });
       const base64Str = await getBase64(file);
-      const chunkSize = 10 * 1024 * 1024;
+      const chunkSize = 500 * 1024;
       const totalChunks = Math.ceil(base64Str.length / chunkSize);
       const uploadId = uuidv4();
       let data: any = null;
       let downloadUrl = "";
       try {
-        const { storage, auth } = await import('../lib/firebase');
-        const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+        
+        
         const uid = auth.currentUser?.uid;
         if (uid) {
           const fileRef = ref(storage, `users/${uid}/labReports/${uuidv4()}_${file.name}`);

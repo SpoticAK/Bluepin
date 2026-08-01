@@ -345,69 +345,127 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
         {isGlucoseTracking && (
           <section 
             onClick={() => onNavigate('glucose')}
-            className="bg-theme-card rounded-[24px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow relative overflow-hidden flex min-h-[140px] group"
+            className="bg-theme-card px-5 py-5 sm:px-6 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all group flex flex-col gap-4"
           >
-            <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between relative">
-              <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
-                <Droplet size={80} fill="currentColor" />
-              </div>
-              <div className="relative z-10 flex items-center justify-between mb-2">
-                <p className="text-[14px] font-semibold text-theme-text-sec">Today's Reading</p>
-                <div className="w-8 h-8 rounded-xl bg-theme-accent/10 border border-theme-accent/20 flex items-center justify-center">
-                  <Droplet className="text-theme-accent" size={16} fill="currentColor" fillOpacity={0.2} />
-                </div>
-              </div>
-               
-              <div className="relative z-10">
-                {todayUniqueReadings.length > 0 ? (
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{todayUniqueReadings[0].value}</span>
-                    <span className="text-sm font-bold text-theme-text-sec">mg/dL</span>
-                  </div>
-                ) : (
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
-                    <span className="text-sm font-bold text-theme-text-sec opacity-20">mg/dL</span>
-                  </div>
-                )}
-                <p className="text-xs font-medium text-theme-text-sec mt-1">
-                  {todayUniqueReadings.length > 0 ? `${todayUniqueReadings.length} reading${todayUniqueReadings.length > 1 ? 's' : ''} today` : 'No readings today'}
-                </p>
-              </div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-[17px] font-bold text-theme-text">Glucose</h2>
             </div>
-
-            <div className="w-[1px] bg-theme-border/50 my-4" />
-
-            <div className="flex-1 p-4 sm:p-5 flex flex-col justify-between relative">
-              <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
-                <Hexagon size={80} fill="currentColor" />
-              </div>
-              <div className="relative z-10 flex items-center justify-between mb-2">
-                <p className="text-[14px] font-semibold text-theme-text-sec">Latest HbA1c</p>
-                <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                  <Hexagon className="text-purple-500" size={16} fill="currentColor" fillOpacity={0.2} />
+            <div className="flex min-h-[120px] relative overflow-hidden -mx-2">
+              <div className="flex-1 px-2 sm:px-4 flex flex-col justify-between relative">
+                <div className="absolute top-0 right-0 p-2 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                  <Droplet size={80} fill="currentColor" />
+                </div>
+                <div className="relative z-10 flex items-center justify-between mb-2">
+                  <p className="text-[14px] font-semibold text-theme-text-sec">Today's Reading</p>
+                  <div className="w-8 h-8 rounded-xl bg-theme-accent/10 border border-theme-accent/20 flex items-center justify-center">
+                    <Droplet className="text-theme-accent" size={16} fill="currentColor" fillOpacity={0.2} />
+                  </div>
+                </div>
+                
+                <div className="relative z-10">
+                  {todayUniqueReadings.length > 0 ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{todayUniqueReadings[0].value}</span>
+                      <span className="text-sm font-bold text-theme-text-sec">mg/dL</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
+                      <span className="text-sm font-bold text-theme-text-sec opacity-20">mg/dL</span>
+                    </div>
+                  )}
+                  <p className="text-xs font-medium text-theme-text-sec mt-1">
+                    {todayUniqueReadings.length > 0 ? `${todayUniqueReadings.length} reading${todayUniqueReadings.length > 1 ? 's' : ''} today` : 'No readings today'}
+                  </p>
                 </div>
               </div>
 
-              <div className="relative z-10">
-                {latestHba1c ? (
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{latestHba1c.value}</span>
-                    <span className="text-sm font-bold text-theme-text-sec">%</span>
+              <div className="w-[1px] bg-theme-border/50 my-2" />
+
+              <div className="flex-1 px-2 sm:px-4 flex flex-col justify-between relative">
+                <div className="absolute top-0 right-0 p-2 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                  <Hexagon size={80} fill="currentColor" />
+                </div>
+                <div className="relative z-10 flex items-center justify-between mb-2">
+                  <p className="text-[14px] font-semibold text-theme-text-sec">Latest HbA1c</p>
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                    <Hexagon className="text-purple-500" size={16} fill="currentColor" fillOpacity={0.2} />
                   </div>
-                ) : (
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
-                    <span className="text-sm font-bold text-theme-text-sec opacity-20">%</span>
-                  </div>
-                )}
-                <p className="text-xs font-medium text-theme-text-sec mt-1">
-                  {latestHba1c ? `Tested ${safeFormat(latestHba1c.date, 'MMM d, yyyy')}` : 'Upload a lab report'}
-                </p>
+                </div>
+
+                <div className="relative z-10">
+                  {latestHba1c ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{latestHba1c.value}</span>
+                      <span className="text-sm font-bold text-theme-text-sec">%</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
+                      <span className="text-sm font-bold text-theme-text-sec opacity-20">%</span>
+                    </div>
+                  )}
+                  <p className="text-xs font-medium text-theme-text-sec mt-1">
+                    {latestHba1c ? `Tested ${safeFormat(latestHba1c.date, 'MMM d, yyyy')}` : 'Upload a lab report'}
+                  </p>
+                </div>
               </div>
             </div>
           </section>
         )}
+
+ {/* 4. CARE REMINDERS */}
+        <section className="mt-8 relative">
+          <div className="flex items-center justify-between px-2 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-amber-400 dark:bg-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]" style={{ animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+              <h2 className="text-[17px] font-bold text-theme-text">Care Reminders</h2>
+            </div>
+            {activeReminders.length > 0 && (
+              <span className="text-[12px] font-medium text-theme-text-sec/60">{activeReminders.length}</span>
+            )}
+          </div>
+          
+          <div className="bg-theme-card border border-theme-border/50 rounded-[20px] overflow-hidden shadow-sm">
+            {activeReminders.length > 0 ? (
+              <div className="flex flex-col">
+                {(showAllReminders ? activeReminders : activeReminders.slice(0, 3)).map((reminder, idx) => (
+                  <div 
+                    key={reminder.id}
+                    onClick={() => {
+                      if (reminder.action === 'log_glucose') onNavigate('glucose');
+                      else if (reminder.action === 'log_weight') onNavigate('fitness');
+                      else if (reminder.action === 'upload_report') onNavigate('biomarkers');
+                    }}
+                    className={cn(
+                      "flex items-start sm:items-center justify-between p-3.5 sm:px-4 sm:py-3 cursor-pointer hover:bg-theme-bg/50 transition-colors group",
+                      idx < (showAllReminders ? activeReminders.length : Math.min(activeReminders.length, 3)) - 1 ? "border-b border-theme-border/20" : ""
+                    )}
+                  >
+                    <div className="flex flex-col pr-4">
+                      <h3 className="text-[14px] font-semibold text-theme-text leading-tight mb-0.5">{reminder.title}</h3>
+                      <p className="text-[12px] font-normal text-theme-text-sec/80 leading-snug">{reminder.message}</p>
+                    </div>
+                    <ChevronRight size={14} className="text-theme-text-sec/30 group-hover:text-theme-text-sec/60 transition-colors shrink-0 mt-0.5 sm:mt-0" />
+                  </div>
+                ))}
+                
+                {activeReminders.length > 3 && !showAllReminders && (
+                  <button 
+                    onClick={() => setShowAllReminders(true)}
+                    className="w-full py-2.5 text-[12px] font-medium text-theme-text-sec hover:text-theme-text bg-theme-bg/20 hover:bg-theme-bg/40 transition-colors border-t border-theme-border/20"
+                  >
+                    View all {activeReminders.length} reminders
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 flex items-center justify-center text-center">
+                <p className="text-[13px] font-medium text-theme-text-sec/70">Nothing needs your attention right now.</p>
+              </div>
+            )}
+          </div>
+        </section>
 
         {/* WEEKLY ACTIVITY STRIP */}
         <section 
@@ -415,7 +473,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           onClick={() => onNavigate('fitness')}
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-[17px] font-bold text-theme-text-sec">Fitness</h2>
+            <h2 className="text-[17px] font-bold text-theme-text">Fitness</h2>
           </div>
           <div className="flex flex-row items-center justify-between w-full">
             <div className="flex-1 flex justify-between items-center relative z-10 pr-4 sm:pr-6">
@@ -471,7 +529,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
  className="bg-theme-card p-4 sm:p-5 rounded-[24px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow flex flex-col gap-3"
  >
  <div className="flex items-center justify-between">
- <h2 className="text-[17px] font-bold text-theme-text-sec">Today's Goals</h2>
+ <h2 className="text-[17px] font-bold text-theme-text">Today's Goals</h2>
  <span className="text-[14px] font-bold text-theme-text-sec">{completedGoalsToday.length} of {activeGoalsToday.length}</span>
  </div>
 
@@ -576,66 +634,13 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           )}
         </section>
 
- {/* 4. CARE REMINDERS */}
-        <section className="mt-8 relative">
-          <div className="flex items-center justify-between px-2 mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-amber-400 dark:bg-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]" style={{ animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-              <h2 className="text-[17px] font-bold text-theme-text">Care Reminders</h2>
-            </div>
-            {activeReminders.length > 0 && (
-              <span className="text-[12px] font-medium text-theme-text-sec/60">{activeReminders.length}</span>
-            )}
-          </div>
-          
-          <div className="bg-theme-card border border-theme-border/50 rounded-[20px] overflow-hidden shadow-sm">
-            {activeReminders.length > 0 ? (
-              <div className="flex flex-col">
-                {(showAllReminders ? activeReminders : activeReminders.slice(0, 3)).map((reminder, idx) => (
-                  <div 
-                    key={reminder.id}
-                    onClick={() => {
-                      if (reminder.action === 'log_glucose') onNavigate('glucose');
-                      else if (reminder.action === 'log_weight') onNavigate('fitness');
-                      else if (reminder.action === 'upload_report') onNavigate('biomarkers');
-                    }}
-                    className={cn(
-                      "flex items-start sm:items-center justify-between p-3.5 sm:px-4 sm:py-3 cursor-pointer hover:bg-theme-bg/50 transition-colors group",
-                      idx < (showAllReminders ? activeReminders.length : Math.min(activeReminders.length, 3)) - 1 ? "border-b border-theme-border/20" : ""
-                    )}
-                  >
-                    <div className="flex flex-col pr-4">
-                      <h3 className="text-[14px] font-semibold text-theme-text leading-tight mb-0.5">{reminder.title}</h3>
-                      <p className="text-[12px] font-normal text-theme-text-sec/80 leading-snug">{reminder.message}</p>
-                    </div>
-                    <ChevronRight size={14} className="text-theme-text-sec/30 group-hover:text-theme-text-sec/60 transition-colors shrink-0 mt-0.5 sm:mt-0" />
-                  </div>
-                ))}
-                
-                {activeReminders.length > 3 && !showAllReminders && (
-                  <button 
-                    onClick={() => setShowAllReminders(true)}
-                    className="w-full py-2.5 text-[12px] font-medium text-theme-text-sec hover:text-theme-text bg-theme-bg/20 hover:bg-theme-bg/40 transition-colors border-t border-theme-border/20"
-                  >
-                    View all {activeReminders.length} reminders
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="p-4 flex items-center justify-center text-center">
-                <p className="text-[13px] font-medium text-theme-text-sec/70">Nothing needs your attention right now.</p>
-              </div>
-            )}
-          </div>
-        </section>
-
         {/* 5. FAMILY */}
       <section 
         onClick={() => onNavigate('family')}
         className="bg-theme-card p-5 sm:p-6 rounded-[24px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[17px] font-bold text-theme-text-sec">Your Family</h2>
+          <h2 className="text-[17px] font-bold text-theme-text">Your Family</h2>
           <ChevronDown size={20} className="text-theme-text-sec" />
         </div>
 
