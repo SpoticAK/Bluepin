@@ -309,7 +309,7 @@ async function startServer() {
         
         let promptText = "";
         let schema: any = {};
-        let modelToUse = "gemini-2.0-flash"; // Default to cheaper capable model
+        let modelToUse = "gemini-1.5-flash"; // Default to cheaper capable model
         
         if (type === "glucose") {
           promptText = GLUCOSE_PROMPT;
