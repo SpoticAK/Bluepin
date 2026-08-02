@@ -267,216 +267,6 @@ async function startServer() {
   app.use("/api", globalIpLimiter);
 
   // API constraints for extracting metrics from images
-  app.post("/api/extract-glucose", requireAuth, aiUserLimiter, upload.single("image"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No image uploaded" });
-      }
-
-      const base64Data = req.file.buffer.toString("base64");
-      
-      const response = await generateContentWithRetry({
-        model: "gemini-3.6-flash",
-        contents: [
-          {
-            parts: [
-              { text: "Extract the glucose reading (mg/dL or mmol/L) from this glucometer display. If there is a date and time, extract those too. If it is obviously not a glucometer reading, indicate that. Respond only in the requested JSON format." },
-              { inlineData: { data: base64Data, mimeType: req.file.mimetype } }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              success: { type: Type.BOOLEAN, description: "True if a valid reading was found, false otherwise." },
-              value: { type: Type.NUMBER, description: "The numeric glucose value." },
-              unit: { type: Type.STRING, description: "The unit of measurement: 'mg/dL' or 'mmol/L'." },
-              readingDate: { type: Type.STRING, description: "The date of the reading in YYYY-MM-DD format, if available." },
-              readingTime: { type: Type.STRING, description: "The time of the reading in HH:mm format, if available." },
-              errorMsg: { type: Type.STRING, description: "If success is false, explain why (e.g., 'No clear number found')." }
-            },
-            required: ["success"]
-          }
-        }
-      });
-
-      const result = JSON.parse(response.text || "{}");
-      res.json(result);
-    } catch (error: any) {
-      console.error("Glucose extraction error:", error.message || "Unknown error");
-      res.status(500).json({ error: "Failed to extract glucose reading." });
-    }
-  });
-
-  app.post("/api/extract-glucose-url", requireAuth, aiUserLimiter, async (req, res) => {
-    try {
-      
-      
-      const ExtractUrlSchema = z.object({
-        fileUrl: z.string().url().max(2000),
-        mimeType: z.enum(['application/pdf', 'image/png', 'image/jpeg', 'image/jpg']).optional(),
-      });
-      const parsedBody = ExtractUrlSchema.safeParse(req.body);
-      if (!parsedBody.success) {
-        return res.status(400).json({ error: "Invalid request body", details: parsedBody.error.format() });
-      }
-      const { fileUrl, mimeType } = parsedBody.data;
-
-
-
-      // Security check: SSRF Protection
-      // Only allow fetching from our Firebase Storage bucket
-      if (!fileUrl.startsWith(`https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/`)) {
-        return res.status(403).json({ error: "Unauthorized access to external or invalid storage URL" });
-      }
-
-      // Download the file into memory
-      const fileRes = await fetch(fileUrl);
-      if (!fileRes.ok) {
-        throw new Error(`Failed to download file from Storage: ${fileRes.status}`);
-      }
-      const arrayBuffer = await fileRes.arrayBuffer();
-      if (arrayBuffer.byteLength > 10 * 1024 * 1024) {
-        return res.status(400).json({ error: "File too large. Maximum size is 10MB." });
-      }
-      const base64Data = Buffer.from(arrayBuffer).toString('base64');
-      const actualMimeType = fileRes.headers.get('content-type') || mimeType || 'image/jpeg';
-      const allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
-      if (!allowed.includes(actualMimeType)) {
-        return res.status(400).json({ error: "Invalid file type. Only PDF, PNG, JPEG, and JPG are allowed." });
-      }
-      
-      const response = await generateContentWithRetry({
-        model: "gemini-3.6-flash",
-        contents: [
-          {
-            parts: [
-              { text: GLUCOSE_PROMPT },
-              { inlineData: { data: base64Data, mimeType: actualMimeType } }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              success: { type: Type.BOOLEAN, description: "True if a valid reading was found, false otherwise." },
-              value: { type: Type.NUMBER, description: "The numeric glucose value." },
-              unit: { type: Type.STRING, description: "The unit of measurement: 'mg/dL' or 'mmol/L'." },
-              readingDate: { type: Type.STRING, description: "The date of the reading in YYYY-MM-DD format, if available." },
-              readingTime: { type: Type.STRING, description: "The time of the reading in HH:mm format, if available." },
-              errorMsg: { type: Type.STRING, description: "If success is false, explain why (e.g., 'No clear number found')." }
-            },
-            required: ["success"]
-          }
-        }
-      });
-
-      const result = JSON.parse(response.text || "{}");
-      res.json(result);
-    } catch (error: any) {
-      console.error("Glucose extraction by URL error:", error.message || "Unknown error");
-      res.status(500).json({ error: "Failed to extract glucose reading from URL." });
-    }
-  });
-
-  app.post("/api/extract-lab-report", requireAuth, aiUserLimiter, upload.single("image"), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No document uploaded" });
-      }
-
-      const base64Data = req.file.buffer.toString("base64");
-      
-      const response = await generateContentWithRetry({
-        model: "gemini-3.6-flash", 
-        contents: [
-          {
-            parts: [
-              { text: LAB_REPORT_PROMPT },
-              { inlineData: { data: base64Data, mimeType: req.file.mimetype } }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: LAB_REPORT_SCHEMA
-        }
-      });
-      let result = JSON.parse(response.text || "{}");
-      result = processLabReportResult(result);
-      res.json(result);
-    } catch (error: any) {
-      console.error("Lab extraction error:", error.message || "Unknown error");
-      res.status(500).json({ error: "Failed to extract lab parameters." });
-    }
-  });
-
-  app.post("/api/extract-lab-report-url", requireAuth, aiUserLimiter, async (req, res) => {
-    try {
-      
-      
-      const ExtractUrlSchema = z.object({
-        fileUrl: z.string().url().max(2000),
-        mimeType: z.enum(['application/pdf', 'image/png', 'image/jpeg', 'image/jpg']).optional(),
-      });
-      const parsedBody = ExtractUrlSchema.safeParse(req.body);
-      if (!parsedBody.success) {
-        return res.status(400).json({ error: "Invalid request body", details: parsedBody.error.format() });
-      }
-      const { fileUrl, mimeType } = parsedBody.data;
-
-
-
-      // Security check: SSRF Protection
-      // Only allow fetching from our Firebase Storage bucket
-      if (!fileUrl.startsWith(`https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/`)) {
-        return res.status(403).json({ error: "Unauthorized access to external or invalid storage URL" });
-      }
-
-      // Download the file into memory
-      const fileRes = await fetch(fileUrl);
-      if (!fileRes.ok) {
-        throw new Error(`Failed to download file from Storage: ${fileRes.status}`);
-      }
-      const arrayBuffer = await fileRes.arrayBuffer();
-      if (arrayBuffer.byteLength > 10 * 1024 * 1024) {
-        return res.status(400).json({ error: "File too large. Maximum size is 10MB." });
-      }
-      const base64Data = Buffer.from(arrayBuffer).toString('base64');
-      const actualMimeType = fileRes.headers.get('content-type') || mimeType || 'application/pdf';
-      const allowed = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
-      if (!allowed.includes(actualMimeType)) {
-        return res.status(400).json({ error: "Invalid file type. Only PDF, PNG, JPEG, and JPG are allowed." });
-      }
-      
-      const response = await generateContentWithRetry({
-        model: "gemini-3.6-flash", 
-        contents: [
-          {
-            parts: [
-              { text: LAB_REPORT_PROMPT },
-              { inlineData: { data: base64Data, mimeType: actualMimeType } }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: LAB_REPORT_SCHEMA
-        }
-      });
-      let result = JSON.parse(response.text || "{}");
-      result = processLabReportResult(result);
-      res.json(result);
-    } catch (error: any) {
-      console.error("Lab extraction by URL error:", error.message || "Unknown error");
-      res.status(500).json({ error: "Failed to extract lab parameters from URL." });
-    }
-  });
-
   const chunkStore = new Map<string, string[]>();
 
   app.post("/api/upload-chunk", requireAuth, aiUserLimiter, express.json({ limit: "50mb" }), async (req, res) => {
@@ -509,7 +299,7 @@ async function startServer() {
 
     try {
       if (chunks.filter(Boolean).length === totalChunks) {
-        const fullBase64 = chunks.join('');
+        let fullBase64 = chunks.join('');
         const estimatedSize = (fullBase64.length * 3) / 4;
         if (estimatedSize > 10 * 1024 * 1024) {
           chunkStore.delete(userScopedUploadId);
@@ -519,9 +309,11 @@ async function startServer() {
         
         let promptText = "";
         let schema: any = {};
+        let modelToUse = "gemini-2.5-flash"; // Default to cheaper capable model
         
         if (type === "glucose") {
           promptText = GLUCOSE_PROMPT;
+          modelToUse = "gemini-2.5-flash-8b"; // Route simple tasks to cheapest 8b model
           schema = {
             type: Type.OBJECT,
             properties: {
@@ -542,20 +334,46 @@ async function startServer() {
         let response;
         let fileInfo = null;
         try {
-          if (fullBase64.length > 2 * 1024 * 1024) { // Use File API for base64 > 2MB
-            const tmpFilePath = path.join('/tmp', `${userScopedUploadId.replace(/[^a-zA-Z0-9_]/g, '')}.tmp`);
-            fs.writeFileSync(tmpFilePath, Buffer.from(fullBase64, 'base64'));
+          let extractedText = null;
+          let activeMimeType = mimeType;
+          let activeBase64 = fullBase64;
+          
+          // Optimization 1: Extract Text Locally First for PDFs to avoid expensive multimodal tokens
+          if (mimeType === 'application/pdf') {
             try {
-              fileInfo = await getAiClient().files.upload({ file: tmpFilePath, config: { mimeType: mimeType } });
-            } finally {
-              if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
+              const pdfBuffer = Buffer.from(fullBase64, 'base64');
+              const pdfData = await pdfParse(pdfBuffer);
+              if (pdfData.text && pdfData.text.trim().length > 50) {
+                extractedText = pdfData.text;
+              }
+            } catch (err) {
+              console.error("Local PDF parsing failed, falling back to Gemini multimodal.", err);
             }
+          }
+          
+          // Optimization 2: Aggressive Image Compression for images (downscale before sending)
+          if (mimeType.startsWith('image/')) {
+            try {
+              const imageBuffer = Buffer.from(fullBase64, 'base64');
+              const compressedBuffer = await sharp(imageBuffer)
+                .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }) // Downscale to max 1024x1024
+                .jpeg({ quality: 65 }) // Heavily compress
+                .toBuffer();
+              activeBase64 = compressedBuffer.toString('base64');
+              activeMimeType = 'image/jpeg';
+            } catch (err) {
+              console.error("Local image compression failed, proceeding with original.", err);
+            }
+          }
+
+          if (extractedText) {
+            // We successfully extracted text, send text tokens (costs pennies) instead of PDF tokens
             response = await generateContentWithRetry({
-              model: "gemini-3.6-flash",
+              model: modelToUse,
               contents: [{
                 parts: [
                   { text: promptText },
-                  { fileData: { fileUri: fileInfo.uri, mimeType: mimeType } }
+                  { text: "\n--- DOCUMENT CONTENT ---\n" + extractedText }
                 ]
               }],
               config: {
@@ -564,19 +382,43 @@ async function startServer() {
               }
             });
           } else {
-            response = await generateContentWithRetry({
-              model: "gemini-3.6-flash",
-              contents: [{
-                parts: [
-                  { text: promptText },
-                  { inlineData: { data: fullBase64, mimeType: mimeType } }
-                ]
-              }],
-              config: {
-                responseMimeType: "application/json",
-                responseSchema: schema
+            // Fallback: send the optimized image or original PDF
+            if (activeBase64.length > 2 * 1024 * 1024) { // Use File API for base64 > 2MB
+              const tmpFilePath = path.join('/tmp', `${userScopedUploadId.replace(/[^a-zA-Z0-9_]/g, '')}.tmp`);
+              fs.writeFileSync(tmpFilePath, Buffer.from(activeBase64, 'base64'));
+              try {
+                fileInfo = await getAiClient().files.upload({ file: tmpFilePath, config: { mimeType: activeMimeType } });
+              } finally {
+                if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
               }
-            });
+              response = await generateContentWithRetry({
+                model: modelToUse,
+                contents: [{
+                  parts: [
+                    { text: promptText },
+                    { fileData: { fileUri: fileInfo.uri, mimeType: activeMimeType } }
+                  ]
+                }],
+                config: {
+                  responseMimeType: "application/json",
+                  responseSchema: schema
+                }
+              });
+            } else {
+              response = await generateContentWithRetry({
+                model: modelToUse,
+                contents: [{
+                  parts: [
+                    { text: promptText },
+                    { inlineData: { data: activeBase64, mimeType: activeMimeType } }
+                  ]
+                }],
+                config: {
+                  responseMimeType: "application/json",
+                  responseSchema: schema
+                }
+              });
+            }
           }
         } finally {
           if (fileInfo) {
@@ -676,7 +518,7 @@ Here are the lab reports: ${JSON.stringify(reports)}`;
       };
 
       const response = await generateContentWithRetry({
-        model: "gemini-3.6-flash",
+        model: "gemini-2.5-flash-8b", // Route insights to cheaper 8b model
         contents: [{ role: "user", parts: [{ text: promptText }] }],
         config: {
           responseMimeType: "application/json",
