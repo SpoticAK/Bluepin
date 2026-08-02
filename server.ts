@@ -309,11 +309,11 @@ async function startServer() {
         
         let promptText = "";
         let schema: any = {};
-        let modelToUse = "gemini-2.5-flash"; // Default to cheaper capable model
+        let modelToUse = "gemini-2.0-flash"; // Default to cheaper capable model
         
         if (type === "glucose") {
           promptText = GLUCOSE_PROMPT;
-          modelToUse = "gemini-2.5-flash-8b"; // Route simple tasks to cheapest 8b model
+          modelToUse = "gemini-1.5-flash-8b"; // Route simple tasks to cheapest 8b model
           schema = {
             type: Type.OBJECT,
             properties: {
@@ -518,7 +518,7 @@ Here are the lab reports: ${JSON.stringify(reports)}`;
       };
 
       const response = await generateContentWithRetry({
-        model: "gemini-2.5-flash-8b", // Route insights to cheaper 8b model
+        model: "gemini-1.5-flash-8b", // Route insights to cheaper 8b model
         contents: [{ role: "user", parts: [{ text: promptText }] }],
         config: {
           responseMimeType: "application/json",
@@ -560,9 +560,21 @@ Here are the lab reports: ${JSON.stringify(reports)}`;
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      setHeaders: (res, path) => {
+        if (path.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        } else if (path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      }
+    }));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      res.sendFile(path.join(distPath, 'index.html'), {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        }
+      });
     });
   }
 
