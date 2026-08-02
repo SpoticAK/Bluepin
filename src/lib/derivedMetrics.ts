@@ -129,10 +129,10 @@ export function getDashboardMetrics(reports: LabReport[], hydratedBiomarkers: an
   };
 }
 
-export function getSugarInsights(history: any[], isFamilyMember = false) {
+export function getSugarInsights(history: any[]) {
   if (!history) return null;
-  const filterKey = isFamilyMember ? 'type' : 'timing';
-  const ppKey = isFamilyMember ? 'Post-prandial' : 'Post-Prandial';
+  const filterKey = 'timing';
+  const ppKey = 'Post-Prandial';
 
   const validHistory = history.filter(h => h[filterKey] !== 'HbA1c');
   

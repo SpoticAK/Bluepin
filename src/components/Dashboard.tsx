@@ -1,12 +1,13 @@
 import { ActivityCircle, emojiToStatus } from './ActivityCircle';
 import { AddWeightModal } from './AddWeightModal';
+import { WeightCard } from './WeightCard';
 import { AddGlucoseModal } from './GlucoseTab';
 import { AddReportFlow } from './AddReportFlow';
 import { motion, AnimatePresence } from 'motion/react';
 import React, { useMemo, useState, useEffect } from 'react';
 import getCareReminders from '../careReminderRules';
 import { useAppStore } from '../store';
-import { Target, Hexagon, Circle, X, FileText, ChevronRight, ChevronDown, Droplet, Plus, ArrowUp, ArrowDown, Users, Check, Activity, HeartPulse, User, Flame } from 'lucide-react';
+import { Target, Hexagon, Circle, X, FileText, ChevronRight, ChevronDown, Droplet, Plus, ArrowUp, ArrowDown, Users, Check, Activity, HeartPulse, User, Flame, AlertCircle } from 'lucide-react';
 import { parseISO, isAfter, subDays } from 'date-fns';
 import { cn, safeFormat } from '../lib/utils';
 import { TIER_1, calculateStatus, isCoreBiomarkerPresent, getCoreBiomarkersByCategory, hydrateBiomarker } from '../lib/biomarkerUtils';
@@ -22,8 +23,7 @@ import { calculateGoalsStreak, getWeeklyActivity } from "../lib/goalUtils";
 export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => void }) {
  const { profile, glucoseReadings, labReports, weightEntries, goals, goalLogs, addWeightEntry, addGlucoseReading, familySummaries } = useAppStore();
  const currentUserId = auth.currentUser?.uid;
- const otherMembers = Object.values(familySummaries).filter((m: any) => m.userId !== currentUserId) as any[];
-  const isGlucoseTracking = (profile as any)?.glucoseEnabled || glucoseReadings.length > 0;
+   const isGlucoseTracking = (profile as any)?.glucoseEnabled || glucoseReadings.length > 0;
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showAllReminders, setShowAllReminders] = useState(false);
   const [quickAddAction, setQuickAddAction] = useState<'none'|'report'|'glucose'|'weight'>('none');
@@ -93,6 +93,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
  const currentNextUpGoal = incompleteGoals[nextUpIndex];
 
  // --- Care Reminders ---
+  
   const activeReminders = useMemo(() => {
     return getCareReminders({
       healthScore: score || null,
@@ -102,6 +103,31 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
       healthReports: labReports.map(r => ({ uploadedAt: r.date }))
     });
   }, [score, isGlucoseTracking, glucoseReadings, weightEntries, labReports]);
+
+  const remindersRef = React.useRef<HTMLElement>(null);
+  const [hasSeenReminders, setHasSeenReminders] = useState(false);
+  const [showNotifierReady, setShowNotifierReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowNotifierReady(true), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!remindersRef.current || activeReminders.length === 0 || hasSeenReminders) return;
+    
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setHasSeenReminders(true);
+        observer.disconnect();
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(remindersRef.current);
+
+    return () => observer.disconnect();
+  }, [activeReminders.length, hasSeenReminders]);
+
 
     
   const hba1cReadings = useMemo(() => {
@@ -266,12 +292,10 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
     };
   }, [weightEntries]);
 
-  // --- Family ---
-  const { currentStreak } = calculateGoalsStreak(goals, goalLogs);
+    const { currentStreak } = calculateGoalsStreak(goals, goalLogs);
   const weeklyActivity = getWeeklyActivity(goals, goalLogs);
 
-  const familyAttention = otherMembers.filter(m => m.healthScore < 80);
-
+  
   return (
     <div className="w-full max-w-2xl mx-auto pt-0 pb-24 space-y-8 animate-in fade-in -mt-4 md:-mt-5">
       {/* 1. TOP HEADER */}
@@ -414,8 +438,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           </section>
         )}
 
+        {/* WEIGHT CARD */}
+        <WeightCard />
+
  {/* 4. CARE REMINDERS */}
-        <section className="mt-8 relative">
+        <section ref={remindersRef} className="mt-8 relative">
           <div className="flex items-center justify-between px-2 mb-3">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-400 dark:bg-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]" style={{ animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
@@ -467,270 +494,48 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           </div>
         </section>
 
-        {/* WEEKLY ACTIVITY STRIP */}
-        <section 
-          className="bg-theme-card px-5 py-5 sm:px-6 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all group flex flex-col gap-4"
-          onClick={() => onNavigate('fitness')}
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-[17px] font-bold text-theme-text">Fitness</h2>
-          </div>
-          <div className="flex flex-row items-center justify-between w-full">
-            <div className="flex-1 flex justify-between items-center relative z-10 pr-4 sm:pr-6">
-              {weeklyActivity.map((day, i) => {
-                const hasNext = i < weeklyActivity.length - 1;
-                const nextDay = hasNext ? weeklyActivity[i + 1] : null;
-                const isLineRed = nextDay?.isBreak;
-
-                return (
-                  <div key={i} className="relative flex-1 flex flex-col items-center min-w-0">
-                    <div className="flex flex-col items-center gap-2 z-10 relative">
-                      <div className="relative z-10 bg-theme-card rounded-full">
-                         <ActivityCircle 
-                           status={emojiToStatus(day.emoji)} 
-                           isToday={day.isToday} 
-                           size="md" 
-                           className={!day.isToday ? "group-hover:scale-105" : ""} 
-                         />
-                      </div>
-                      <span className={cn(
-                        "text-[9px] sm:text-[10px] transition-colors duration-300 px-0.5 relative z-10 truncate", 
-                        day.isToday ? "text-theme-text font-bold" : "text-theme-text-sec font-medium group-hover:text-theme-text"
-                      )}>
-                        {day.isToday ? 'TODAY' : safeFormat(day.date, 'EEEEE')}
-                      </span>
-                    </div>
-                    {hasNext && (
-                      <div className={cn(
-                        "absolute top-[10px] sm:top-[14px] left-1/2 w-full h-[2px] sm:h-[3px] rounded-full z-0",
-                        isLineRed ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-theme-border/60"
-                      )} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            
-            <div className="flex flex-col items-center justify-center pl-4 sm:pl-6 border-l border-theme-border/60 shrink-0 min-w-[70px] sm:min-w-[90px] relative z-10">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <Flame className="w-[18px] h-[18px] sm:w-[22px] sm:h-[22px] text-theme-accent drop-shadow-[0_0_8px_rgba(232,122,93,0.4)] group-hover:scale-110 transition-transform duration-300" strokeWidth={2.5} />
-                  <span className="text-[26px] sm:text-[34px] font-display font-bold leading-none bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-amber-500 drop-shadow-sm">{currentStreak}</span>
-                </div>
-                <span className="text-[10px] sm:text-[11px] font-medium text-theme-text-sec mt-1.5 uppercase tracking-wider">Day Streak</span>
-            </div>
-          </div>
-        </section>
-
-        {/* 3. TODAY'S GOALS */}
- <section 
- onClick={() => onNavigate('fitness')}
- onMouseEnter={() => setIsHoveringGoals(true)}
- onMouseLeave={() => setIsHoveringGoals(false)}
- className="bg-theme-card p-4 sm:p-5 rounded-[24px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow flex flex-col gap-3"
- >
- <div className="flex items-center justify-between">
- <h2 className="text-[17px] font-bold text-theme-text">Today's Goals</h2>
- <span className="text-[14px] font-bold text-theme-text-sec">{completedGoalsToday.length} of {activeGoalsToday.length}</span>
- </div>
-
- {activeGoalsToday.length > 0 ? (
- <>
- <div className="flex gap-1.5">
- {activeGoalsToday.map((g) => {
- const isComplete = todayLogs[g.id]?.completed;
- const isNextUp = !isComplete && currentNextUpGoal?.id === g.id;
- return (
- <div 
- key={g.id} 
- className={cn(
- "flex-1 h-2 rounded-full transition-colors duration-500",
- isComplete ? "bg-emerald-500/80 dark:bg-emerald-600" : 
- isNextUp ? "bg-amber-400/80 dark:bg-amber-600/80" : 
- "bg-stone-200 dark:bg-stone-800"
- )} 
- />
- );
- })}
- </div>
- 
- {incompleteGoals.length > 0 ? (
- <div className="flex items-center justify-between mt-0.5">
- <div className="flex flex-col overflow-hidden relative h-10 w-full pr-4">
- <p className="text-[14px] font-bold text-theme-text-sec mb-0.5 shrink-0">Next up</p>
- <div className="relative flex-1">
- {incompleteGoals.map((g, idx) => (
- <p 
- key={g.id}
- className={cn(
- "text-sm font-medium text-theme-text truncate absolute inset-0 transition-all duration-500",
- idx === nextUpIndex 
- ? "opacity-100 translate-y-0 pointer-events-auto" 
- : idx < nextUpIndex 
- ? "opacity-0 -translate-y-2 pointer-events-none" 
- : "opacity-0 translate-y-2 pointer-events-none"
- )}
- >
- {g.title}
- </p>
- ))}
- </div>
- </div>
- <div className="flex items-center justify-center shrink-0">
- <ChevronRight size={16} className="text-theme-text-sec" />
- </div>
- </div>
- ) : (
- <div className="flex items-center mt-0.5">
- <p className="text-sm font-medium text-theme-text-sec">All done for today.</p>
- </div>
- )}
- </>
- ) : (
- <div className="flex items-center justify-between mt-0.5">
- <p className="text-sm font-medium text-theme-text-sec">Set your first health goal.</p>
- <span className="text-xs font-bold text-theme-text-sec">
- Add Goal ›
- </span>
- </div>
- )}
- 
-          {/* Compact Weight Row within Today's Goals */}
-          {weightSnapshot && (
-            <>
-              <div className="h-px bg-theme-border/50 my-3" />
-              <div 
-                className="flex items-center justify-between cursor-pointer group/weight"
-                onClick={(e) => { e.stopPropagation(); onNavigate('fitness'); }}
+      
+      {/* FLOATING ACTION BUTTONS */}
+      <div className="fixed bottom-24 md:bottom-10 left-6 sm:left-8 right-6 sm:right-8 z-40 flex items-center justify-between pointer-events-none">
+        
+        {/* PENDING REMINDERS FLOATING NOTIFIER */}
+        <div className="flex-1 flex justify-start">
+          <AnimatePresence>
+            {activeReminders.length > 0 && !hasSeenReminders && showNotifierReady && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                className="pointer-events-auto"
               >
-                <div className="flex items-end gap-3">
-                  <div>
-                    <h3 className="text-[10px] font-bold text-theme-text-sec mb-0.5 uppercase tracking-wider">Weight</h3>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xl font-bold text-theme-text">{weightSnapshot.latest.weight}</span>
-                      <span className="text-xs font-medium text-theme-text-sec">kg</span>
+                <div className="bg-white/95 dark:bg-[#1a2332]/95 backdrop-blur-md p-2 px-3 rounded-[32px] shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-theme-border/50 flex flex-col items-center">
+                  <button
+                    onClick={() => {
+                      remindersRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }}
+                    className="flex flex-col items-center gap-1 hover:scale-105 active:scale-95 transition-transform pt-1"
+                  >
+                    <div className="w-10 h-10 bg-amber-400 dark:bg-amber-500 rounded-full flex items-center justify-center shadow-[0_4px_16px_rgba(251,191,36,0.4)] animate-bounce border-2 border-white dark:border-[#1a2332]">
+                      <AlertCircle size={20} className="text-white dark:text-[#0f172a]" />
                     </div>
-                  </div>
-                  {weightSnapshot.trend && (
-                    <div className="flex items-center text-[12px] font-bold text-theme-text mb-1">
-                      {weightSnapshot.trend.direction === 'down' ? <ArrowDown size={14} className="text-emerald-500 mr-0.5" /> : <ArrowUp size={14} className="text-red-500 mr-0.5" />}
-                      {weightSnapshot.trend.pct.toFixed(1)}%
-                    </div>
-                  )}
+                    <ChevronDown size={16} className="text-amber-500 dark:text-amber-400 -mt-2 animate-bounce" style={{ animationDelay: '0.1s' }} />
+                  </button>
                 </div>
-                
-                <div className="text-right">
-                  {weightSnapshot.trend ? (
-                    <span className="text-xs font-medium text-theme-text-sec">
-                      Logged {safeFormat(weightSnapshot.latest.date, 'MMM d')}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-medium text-theme-text-sec">
-                      Logged {safeFormat(weightSnapshot.latest.date, 'MMM d')}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </section>
-
-        {/* 5. FAMILY */}
-      <section 
-        onClick={() => onNavigate('family')}
-        className="bg-theme-card p-5 sm:p-6 rounded-[24px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[17px] font-bold text-theme-text">Your Family</h2>
-          <ChevronDown size={20} className="text-theme-text-sec" />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {otherMembers.length > 0 ? (
-          <div className="space-y-4">
-            {otherMembers.slice(0, 2).map((member, idx) => {
-              const { recentStreak, currentStreak } = getAdjustedMemberStreak(member);
-              const mockWeek = recentStreak;
-              return (
-                <div key={member.userId}>
-                  {idx > 0 && <div className="h-px bg-theme-border/50 my-4" />}
-                  
-                  <div className="flex items-center justify-between">
-                    {/* Left Side */}
-                    <div className="flex items-start gap-3">
-                      <div 
-                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white font-bold text-base shrink-0 shadow-sm"
-                        style={{ backgroundColor: member.avatarColor || '#94a3b8' }}
-                      >
-                        {member.name ? member.name.charAt(0).toUpperCase() : '?'}
-                      </div>
-                      
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-bold text-theme-text">{member.name}</span>
-                          {currentStreak > 0 && (
-                            <div className="flex items-center gap-1">
-                              <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
-                              <span className="text-[11px] sm:text-xs font-black text-theme-text">{currentStreak}</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center gap-1">
-                          {mockWeek.slice(-7).map((status, i) => {
-                            const isToday = i === mockWeek.length - 1;
-                            
-                            return (
-                              <ActivityCircle 
-                                key={i}
-                                status={status as any}
-                                isToday={isToday}
-                                size="xs"
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Right Side */}
-                    <div className="flex flex-col items-end">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-xl sm:text-2xl font-display font-medium text-theme-text">{member.healthScore || 0}</span>
-                      </div>
-                      <span className="text-[10px] sm:text-[11px] font-medium text-theme-text-sec mb-1">Health Score</span>
-                      
-                      {member.glucoseEnabled && member.latestGlucose && (
-                        <>
-                          <div className="flex items-baseline gap-0.5 mt-0.5">
-                            <span className="text-sm font-bold text-theme-text">{member.latestGlucose}</span>
-                            <span className="text-[10px] font-medium text-theme-text-sec">{member.glucoseUnit || 'mg/dL'}</span>
-                          </div>
-                          <span className="text-[10px] sm:text-[11px] font-medium text-theme-text-sec">Glucose</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-4">
-            <p className="text-sm font-bold text-theme-text mb-1">Health works better together</p>
-            <p className="text-xs text-theme-text-sec mb-4">Create or join a family to help each other stay on top of health.</p>
-            <button className="text-sm font-bold bg-theme-bg text-theme-text px-4 py-2 rounded-full border border-theme-border" onClick={(e) => { e.stopPropagation(); onNavigate('family'); }}>
-              Create or Join Family
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* QUICK ADD FLOATING BUTTON */}
-      <button 
-        onClick={() => setShowQuickAdd(true)}
-        className="fixed bottom-24 md:bottom-10 right-6 sm:right-8 w-14 h-14 bg-theme-text text-theme-bg rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-40"
-      >
-        <Plus size={28} />
-      </button>
+        {/* QUICK ADD FLOATING BUTTON */}
+        <div className="flex-1 flex justify-end">
+          <button 
+            onClick={() => setShowQuickAdd(true)}
+            className="pointer-events-auto w-14 h-14 bg-theme-text text-theme-bg rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
+          >
+            <Plus size={28} />
+          </button>
+        </div>
+      </div>
 
       {/* QUICK ADD BOTTOM SHEET */}
       <AnimatePresence>

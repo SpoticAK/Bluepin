@@ -98,40 +98,6 @@ export interface UserProfile {
   familyId?: string | null;
 }
 
-export interface FamilyMemberMeta {
-  role: 'admin' | 'member';
-  joinedAt: number;
-}
-
-export interface Family {
-  id: string;
-  name: string;
-  createdAt: number;
-  members: Record<string, FamilyMemberMeta>;
-}
-
-export interface FamilySummary {
-  userId: string;
-  name: string;
-  avatarColor?: string;
-  photoUrl?: string;
-  healthScore: number;
-  prevHealthScore?: number;
-  bmi: number;
-  currentStreak: number;
-  highestStreak?: number;
-  recentStreak?: ('completed' | 'partial' | 'missed' | 'none')[];
-  glucoseEnabled: boolean;
-  latestGlucose?: number;
-  glucoseUnit?: string;
-  latestGlucoseType?: string;
-  hba1c?: number;
-  currentWeight?: number;
-  healthHighlights?: string[];
-  quickObservations?: string[];
-  careReminders?: any[];
-  updatedAt: number;
-}
 
 export interface Invitation {
   id: string;
@@ -151,7 +117,5 @@ export interface AppState {
   goals: Goal[];
   goalLogs: GoalLog;
   profile: UserProfile;
-  family: Family | null;
-  familySummaries: Record<string, FamilySummary>;
   deletedDummyGlucoseIds?: string[];
 }

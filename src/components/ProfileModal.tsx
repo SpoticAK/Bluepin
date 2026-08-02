@@ -8,7 +8,7 @@ import { LegalDocsModal } from './LegalDocsModal';
 import { LegalDocType } from '../lib/consentManager';
 
 export function ProfileModal({ onClose }: { onClose: () => void }) {
-  const { profile, family, leaveFamily, updateProfile } = useAppStore();
+  const { profile, updateProfile } = useAppStore();
   const user = auth.currentUser;
   
   const [isDeleting, setIsDeleting] = useState(false);
@@ -16,8 +16,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   const [editValue, setEditValue] = useState<any>('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
-  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
-  const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
+    const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
 
   const dateJoined = user?.metadata.creationTime 
     ? new Date(user.metadata.creationTime).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) 
@@ -46,15 +45,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const confirmLeaveFamily = async () => {
-    try {
-      await leaveFamily();
-      setShowLeaveConfirm(false);
-    } catch (e: any) {
-      alert("Failed to leave family: " + e.message);
-    }
-  };
-
+  
   const openEdit = (field: keyof typeof profile, currentValue: any, isBoolean = false) => {
     if (isBoolean) {
       if (window.confirm(`Toggle this setting?`)) {
@@ -133,42 +124,6 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     );
   }
 
-  if (showLeaveConfirm) {
-    return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={onClose}>
-        <div className="bg-theme-card dark:bg-[#0f172a] rounded-[24px] w-full max-w-sm shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 relative" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between p-4 border-b border-theme-border">
-            <button onClick={() => setShowLeaveConfirm(false)} className="flex items-center text-theme-text-sec hover:text-theme-text font-medium transition-colors">
-              <ChevronLeft size={20} className="mr-1"/> Back
-            </button>
-            <h3 className="font-semibold text-orange-500">Leave Family</h3>
-            <div className="w-16" /> {/* Spacer */}
-          </div>
-          <div className="p-6 text-center">
-            <UserX size={48} className="mx-auto text-orange-500 mb-4 opacity-80" />
-            <p className="text-theme-text mb-6 text-[15px]">
-              Are you sure you want to leave your family group? You will lose access to shared family data.
-            </p>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setShowLeaveConfirm(false)}
-                className="flex-1 bg-theme-bg hover:bg-theme-bg-hover text-theme-text font-semibold py-3 rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmLeaveFamily}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-xl transition-colors"
-              >
-                Leave
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (editField) {
     const isNumber = ['age', 'heightCm', 'weight'].includes(editField);
     return (
@@ -232,8 +187,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
             <Row label="Height" value={profile.heightCm ? `${profile.heightCm} cm` : 'Not set'} onClick={() => openEdit('heightCm', profile.heightCm)} />
             <Row label="Weight" value={profile.weight ? `${profile.weight} kg` : 'Not set'} onClick={() => openEdit('weight', profile.weight)} />
             <Row label="Diabetes Status" value={profile.glucoseEnabled ? 'Diabetic' : 'Non-diabetic'} onClick={() => openEdit('glucoseEnabled', profile.glucoseEnabled, true)} />
-            <Row label="Family" value={family ? family.name : 'Not joined'} editable={false} />
-          </div>
+                      </div>
 
           
           <div className="pt-0">
@@ -261,12 +215,6 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
           <div className="pt-0">
             <h4 className="text-[11px] font-semibold text-theme-text-sec/70 uppercase tracking-wider mb-1 pl-1">Danger Zone</h4>
             <div className="px-2">
-              {family && (
-                <button onClick={() => setShowLeaveConfirm(true)} className="w-full flex items-center py-2 border-b border-theme-border/40 last:border-0 group hover:opacity-70 transition-opacity text-orange-500 dark:text-orange-400 outline-none">
-                  <UserX size={16} className="mr-3 ml-1" />
-                  <span className="font-medium text-[14px]">Leave Family</span>
-                </button>
-              )}
               <button disabled={isDeleting} onClick={() => { setDeleteInput(''); setShowDeleteConfirm(true); }} className="w-full flex items-center py-2 border-b border-theme-border/40 last:border-0 group hover:opacity-70 transition-opacity text-red-500 dark:text-red-400 disabled:opacity-50 outline-none">
                 <Trash2 size={16} className="mr-3 ml-1" />
                 <span className="font-medium text-[14px]">{isDeleting ? 'Deleting...' : 'Delete Account'}</span>

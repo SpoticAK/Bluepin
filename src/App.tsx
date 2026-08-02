@@ -16,8 +16,6 @@ import { cn } from "./lib/utils";
 import Dashboard from "./components/Dashboard";
 import GlucoseTab from "./components/GlucoseTab";
 import BiomarkersTab from "./components/BiomarkersTab";
-import FitnessTab from "./components/FitnessTab";
-import FamilyTab from "./components/FamilyTab";
 import { AppProvider, useAppStore } from "./store";
 import AuthScreen from "./components/AuthScreen";
 import { ProfileModal } from "./components/ProfileModal";
@@ -30,7 +28,7 @@ import { LegalDocsModal } from './components/LegalDocsModal';
 import { LegalDocType } from './lib/consentManager';
 
 
-type TabType = "dashboard" | "family" | "glucose" | "biomarkers" | "fitness";
+type TabType = "dashboard" | "glucose" | "biomarkers";
 
 function MainLayout() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
@@ -111,23 +109,7 @@ function MainLayout() {
             isCollapsed={isSidebarCollapsed}
             colorClass="text-emerald-500"
           />
-          <NavItem
-            icon={<Flame />}
-            label="Fitness"
-            isActive={activeTab === "fitness"}
-            onClick={() => setActiveTab("fitness")}
-            isCollapsed={isSidebarCollapsed}
-            colorClass="text-orange-500"
-          />
-          <NavItem
-            icon={<Users />}
-            label="Family"
-            isActive={activeTab === "family"}
-            onClick={() => setActiveTab("family")}
-            isCollapsed={isSidebarCollapsed}
-            colorClass="text-purple-500"
-          />
-        </nav>
+          </nav>
 
         <div className="mt-auto pt-4 pb-8 space-y-2 shrink-0 bg-theme-bg">
           <button
@@ -210,13 +192,8 @@ function MainLayout() {
         {activeTab === "dashboard" && (
           <Dashboard onNavigate={(tab: TabType) => setActiveTab(tab)} />
         )}
-        {activeTab === "family" && (
-          <FamilyTab onNavigate={(tab: TabType) => setActiveTab(tab)} />
-        )}
         {activeTab === "glucose" && <GlucoseTab />}
         {activeTab === "biomarkers" && <BiomarkersTab />}
-        {activeTab === "fitness" && <FitnessTab />}
-
         <footer className="mt-12 pt-8 pb-4 border-t border-theme-border/50 text-center text-xs text-theme-text-sec flex flex-wrap justify-center gap-4">
           <button onClick={() => setOpenLegalDoc('terms')} className="hover:text-theme-text transition-colors">Terms of Service</button>
           <button onClick={() => setOpenLegalDoc('privacy')} className="hover:text-theme-text transition-colors">Privacy Policy</button>
@@ -249,21 +226,7 @@ function MainLayout() {
           onClick={() => setActiveTab("biomarkers")}
           colorClass="text-emerald-500"
         />
-        <MobileNavItem
-          icon={<Flame size={20} />}
-          label="Fitness"
-          isActive={activeTab === "fitness"}
-          onClick={() => setActiveTab("fitness")}
-          colorClass="text-orange-500"
-        />
-        <MobileNavItem
-          icon={<Users size={20} />}
-          label="Family"
-          isActive={activeTab === "family"}
-          onClick={() => setActiveTab("family")}
-          colorClass="text-purple-500"
-        />
-      </nav>
+        </nav>
     </div>
   );
 }

@@ -79,6 +79,29 @@ export function calculateStatus(id: string, val: any, minVal?: any, maxVal?: any
       
       if (def.calculateStatus) {
         clinicalStatus = def.calculateStatus(value);
+      } else {
+          if (!isNaN(value)) {
+              if (clinicalMin !== undefined && clinicalMax !== undefined) {
+                  if (value >= clinicalMin && value <= clinicalMax) clinicalStatus = 'Healthy';
+                  else {
+                      const range = clinicalMax - clinicalMin;
+                      const margin = range * 0.15;
+                      if ((value >= clinicalMin - margin && value < clinicalMin) || (value <= clinicalMax + margin && value > clinicalMax)) {
+                          clinicalStatus = 'Borderline';
+                      } else {
+                          clinicalStatus = 'Needs Attention';
+                      }
+                  }
+              } else if (clinicalMin !== undefined) {
+                  if (value >= clinicalMin) clinicalStatus = 'Healthy';
+                  else if (value >= clinicalMin * 0.85) clinicalStatus = 'Borderline';
+                  else clinicalStatus = 'Needs Attention';
+              } else if (clinicalMax !== undefined) {
+                  if (value <= clinicalMax) clinicalStatus = 'Healthy';
+                  else if (value <= clinicalMax * 1.15) clinicalStatus = 'Borderline';
+                  else clinicalStatus = 'Needs Attention';
+              }
+          }
       }
 
   }
@@ -88,9 +111,9 @@ export function calculateStatus(id: string, val: any, minVal?: any, maxVal?: any
   if (!finalStatus) {
       if (providedStatus) {
           const ps = providedStatus.toLowerCase();
-          if (ps === 'normal') finalStatus = 'Healthy';
+          if (ps === 'normal' || ps === 'healthy') finalStatus = 'Healthy';
           else if (ps === 'borderline') finalStatus = 'Borderline';
-          else if (ps === 'high' || ps === 'low' || ps === 'abnormal') finalStatus = 'Needs Attention';
+          else if (ps === 'high' || ps === 'low' || ps === 'abnormal' || ps === 'needs attention' || ps === 'critical') finalStatus = 'Needs Attention';
       }
       if (!finalStatus) finalStatus = 'Healthy';
   }
@@ -110,27 +133,36 @@ export function calculateStatus(id: string, val: any, minVal?: any, maxVal?: any
   const isMissingOrZero = (min === null && max === null && !refRangeText) ||
                           (min === 0 && max === 0);
   
-  const isLipidProfile = ['ldl', 'hdl', 'cholesterol_total', 'triglycerides'].includes(id);
-
-  if (isMissingOrZero || isLipidProfile) {
-      if (clinicalRefText) {
-          result.refMin = clinicalMin !== undefined ? clinicalMin : null;
-          result.refMax = clinicalMax !== undefined ? clinicalMax : null;
-          result.refRangeText = clinicalRefText;
-          if (isMissingOrZero && !info) {
-            info = `Reference range not provided in report. Using general clinical guidelines: ${clinicalReasoning}`;
-          } else if (isLipidProfile && !info) {
-            info = `Using general clinical guidelines for optimal reference range: ${clinicalReasoning}`;
+  if (clinicalRefText !== undefined || clinicalMin !== undefined || clinicalMax !== undefined) {
+      result.refMin = clinicalMin !== undefined ? clinicalMin : null;
+      result.refMax = clinicalMax !== undefined ? clinicalMax : null;
+      result.refRangeText = clinicalRefText !== undefined ? clinicalRefText : null;
+      
+      let fileHasDifferentRange = false;
+      if (!isMissingOrZero) {
+          if (clinicalMin !== undefined && min !== null && Math.abs(min - clinicalMin) > 0.01) {
+              fileHasDifferentRange = true;
           }
-      } else if (isMissingOrZero) {
-          result.refMin = null;
-          result.refMax = null;
-          result.refRangeText = null;
+          if (clinicalMax !== undefined && max !== null && Math.abs(max - clinicalMax) > 0.01) {
+              fileHasDifferentRange = true;
+          }
       }
+      
+      if (!info) {
+          if (isMissingOrZero) {
+              info = `Reference range not provided in report. Using general clinical guidelines${clinicalReasoning ? ': ' + clinicalReasoning : '.'}`;
+          } else if (fileHasDifferentRange) {
+              info = `Using general clinical guidelines for optimal reference range, which may differ from the laboratory report's reference range${clinicalReasoning ? '. ' + clinicalReasoning : '.'}`;
+          }
+      }
+  } else if (isMissingOrZero) {
+      result.refMin = null;
+      result.refMax = null;
+      result.refRangeText = null;
   }
 
   if (info) {
-    result.info = info;
+    result.info = info.trim();
   }
   return result as any;
 }

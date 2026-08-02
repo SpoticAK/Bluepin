@@ -13,8 +13,8 @@ export function calculateBMI(weightKg: number, heightCm: number): number {
 
 export function getBMICategory(bmi: number): string {
   if (bmi < 18.5) return "Underweight";
-  if (bmi >= 18.5 && bmi < 25) return "Normal weight";
-  if (bmi >= 25 && bmi < 30) return "Overweight";
+  if (bmi >= 18.5 && bmi < 23) return "Normal weight";
+  if (bmi >= 23 && bmi < 27.5) return "Overweight";
   return "Obese";
 }
 

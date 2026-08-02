@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
-import { AppState, GlucoseReading, LabReport, WeightEntry, Goal, GoalLog, UserProfile, Family, FamilySummary } from "./types";
+import { AppState, GlucoseReading, LabReport, WeightEntry, Goal, GoalLog, UserProfile } from "./types";
 import { DEFAULT_GOALS, DUMMY_GLUCOSE_READINGS } from "./data";
 import { auth, db, handleFirestoreError, OperationType } from "./lib/firebase";
 import { doc, collection, onSnapshot, setDoc, deleteDoc, serverTimestamp, updateDoc, getDoc, getDocs, deleteField, runTransaction, writeBatch, query, orderBy, limit } from "firebase/firestore";
-import { buildFamilySummary } from "./lib/familyUtils";
 
 const defaultState: AppState = {
   glucoseReadings: DUMMY_GLUCOSE_READINGS,
@@ -29,15 +28,14 @@ interface AppContextType extends AppState {
   addCustomGoal: (goal: Goal) => void;
   removeGoal: (id: string) => void;
   logGoal: (date: string, goalId: string, completed: boolean, value?: number) => void;
-  createFamily: (name: string) => Promise<void>;
-  joinFamily: (invitationId: string) => Promise<void>;
-  leaveFamily: () => Promise<void>;
-  createInvitation: () => Promise<string | null>;
-  loadMemberDetailedData: (memberId: string) => Promise<Partial<AppState>>;
-}
+          }
 
 function removeUndefined<T>(obj: T): T {
   if (obj === null || obj === undefined) {
+    return obj;
+  }
+  // Check if it's a Firebase FieldValue or Date to prevent breaking it
+  if (typeof obj === 'object' && (obj.constructor.name === 'FieldValueImpl' || obj.constructor.name === 'ServerTimestampTransform' || obj.constructor.name === 'FieldValue' || obj instanceof Date || (obj as any).isEqual)) {
     return obj;
   }
   if (Array.isArray(obj)) {
@@ -89,7 +87,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }, (err) => handleFirestoreError(err, OperationType.LIST, `users/${uid}/labReports`));
 
     const unsubWeight = onSnapshot(collection(db, `users/${uid}/weightLogs`), (snapshot) => {
-      const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const logs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let createdAt = data.createdAt;
+        if (createdAt && typeof createdAt.toMillis === 'function') {
+          createdAt = createdAt.toMillis();
+        } else if (createdAt && createdAt.seconds) {
+          createdAt = createdAt.seconds * 1000;
+        } else if (createdAt && typeof createdAt === 'object' && Object.keys(createdAt).length === 0) {
+          createdAt = new Date(data.date).getTime();
+        }
+        return { id: doc.id, ...data, createdAt } as any;
+      });
       setState(s => ({ ...s, weightEntries: logs }));
     }, (err) => handleFirestoreError(err, OperationType.LIST, `users/${uid}/weightLogs`));
 
@@ -125,102 +134,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const stateRef = useRef(state);
   stateRef.current = state;
-
-  useEffect(() => {
-    if (!auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    const s = stateRef.current;
-    if (!s.profile.familyId) return;
-
-    const newSummary = buildFamilySummary(s);
-    newSummary.userId = uid;
-    newSummary.name = s.profile.name || 'Anonymous';
-    newSummary.avatarColor = s.profile.profileColor;
-    newSummary.photoUrl = s.profile.photoUrl;
-
-    const existing = s.familySummaries[uid];
-    
-    let shouldSync = false;
-    if (!existing) {
-      shouldSync = true;
-    } else {
-      const keys = ['healthScore', 'bmi', 'currentWeight', 'currentStreak', 'highestStreak', 'latestGlucose', 'latestGlucoseType', 'hba1c', 'glucoseEnabled', 'name', 'avatarColor', 'photoUrl'];
-      for (const k of keys) {
-        if (newSummary[k] !== existing[k]) {
-          shouldSync = true;
-          break;
-        }
-      }
-      if (!shouldSync && (JSON.stringify(newSummary.recentStreak) !== JSON.stringify(existing.recentStreak) || JSON.stringify(newSummary.careReminders) !== JSON.stringify(existing.careReminders))) {
-        shouldSync = true;
-      }
-    }
-
-    if (shouldSync) {
-      const ref = doc(db, `users/${uid}/familySummary/latest`);
-      setDoc(ref, removeUndefined(newSummary)).catch(e => console.error(e)); setState(s => ({ ...s, familySummaries: { ...s.familySummaries, [uid]: newSummary as any } }));
-    }
-  }, [state.glucoseReadings, state.labReports, state.weightEntries, state.goals, state.goalLogs, state.profile.name, state.profile.profileColor, state.profile.photoUrl, state.profile.glucoseEnabled, state.profile.familyId, state.profile.heightCm]);
-
-  // Family listeners
-  useEffect(() => {
-    if (!auth.currentUser) return;
-    const uid = auth.currentUser.uid;
-    const familyId = state.profile.familyId;
-    
-    let unsubFamily = () => {};
-    let unsubSummaries = {} as Record<string, () => void>;
-
-    if (familyId) {
-      unsubFamily = onSnapshot(doc(db, 'families', familyId), (docSnap) => {
-        if (docSnap.exists()) {
-          const famData = { id: docSnap.id, ...docSnap.data() } as any;
-          setState(s => ({ ...s, family: famData }));
-          
-          // Sync summaries
-          const members = Object.keys(famData.members || {});
-          
-          // Remove old listeners
-          Object.keys(unsubSummaries).forEach(memberId => {
-            if (!members.includes(memberId)) {
-              unsubSummaries[memberId]();
-              delete unsubSummaries[memberId];
-              setState(s => {
-                const newSums = { ...s.familySummaries };
-                delete newSums[memberId];
-                return { ...s, familySummaries: newSums };
-              });
-            }
-          });
-
-          // Add new listeners
-          members.forEach(memberId => {
-            if (memberId !== uid && !unsubSummaries[memberId]) {
-              unsubSummaries[memberId] = onSnapshot(doc(db, `users/${memberId}/familySummary/latest`), (sumSnap) => {
-                if (sumSnap.exists()) {
-                  setState(s => ({
-                    ...s,
-                    familySummaries: { ...s.familySummaries, [memberId]: sumSnap.data() as any }
-                  }));
-                }
-              });
-            }
-          });
-
-        } else {
-          setState(s => ({ ...s, family: null, familySummaries: {} }));
-        }
-      });
-    } else {
-      setState(s => ({ ...s, family: null, familySummaries: {} }));
-    }
-
-    return () => {
-      unsubFamily();
-      Object.values(unsubSummaries).forEach(unsub => unsub());
-    };
-  }, [state.profile.familyId]);
-
 
   const uid = auth.currentUser?.uid;
 
@@ -453,136 +366,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
 
-  const createFamily = async (name: string) => {
-    if (!uid) return;
-    try {
-      const batch = writeBatch(db);
-      const famRef = doc(collection(db, 'families'));
-      batch.set(famRef, {
-        name,
-        createdAt: serverTimestamp(),
-        members: {
-          [uid]: { role: 'admin', joinedAt: Date.now() }
-        }
-      });
-      batch.update(doc(db, 'users', uid), { familyId: famRef.id });
-      await batch.commit();
-    } catch (e: any) {
-      handleFirestoreError(e, OperationType.CREATE, `families`);
-    }
-  };
-
-  const createInvitation = async () => {
-    if (!uid || !state.family || !state.profile.familyId) return null;
-    try {
-      const invRef = doc(collection(db, 'invitations'));
-      await setDoc(invRef, {
-        familyId: state.profile.familyId,
-        familyName: state.family.name,
-        inviterId: uid,
-        inviterName: state.profile.name || 'Anonymous',
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000
-      });
-      return invRef.id;
-    } catch (e: any) {
-      handleFirestoreError(e, OperationType.CREATE, `invitations`);
-      return null;
-    }
-  };
-
-  const joinFamily = async (invitationId: string) => {
-    if (!uid) return;
-    try {
-      await runTransaction(db, async (transaction) => {
-        const invRef = doc(db, 'invitations', invitationId);
-        const invSnap = await transaction.get(invRef);
-        if (!invSnap.exists()) throw new Error('Invalid invitation');
-        const invData = invSnap.data();
-        if (invData.status !== 'pending' || invData.expiresAt < Date.now()) throw new Error('Expired invitation');
-        
-        const familyRef = doc(db, 'families', invData.familyId);
-        const familySnap = await transaction.get(familyRef);
-        if (!familySnap.exists()) throw new Error('Family does not exist');
-        
-        const userRef = doc(db, 'users', uid);
-        
-        transaction.update(familyRef, {
-          [`members.${uid}`]: { role: 'member', joinedAt: Date.now() }, lastUsedInvitation: invitationId
-        });
-        transaction.update(userRef, { familyId: invData.familyId });
-        transaction.update(invRef, { status: 'used', usedBy: uid, usedAt: Date.now() });
-      });
-    } catch (e: any) {
-      handleFirestoreError(e, OperationType.UPDATE, `invitations/${invitationId}`);
-    }
-  };
-
-  const leaveFamily = async () => {
-    if (!uid || !state.profile.familyId) return;
-    try {
-      const batch = writeBatch(db);
-      const fid = state.profile.familyId;
-      const famRef = doc(db, 'families', fid);
-      batch.update(famRef, {
-        [`members.${uid}`]: deleteField()
-      });
-      batch.update(doc(db, 'users', uid), { familyId: null });
-      await batch.commit();
-    } catch (e: any) {
-      handleFirestoreError(e, OperationType.UPDATE, `families`);
-    }
-  };
+    
   
-  const loadMemberDetailedData = async (memberId: string) => {
-    try {
-      const gQ = query(collection(db, `users/${memberId}/glucoseReadings`), orderBy('date', 'desc'), limit(30));
-      const gSnap = await getDocs(gQ);
-      const glucoseReadings = gSnap.docs.map(d => ({id: d.id, ...d.data()}) as any);
-      
-      const wQ = query(collection(db, `users/${memberId}/weightLogs`), orderBy('date', 'desc'), limit(30));
-      const wSnap = await getDocs(wQ);
-      const weightEntries = wSnap.docs.map(d => ({id: d.id, ...d.data()}) as any);
-      
-      const rQ = query(collection(db, `users/${memberId}/labReports`), orderBy('date', 'desc'), limit(5));
-      const rSnap = await getDocs(rQ);
-      const labReports = rSnap.docs.map(d => ({id: d.id, ...d.data()}) as any);
-
-      const goalSnap = await getDocs(collection(db, `users/${memberId}/goals`));
-      const loadedGoals = goalSnap.docs.map(d => ({id: d.id, ...d.data()}) as any);
-      const goals = [...DEFAULT_GOALS];
-      loadedGoals.forEach(loaded => {
-        const idx = goals.findIndex(g => g.id === loaded.id);
-        if (idx !== -1) {
-          goals[idx] = { ...goals[idx], ...loaded };
-        } else {
-          goals.push(loaded);
-        }
-      });
-
-      const lQ = query(collection(db, `users/${memberId}/dailyLogs`), orderBy('date', 'desc'), limit(100));
-      const logSnap = await getDocs(lQ);
-      const goalLogs: any = {};
-      logSnap.docs.forEach(d => {
-        const data = d.data();
-        if (!goalLogs[data.date]) goalLogs[data.date] = {};
-        goalLogs[data.date][data.goalId] = { completed: data.completed, value: data.value };
-      });
-
-      return {
-        glucoseReadings,
-        weightEntries,
-        labReports,
-        goals,
-        goalLogs
-      };
-    } catch(e) {
-      console.error("Failed to load member data", e);
-      return {};
-    }
-  };
-
   if (loading) return null;
 
 
@@ -594,7 +379,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addWeightEntry,
       updateProfile,
       toggleGoalActive, addCustomGoal, removeGoal, logGoal,
-      createFamily, joinFamily, leaveFamily, createInvitation, loadMemberDetailedData
+      
     }}>
       {children}
     </AppContext.Provider>

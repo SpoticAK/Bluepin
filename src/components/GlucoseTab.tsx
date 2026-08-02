@@ -471,9 +471,9 @@ export default function GlucoseTab() {
  const getIdealRange = (type: string) => {
  switch (type) {
  case 'Fasting': return { min: 70, max: 99, text: '70 - 99 mg/dL' };
- case 'Post-Prandial': return { min: 70, max: 140, text: '< 140 mg/dL' };
- case 'Random': return { min: 70, max: 140, text: '< 140 mg/dL' };
- case 'HbA1c': return { min: 4.0, max: 5.6, text: '< 5.7 %' };
+ case 'Post-Prandial': return { min: 0, max: 140, text: '< 140 mg/dL' };
+ case 'Random': return { min: 0, max: 140, text: '< 140 mg/dL' };
+ case 'HbA1c': return { min: 0, max: 5.6, text: '< 5.7 %' };
  default: return null;
  }
  };
