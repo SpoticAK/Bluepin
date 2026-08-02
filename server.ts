@@ -309,11 +309,11 @@ async function startServer() {
         
         let promptText = "";
         let schema: any = {};
-        let modelToUse = "gemini-1.5-flash"; // Default to cheaper capable model
+        let modelToUse = "gemini-3.6-flash"; // Default to cheaper capable model
         
         if (type === "glucose") {
           promptText = GLUCOSE_PROMPT;
-          modelToUse = "gemini-1.5-flash-8b"; // Route simple tasks to cheapest 8b model
+          modelToUse = "gemini-3.5-flash-lite"; // Route simple tasks to cheapest 8b model
           schema = {
             type: Type.OBJECT,
             properties: {
@@ -518,7 +518,7 @@ Here are the lab reports: ${JSON.stringify(reports)}`;
       };
 
       const response = await generateContentWithRetry({
-        model: "gemini-1.5-flash-8b", // Route insights to cheaper 8b model
+        model: "gemini-3.5-flash-lite", // Route insights to cheaper 8b model
         contents: [{ role: "user", parts: [{ text: promptText }] }],
         config: {
           responseMimeType: "application/json",
