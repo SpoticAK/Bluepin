@@ -1,0 +1,56 @@
+ const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+ const previousWeekStart = subWeeks(currentWeekStart, 1);
+ const previousWeekSameDay = subWeeks(now, 1);
+
+ const currentWeekLogs = history.filter(h => {
+ try {
+ const d = parseISO(h.date);
+ return d >= currentWeekStart && d <= now;
+ } catch(e) { return false; }
+ });
+ const previousWeekLogsWTD = history.filter(h => {
+ try {
+ const d = parseISO(h.date);
+ return d >= previousWeekStart && d <= previousWeekSameDay;
+ } catch(e) { return false; }
+ });
+ const previousWeekLogsFull = history.filter(h => {
+ try {
+ const d = parseISO(h.date);
+ return d >= previousWeekStart && d < currentWeekStart;
+ } catch(e) { return false; }
+ });
+
+ const currentWeekFasting = getStats(currentWeekLogs, 'Fasting');
+ const prevWeekFastingFull = getStats(previousWeekLogsFull, 'Fasting');
+ const currentWeekPP = getStats(currentWeekLogs, 'Post-Prandial');
+ const prevWeekPPFull = getStats(previousWeekLogsFull, 'Post-Prandial');
+
+ const trends: string[] = [];
+
+ if (currentWeekFasting.count > 0 && prevWeekFastingFull.count > 0 && currentWeekFasting.avg !== null && prevWeekFastingFull.avg !== null) {
+ const diff = Math.round(Math.abs(currentWeekFasting.avg - prevWeekFastingFull.avg));
+ if (currentWeekFasting.avg < prevWeekFastingFull.avg) {
+ trends.push(`Fasting average decreased by ${diff} mg/dL compared to last week's average.`);
+ } else if (currentWeekFasting.avg > prevWeekFastingFull.avg) {
+ trends.push(`Fasting average increased by ${diff} mg/dL compared to last week's average.`);
+ }
+ }
+
+ if (currentWeekPP.count > 0 && prevWeekPPFull.count > 0 && currentWeekPP.avg !== null && prevWeekPPFull.avg !== null) {
+ const diff = Math.round(Math.abs(currentWeekPP.avg - prevWeekPPFull.avg));
+ if (currentWeekPP.avg < prevWeekPPFull.avg) {
+ trends.push(`Post-prandial average decreased by ${diff} mg/dL compared to last week's average.`);
+ } else if (currentWeekPP.avg > prevWeekPPFull.avg) {
+ trends.push(`Post-prandial average increased by ${diff} mg/dL compared to last week's average.`);
+ }
+ }
+
+ const countDiff = currentWeekLogs.length - previousWeekLogsWTD.length;
+ if (countDiff > 0) {
+ trends.push(`You logged ${countDiff} more reading${countDiff > 1 ? 's' : ''} this week compared to the same time last week.`);
+ } else if (countDiff < 0) {
+ trends.push(`You logged ${Math.abs(countDiff)} fewer reading${Math.abs(countDiff) > 1 ? 's' : ''} this week compared to the same time last week.`);
+ } else if (currentWeekLogs.length > 0 && previousWeekLogsWTD.length > 0) {
+ trends.push(`You logged the same number of readings this week as you did by this time last week.`);
+ }

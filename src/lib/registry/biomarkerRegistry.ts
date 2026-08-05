@@ -231,7 +231,9 @@ export const biomarkerRegistry: BiomarkerDefinition[] = [
       "Fasting Blood Sugar",
       "FBS",
       "FBG",
-      "Fasting Sugar"
+      "Fasting Sugar",
+      "Fasting Plasma Glucose",
+      "Glucose Fasting Plasma"
     ],
     "expectedSections": [
       "Glucose Profile"
@@ -290,7 +292,10 @@ export const biomarkerRegistry: BiomarkerDefinition[] = [
       "mmol/L"
     ],
     "valueType": "numeric",
-    "commonOcrMistakes": []
+    "commonOcrMistakes": [],
+    "clinicalMax": 139,
+    "clinicalRefText": "< 140",
+    "clinicalReasoning": "Random blood glucose < 140 mg/dL is normal. 140-199 mg/dL is prediabetes (borderline), and >= 200 mg/dL is diabetes based on clinical guidelines."
   },
   {
     "id": "eag",

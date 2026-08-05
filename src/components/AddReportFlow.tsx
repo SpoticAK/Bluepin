@@ -168,7 +168,10 @@ export function AddReportFlow({ onClose, onSuccess }: { onClose: () => void, onS
               <p className="text-theme-text-sec text-sm mt-2 text-center">{uploadStatus}</p>
             </div>
           ) : errorMsg ? (
-            <div className="p-8 text-center min-h-[300px] flex flex-col items-center justify-center">
+            <div className="p-8 text-center min-h-[300px] flex flex-col items-center justify-center relative">
+              <button onClick={onClose} className="absolute top-4 right-4 p-2 text-theme-text-sec hover:text-theme-text transition-colors">
+                <X size={24} />
+              </button>
               <h3 className="text-xl font-bold text-theme-text mb-2">Upload Failed</h3>
               <p className="text-theme-text-sec text-sm mb-2">{typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg}</p>
               <p className="text-theme-text-sec text-xs mb-6">

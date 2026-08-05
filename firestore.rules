@@ -17,6 +17,12 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if false;
     }
+    
+    match /feedbacks/{feedbackId} {
+      allow read: if request.auth != null && request.auth.token.email == "sparsh@bluepin.in";
+      allow create: if true;
+      allow update, delete: if false;
+    }
 
     match /families/{familyId} {
       allow get: if isSignedIn();

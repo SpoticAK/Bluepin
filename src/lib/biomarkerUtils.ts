@@ -34,10 +34,58 @@ export function isCoreBiomarkerPresent(coreId: string, availableIds: string[]) {
   return availableIds.includes(coreId);
 }
 
+
+function parseRefRangeText(text: string) {
+  if (!text) return { min: null, max: null };
+  const str = text.toString().toLowerCase().replace(/,/g, '');
+  
+  // "< 100" or "<100"
+  let match = str.match(/<\s*([\d.]+)/);
+  if (match) return { min: null, max: parseFloat(match[1]) };
+  
+  // "> 100" or ">100"
+  match = str.match(/>\s*([\d.]+)/);
+  if (match) return { min: parseFloat(match[1]), max: null };
+  
+  // "Up to 120"
+  match = str.match(/up to\s*([\d.]+)/);
+  if (match) return { min: null, max: parseFloat(match[1]) };
+
+  // "100 - 200" or "100-200"
+  match = str.match(/([\d.]+)\s*-\s*([\d.]+)/);
+  if (match) return { min: parseFloat(match[1]), max: parseFloat(match[2]) };
+
+  // "100 to 200"
+  match = str.match(/([\d.]+)\s*to\s*([\d.]+)/);
+  if (match) return { min: parseFloat(match[1]), max: parseFloat(match[2]) };
+  
+  return { min: null, max: null };
+}
+
 export function calculateStatus(id: string, val: any, minVal?: any, maxVal?: any, providedStatus?: string, refRangeText?: string): { status: 'Healthy'|'Needs Attention'|'Borderline', info?: string, refMin?: number | null, refMax?: number | null, refRangeText?: string | null } {
-  const value = Number(val);
+  let value = Number(val);
+  if (isNaN(value) && typeof val === 'string') {
+    const match = val.match(/-?\d+(\.\d+)?/);
+    if (match) value = Number(match[0]);
+  }
+  
   let min = minVal !== undefined && minVal !== null && minVal !== '' ? Number(minVal) : null;
   let max = maxVal !== undefined && maxVal !== null && maxVal !== '' ? Number(maxVal) : null;
+  
+  if ((min === null || isNaN(min)) && (max === null || isNaN(max)) && refRangeText) {
+    const parsed = parseRefRangeText(refRangeText);
+    min = parsed.min;
+    max = parsed.max;
+  }
+
+  const def = getBiomarkerById(id);
+  const isGlucoseProfile = def && def.profile === 'Glucose Profile';
+  
+  if (isGlucoseProfile) {
+    min = null;
+    max = null;
+    refRangeText = undefined;
+  }
   
   let labStatus: 'Healthy'|'Needs Attention'|'Borderline'|undefined = undefined;
   if (!isNaN(value)) {
@@ -69,7 +117,6 @@ export function calculateStatus(id: string, val: any, minVal?: any, maxVal?: any
   let clinicalRefText: string | undefined = undefined;
   let clinicalReasoning: string | undefined = undefined;
 
-  const def = getBiomarkerById(id);
   if (def && (def.clinicalMin !== undefined || def.clinicalMax !== undefined)) {
       clinicalMin = def.clinicalMin;
       clinicalMax = def.clinicalMax;
@@ -161,15 +208,15 @@ export function calculateStatus(id: string, val: any, minVal?: any, maxVal?: any
       result.refRangeText = null;
   }
 
-  if (info) {
+  if (info && !isGlucoseProfile) {
     result.info = info.trim();
   }
   return result as any;
 }
 
 export function hydrateBiomarker(b: any): any {
-  if (b.category && b.category !== 'Others' && b.biomarkerId) return b;
-  const match = matchBiomarker(b.name || '', { unit: b.unit, section: b.category });
+  const nameToMatch = b.originalName || b.name || '';
+  const match = matchBiomarker(nameToMatch, { unit: b.unit, section: b.category });
   
   let finalCategory = b.category;
   if (!finalCategory || finalCategory === 'Others') {
@@ -178,11 +225,11 @@ export function hydrateBiomarker(b: any): any {
 
   return {
     ...b,
-    biomarkerId: b.biomarkerId || match.biomarkerId,
+    biomarkerId: match.biomarkerId || b.biomarkerId,
     category: finalCategory,
-    confidence: b.confidence || match.confidence,
-    matchedBy: b.matchedBy || match.matchedBy,
+    confidence: match.confidence || b.confidence,
+    matchedBy: match.matchedBy || b.matchedBy,
     name: match.canonicalName || b.name,
-    originalName: b.originalName || b.name
+    originalName: nameToMatch
   };
 }

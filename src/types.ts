@@ -90,7 +90,7 @@ export interface UserProfile {
   gender?: string;
   heightCm: number;
   weight?: number;
-  glucoseEnabled?: boolean;
+  diabetesStatus?: 'No' | 'Pre diabetes' | 'Yes';
   bmi?: number;
   country?: string;
   photoUrl?: string;

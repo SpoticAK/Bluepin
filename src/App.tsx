@@ -11,13 +11,16 @@ import { User, Orbit, Fingerprint, Eclipse, Hexagon,
   ChevronRight,
   Flame,
   Droplet,
+  MessageSquare, Shield,
 } from "lucide-react";
 import { cn } from "./lib/utils";
 import Dashboard from "./components/Dashboard";
 import GlucoseTab from "./components/GlucoseTab";
 import BiomarkersTab from "./components/BiomarkersTab";
+import { FeedbackWidget } from "./components/FeedbackWidget";
 import { AppProvider, useAppStore } from "./store";
 import AuthScreen from "./components/AuthScreen";
+import WelcomeScreen from "./components/WelcomeScreen";
 import { ProfileModal } from "./components/ProfileModal";
 import OnboardingScreen from "./components/OnboardingScreen";
 import { auth, db } from "./lib/firebase";
@@ -26,16 +29,28 @@ import { doc, getDoc } from "firebase/firestore";
 import { ThemeProvider, useTheme } from "./theme";
 import { LegalDocsModal } from './components/LegalDocsModal';
 import { LegalDocType } from './lib/consentManager';
+import AdminFeedbackView from './components/AdminFeedbackView';
 
 
-type TabType = "dashboard" | "glucose" | "biomarkers";
+type TabType = "dashboard" | "glucose" | "biomarkers" | "admin";
 
 function MainLayout() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
+  const [isWaving, setIsWaving] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const isAdmin = auth.currentUser?.email === 'sparsh@bluepin.in';
+
+  useEffect(() => {
+    const showTimer = setTimeout(() => setIsWaving(true), 1500);
+    const hideTimer = setTimeout(() => setIsWaving(false), 6000);
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  }, []);
 
   return (
     <div
@@ -109,6 +124,17 @@ function MainLayout() {
             isCollapsed={isSidebarCollapsed}
             colorClass="text-emerald-500"
           />
+          
+          {isAdmin && (
+            <NavItem
+              icon={<Shield />}
+              label="Admin"
+              isActive={activeTab === "admin"}
+              onClick={() => setActiveTab("admin")}
+              isCollapsed={isSidebarCollapsed}
+              colorClass="text-purple-500"
+            />
+          )}
           </nav>
 
         <div className="mt-auto pt-4 pb-8 space-y-2 shrink-0 bg-theme-bg">
@@ -145,6 +171,25 @@ function MainLayout() {
       {/* Main Content */}
       <main className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-8 overflow-y-auto relative">
         <div className="hidden md:flex absolute top-6 right-8 gap-3 z-30">
+          <FeedbackWidget trigger={
+            <div className="relative group flex items-center">
+              <div className={cn(
+                "absolute top-full right-0 mt-3 whitespace-nowrap bg-theme-bg border border-theme-border text-theme-text px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 pointer-events-none z-50",
+                "opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0"
+              )}>
+                Talk to the founder
+                <div className="absolute -top-[5px] right-[14px] w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
+              </div>
+              <button className="w-10 h-10 bg-theme-card border border-theme-border rounded-full flex items-center justify-center text-theme-text hover:bg-theme-card-sec transition-colors shadow-sm">
+                <div className={cn(
+                  "text-xl group-hover:scale-110 transition-transform duration-300 relative",
+                  isWaving ? "animate-[wave_2.5s_ease-in-out_infinite] origin-bottom-right" : ""
+                )}>
+                  👋
+                </div>
+              </button>
+            </div>
+          } />
           <button 
             onClick={() => setShowProfile(true)}
             className="w-10 h-10 bg-theme-card border border-theme-border rounded-full flex items-center justify-center text-theme-text hover:bg-theme-card-sec transition-colors shadow-sm group"
@@ -155,6 +200,7 @@ function MainLayout() {
             </div>
           </button>
         </div>
+
         {/* Mobile Header */}
         <div className="md:hidden flex items-center justify-between mb-5 pt-1 pb-2 border-b border-theme-border">
           <div className="flex items-center gap-2">
@@ -168,7 +214,26 @@ function MainLayout() {
               <span className="font-medium opacity-80">pin.</span>
             </h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
+            <FeedbackWidget trigger={
+              <div className="relative group flex items-center">
+                <div className={cn(
+                  "absolute top-full right-0 mt-2 whitespace-nowrap bg-theme-bg border border-theme-border text-theme-text px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 pointer-events-none z-50",
+                  "opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0"
+                )}>
+                  Talk to the founder
+                  <div className="absolute -top-[5px] right-[14px] w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
+                </div>
+                <button className="text-theme-text-sec p-2">
+                  <div className={cn(
+                    "text-xl hover:scale-110 transition-transform duration-300 relative",
+                    isWaving ? "animate-[wave_2.5s_ease-in-out_infinite] origin-bottom-right" : ""
+                  )}>
+                    👋
+                  </div>
+                </button>
+              </div>
+            } />
             <button onClick={toggleTheme} className="text-theme-text-sec p-2 group">
               {theme === "dark" ? (
               <div className="relative flex items-center justify-center transition-transform duration-300">
@@ -194,6 +259,8 @@ function MainLayout() {
         )}
         {activeTab === "glucose" && <GlucoseTab />}
         {activeTab === "biomarkers" && <BiomarkersTab />}
+        
+        {activeTab === "admin" && isAdmin && <AdminFeedbackView />}
         <footer className="mt-12 pt-8 pb-4 border-t border-theme-border/50 text-center text-xs text-theme-text-sec flex flex-wrap justify-center gap-4">
           <button onClick={() => setOpenLegalDoc('terms')} className="hover:text-theme-text transition-colors">Terms of Service</button>
           <button onClick={() => setOpenLegalDoc('privacy')} className="hover:text-theme-text transition-colors">Privacy Policy</button>
@@ -202,7 +269,6 @@ function MainLayout() {
         {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       </main>
       <LegalDocsModal isOpen={!!openLegalDoc} onClose={() => setOpenLegalDoc(null)} defaultTab={openLegalDoc || 'terms'} />
-
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-theme-card border-t border-theme-border z-50 flex justify-around p-2 pb-safe transition-colors duration-300">
         <MobileNavItem
@@ -226,6 +292,15 @@ function MainLayout() {
           onClick={() => setActiveTab("biomarkers")}
           colorClass="text-emerald-500"
         />
+        {isAdmin && (
+          <MobileNavItem
+            icon={<Shield size={20} />}
+            label="Admin"
+            isActive={activeTab === "admin"}
+            onClick={() => setActiveTab("admin")}
+            colorClass="text-purple-500"
+          />
+        )}
         </nav>
     </div>
   );
@@ -308,6 +383,7 @@ function MobileNavItem({
 function AppContent() {
   const [sessionUser, setSessionUser] = useState<any>(undefined);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -335,6 +411,9 @@ function AppContent() {
   }
 
   if (sessionUser === null) {
+    if (showWelcome) {
+      return <WelcomeScreen onStart={() => setShowWelcome(false)} />;
+    }
     return <AuthScreen />;
   }
 

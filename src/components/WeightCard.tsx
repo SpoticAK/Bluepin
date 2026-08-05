@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store';
 import { calculateBMI, getBMICategory, safeFormat } from '../lib/utils';
-import { Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Pin, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { AddWeightModal } from './AddWeightModal';
 import { cn } from '../lib/utils';
 import { parseISO, subDays } from 'date-fns';
 
-export function WeightCard() {
+export function WeightCard({ isPinned, onPin }: { isPinned?: boolean, onPin?: () => void }) {
   const { profile, weightEntries, addWeightEntry } = useAppStore();
   const [showAddWeight, setShowAddWeight] = useState(false);
   const [timeFilter, setTimeFilter] = useState<'30d' | '90d' | 'all'>('30d');
@@ -72,12 +72,26 @@ export function WeightCard() {
     <section className="bg-theme-card p-5 sm:p-6 rounded-[28px] border border-theme-border/50 shadow-sm flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[17px] font-bold text-theme-text">Weight</h2>
-        <button
-          onClick={() => setShowAddWeight(true)}
-          className="w-8 h-8 rounded-full bg-theme-bg flex items-center justify-center border border-theme-border hover:bg-theme-bg-hover transition-colors text-theme-text"
-        >
-          <Plus size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          {onPin && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); onPin(); }}
+              className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                isPinned ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+              )}
+              title="Pin to top"
+            >
+              <Pin size={16} className={isPinned ? "fill-current" : ""} />
+            </button>
+          )}
+          <button
+            onClick={() => setShowAddWeight(true)}
+            className="w-8 h-8 rounded-full bg-theme-bg flex items-center justify-center border border-theme-border hover:bg-theme-bg-hover transition-colors text-theme-text"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
       </div>
 
       {hasEntries ? (

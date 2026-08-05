@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { X, User, Trash2, UserX, Camera, ChevronRight, ChevronLeft, LogOut } from 'lucide-react';
+import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet } from 'lucide-react';
 import { useAppStore } from '../store';
 import { auth } from '../lib/firebase';
 import { cn } from '../lib/utils';
@@ -16,11 +15,8 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   const [editValue, setEditValue] = useState<any>('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
-    const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
-
-  const dateJoined = user?.metadata.creationTime 
-    ? new Date(user.metadata.creationTime).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) 
-    : 'N/A';
+  
+  const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
 
   const handleLogout = async () => {
     try {
@@ -44,80 +40,88 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
       onClose();
     }
   };
-
   
-  const openEdit = (field: keyof typeof profile, currentValue: any, isBoolean = false) => {
-    if (isBoolean) {
-      if (window.confirm(`Toggle this setting?`)) {
-        updateProfile({ [field]: !currentValue });
-      }
-      return;
-    }
+  const openEdit = (field: keyof typeof profile, currentValue: any) => {
     setEditField(field);
     setEditValue(currentValue || '');
   };
 
   const saveEdit = async () => {
-    if (!editField) return;
-    let parsedValue = editValue;
-    if (['age', 'heightCm', 'weight'].includes(editField)) {
-      parsedValue = Number(editValue);
-      if (isNaN(parsedValue)) parsedValue = undefined;
+    let valueToSave = editValue;
+    if (['age', 'heightCm', 'weight'].includes(editField as string)) {
+      valueToSave = parseFloat(editValue);
+      if (isNaN(valueToSave)) valueToSave = 0;
     }
-    await updateProfile({ [editField]: parsedValue });
+    await updateProfile({ [editField!]: valueToSave });
     setEditField(null);
   };
-
-  const Row = ({ label, value, onClick, editable = true }: { label: string, value: string, onClick?: () => void, editable?: boolean }) => (
-    <button 
-      onClick={onClick} 
-      disabled={!editable} 
-      className={cn(
-        "w-full flex items-center justify-between py-2 border-b border-theme-border/40 last:border-0 group outline-none",
-        editable ? "hover:opacity-70 transition-opacity" : "cursor-default"
-      )}
-    >
-      <span className="text-theme-text-sec text-[15px] pl-1">{label}</span>
-      <div className="flex items-center gap-1 pr-1">
-        <span className="text-theme-text font-medium text-[15px]">{value}</span>
-        {editable && <ChevronRight size={16} className="text-theme-text-sec/40 group-hover:text-theme-text-sec transition-colors" />}
-      </div>
-    </button>
-  );
 
   if (showDeleteConfirm) {
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={onClose}>
-        <div className="bg-theme-card dark:bg-[#0f172a] rounded-[24px] w-full max-w-sm shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 relative" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between p-4 border-b border-theme-border">
-            <button onClick={() => setShowDeleteConfirm(false)} className="flex items-center text-theme-text-sec hover:text-theme-text font-medium transition-colors">
-              <ChevronLeft size={20} className="mr-1"/> Back
+        <div className="bg-white rounded-3xl w-full max-w-sm shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 relative" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center p-4 border-b border-neutral-100 bg-neutral-50/50">
+            <button onClick={() => setShowDeleteConfirm(false)} className="mr-2 text-neutral-500 hover:text-neutral-900 transition-colors p-1">
+              <ChevronLeft size={20} />
             </button>
-            <h3 className="font-semibold text-theme-critical">Delete Account</h3>
-            <div className="w-16" /> {/* Spacer */}
+            <h3 className="text-[15px] font-semibold text-red-500">Delete Account</h3>
           </div>
-          <div className="p-6">
-            <p className="text-theme-text mb-4 text-[15px]">
+          <div className="p-5 bg-white">
+            <p className="text-neutral-700 mb-4 text-[13px] leading-relaxed">
               Are you sure you want to permanently delete your account and all data? This action cannot be undone.
             </p>
-            <p className="text-theme-text-sec mb-4 text-[14px]">
-              Type <strong>DELETE</strong> below to confirm.
+            <p className="text-neutral-500 mb-2 text-[12px]">
+              Type <strong className="text-neutral-900">DELETE</strong> to confirm
             </p>
             <input
               type="text"
               value={deleteInput}
               onChange={(e) => setDeleteInput(e.target.value)}
               placeholder="DELETE"
-              className="w-full bg-theme-bg border border-theme-border rounded-xl px-4 py-3 text-theme-text focus:outline-none focus:ring-2 focus:ring-red-500 mb-6 uppercase"
+              className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-neutral-900 focus:outline-none focus:border-red-500 mb-4 text-sm"
               autoFocus
             />
             <button 
               onClick={confirmDeleteProfile}
               disabled={isDeleting || deleteInput !== 'DELETE'}
-              className="w-full bg-theme-critical hover:bg-red-600 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
+              className="w-full bg-red-500 hover:bg-red-600 text-white font-medium text-[14px] py-3 rounded-xl transition-all disabled:opacity-50 disabled:hover:bg-red-500"
             >
-              {isDeleting ? 'Deleting...' : 'Permanently Delete'}
+              {isDeleting ? 'Deleting...' : 'Confirm Deletion'}
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (editField === 'diabetesStatus') {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={onClose}>
+        <div className="bg-white rounded-3xl w-full max-w-sm shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 relative" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center p-4 border-b border-neutral-100 bg-neutral-50/50">
+            <button onClick={() => setEditField(null)} className="mr-2 text-neutral-500 hover:text-neutral-900 transition-colors p-1">
+              <ChevronLeft size={20} />
+            </button>
+            <h3 className="text-[15px] font-semibold text-neutral-900">Diabetes Status</h3>
+          </div>
+          <div className="p-5 bg-white flex flex-col gap-2">
+            {['No', 'Pre diabetes', 'Yes'].map((status) => (
+              <button
+                key={status}
+                onClick={async () => {
+                  await updateProfile({ diabetesStatus: status as any });
+                  setEditField(null);
+                }}
+                className={cn(
+                  "w-full py-3 px-4 rounded-xl text-sm font-medium transition-all text-left",
+                  profile.diabetesStatus === status 
+                    ? "bg-neutral-900 text-white shadow-md"
+                    : "bg-white text-neutral-600 border border-neutral-200 hover:border-neutral-300"
+                )}
+              >
+                {status}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -128,25 +132,24 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     const isNumber = ['age', 'heightCm', 'weight'].includes(editField);
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={onClose}>
-        <div className="bg-theme-card dark:bg-[#0f172a] rounded-[24px] w-full max-w-sm shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 relative" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-between p-4 border-b border-theme-border">
-            <button onClick={() => setEditField(null)} className="flex items-center text-blue-500 font-medium">
-              <ChevronLeft size={20} className="mr-1"/> Back
+        <div className="bg-white rounded-3xl w-full max-w-sm shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 relative" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center p-4 border-b border-neutral-100 bg-neutral-50/50">
+            <button onClick={() => setEditField(null)} className="mr-2 text-neutral-500 hover:text-neutral-900 transition-colors p-1">
+              <ChevronLeft size={20} />
             </button>
-            <h3 className="font-semibold text-theme-text capitalize">{editField.replace('Cm', ' (cm)')}</h3>
-            <div className="w-16" /> {/* Spacer */}
+            <h3 className="text-[15px] font-semibold text-neutral-900 capitalize">{editField.replace('Cm', ' (cm)')}</h3>
           </div>
-          <div className="p-6">
+          <div className="p-5 bg-white">
             <input
               type={isNumber ? "number" : "text"}
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              className="w-full bg-theme-bg border border-theme-border rounded-xl px-4 py-3 text-theme-text focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
+              className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-4 py-2.5 text-neutral-900 focus:outline-none focus:border-blue-500 mb-4 text-sm"
               autoFocus
             />
             <button 
               onClick={saveEdit}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-xl transition-colors"
+              className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[14px] py-3 rounded-xl transition-all shadow-[0_4px_12px_-4px_rgba(26,115,232,0.4)]"
             >
               Save
             </button>
@@ -156,71 +159,112 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     );
   }
 
+  const StatBox = ({ label, value, onClick }: { label: string, value: string, onClick: () => void }) => (
+    <div onClick={onClick} className="bg-white border border-neutral-100 p-2 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-neutral-50 transition-colors active:scale-95 shadow-sm">
+      <span className="text-[11px] text-neutral-500 font-medium mb-0.5">{label}</span>
+      <span className="text-[13px] font-semibold text-neutral-900">{value}</span>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-theme-card dark:bg-[#0f172a] rounded-[24px] w-full max-w-md shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 relative" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-[28px] w-full max-w-[340px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative flex flex-col border border-neutral-100" onClick={e => e.stopPropagation()}>
         
-        <div className="px-4 pt-5 pb-3 flex flex-col items-center text-center relative">
-          <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-theme-bg flex items-center justify-center text-theme-text-sec hover:text-theme-text transition-colors z-10">
-            <X size={18} />
+        {/* Header with Close */}
+        <div className="absolute top-3 right-3 z-10">
+          <button onClick={onClose} className="p-2 bg-neutral-100/80 hover:bg-neutral-200/80 rounded-full text-neutral-500 hover:text-neutral-900 transition-colors backdrop-blur-md">
+            <X size={18} strokeWidth={2.5} />
           </button>
-
-          <div className="relative mb-2 cursor-pointer group" onClick={() => openEdit('profileColor', profile.profileColor)}>
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-sm ${profile.profileColor || 'bg-blue-500'}`}>
-              {profile.name ? profile.name.charAt(0).toUpperCase() : <User size={32} />}
-            </div>
-            <div className="absolute inset-0 bg-black/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <Camera size={20} className="text-white" />
-            </div>
-          </div>
-          
-          <h2 onClick={() => openEdit('name', profile.name)} className="text-[18px] font-bold text-theme-text mb-0.5 tracking-tight cursor-pointer hover:opacity-70 transition-opacity">
-            {profile.name || 'Anonymous User'}
-          </h2>
-          <p className="text-theme-text-sec text-[12px]">Joined {dateJoined}</p>
         </div>
 
-        <div className="px-4 pb-4 space-y-4">
-          <div className="px-2">
-            <Row label="Age" value={profile.age ? profile.age.toString() : 'Not set'} onClick={() => openEdit('age', profile.age)} />
-            <Row label="Gender" value={profile.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Not set'} onClick={() => openEdit('gender', profile.gender)} />
-            <Row label="Height" value={profile.heightCm ? `${profile.heightCm} cm` : 'Not set'} onClick={() => openEdit('heightCm', profile.heightCm)} />
-            <Row label="Weight" value={profile.weight ? `${profile.weight} kg` : 'Not set'} onClick={() => openEdit('weight', profile.weight)} />
-            <Row label="Diabetes Status" value={profile.glucoseEnabled ? 'Diabetic' : 'Non-diabetic'} onClick={() => openEdit('glucoseEnabled', profile.glucoseEnabled, true)} />
-                      </div>
-
+        <div className="p-4 pb-2 flex flex-col items-center">
+          {/* Profile Picture */}
+          <div className="relative mb-2 cursor-pointer group mt-2" onClick={() => openEdit('profileColor', profile.profileColor)}>
+            <div className={cn(
+              "w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-medium shadow-sm overflow-hidden",
+              !user?.photoURL && (profile.profileColor || 'bg-[#1A73E8]')
+            )}>
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                profile.name ? profile.name.charAt(0).toUpperCase() : <User size={28} />
+              )}
+            </div>
+            <div className="absolute inset-0 bg-black/30 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[2px]">
+              <Camera size={16} className="text-white" />
+            </div>
+          </div>
           
-          <div className="pt-0">
-            <h4 className="text-[11px] font-semibold text-theme-text-sec/70 uppercase tracking-wider mb-1 pl-1">Legal</h4>
-            <div className="px-2">
-              <button onClick={() => setOpenLegalDoc('privacy')} className="w-full flex items-center py-2 border-b border-theme-border/40 last:border-0 group hover:opacity-70 transition-opacity text-theme-text outline-none">
-                <span className="font-medium text-[14px]">Privacy Policy</span>
-              </button>
-              <button onClick={() => setOpenLegalDoc('terms')} className="w-full flex items-center py-2 border-b border-theme-border/40 last:border-0 group hover:opacity-70 transition-opacity text-theme-text outline-none">
-                <span className="font-medium text-[14px]">Terms of Service</span>
-              </button>
-              
-            </div>
+          {/* Name & Email */}
+          <div className="text-center w-full px-4">
+            <h2 onClick={() => openEdit('name', profile.name)} className="text-[17px] font-bold text-neutral-900 mb-0.5 cursor-pointer hover:opacity-70 transition-opacity truncate" style={{ fontFamily: 'Garet, sans-serif' }}>
+              {profile.name || 'Anonymous User'}
+            </h2>
+            <p className="text-neutral-500 text-[11px] truncate max-w-[200px] mx-auto">
+              {user?.email || 'No email provided'}
+            </p>
           </div>
-          <div className="pt-0">
-            <h4 className="text-[11px] font-semibold text-theme-text-sec/70 uppercase tracking-wider mb-1 pl-1">Account Actions</h4>
-            <div className="px-2">
-              <button onClick={handleLogout} className="w-full flex items-center py-2 border-b border-theme-border/40 last:border-0 group hover:opacity-70 transition-opacity text-theme-text outline-none">
-                <LogOut size={16} className="mr-3 ml-1 text-theme-text-sec" />
-                <span className="font-medium text-[14px]">Log Out</span>
-              </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="px-4 pb-4 overflow-y-auto flex flex-col gap-2 custom-scrollbar">
+          
+          {/* Biometrics Grid */}
+          <div className="grid grid-cols-4 gap-1.5">
+            <StatBox label="Age" value={profile.age ? profile.age.toString() : '-'} onClick={() => openEdit('age', profile.age)} />
+            <StatBox label="Gender" value={profile.gender ? profile.gender.charAt(0).toUpperCase() : '-'} onClick={() => openEdit('gender', profile.gender)} />
+            <StatBox label="Height" value={profile.heightCm ? `${profile.heightCm}cm` : '-'} onClick={() => openEdit('heightCm', profile.heightCm)} />
+            <StatBox label="Weight" value={profile.weight ? `${profile.weight}kg` : '-'} onClick={() => openEdit('weight', profile.weight)} />
+          </div>
+
+          {/* Settings Section */}
+          <div className="bg-neutral-50 rounded-2xl p-1.5 flex flex-col gap-0.5 border border-neutral-100/50 shadow-sm mt-1">
+            <div onClick={() => openEdit('diabetesStatus', profile.diabetesStatus || 'No')} className="flex justify-between items-center px-3 py-2 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]">
+              <div className="flex items-center gap-2.5 text-neutral-900">
+                <div className="w-7 h-7 rounded-full bg-red-50 text-red-500 flex items-center justify-center">
+                  <Droplet size={14} className="fill-red-500" />
+                </div>
+                <span className="text-[13px] font-medium">Glucose</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-500">
+                {profile.diabetesStatus || 'No'}
+                <ChevronRight size={14} />
+              </div>
+            </div>
+            
+            <div onClick={() => setOpenLegalDoc('privacy')} className="flex justify-between items-center px-3 py-2 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]">
+              <div className="flex items-center gap-2.5 text-neutral-900">
+                <div className="w-7 h-7 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <FileText size={14} />
+                </div>
+                <span className="text-[13px] font-medium">Privacy Policy</span>
+              </div>
+              <ChevronRight size={14} className="text-neutral-400" />
+            </div>
+
+            <div onClick={() => setOpenLegalDoc('terms')} className="flex justify-between items-center px-3 py-2 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]">
+              <div className="flex items-center gap-2.5 text-neutral-900">
+                <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <FileText size={14} />
+                </div>
+                <span className="text-[13px] font-medium">Terms of Service</span>
+              </div>
+              <ChevronRight size={14} className="text-neutral-400" />
             </div>
           </div>
 
-          <div className="pt-0">
-            <h4 className="text-[11px] font-semibold text-theme-text-sec/70 uppercase tracking-wider mb-1 pl-1">Danger Zone</h4>
-            <div className="px-2">
-              <button disabled={isDeleting} onClick={() => { setDeleteInput(''); setShowDeleteConfirm(true); }} className="w-full flex items-center py-2 border-b border-theme-border/40 last:border-0 group hover:opacity-70 transition-opacity text-red-500 dark:text-red-400 disabled:opacity-50 outline-none">
-                <Trash2 size={16} className="mr-3 ml-1" />
-                <span className="font-medium text-[14px]">{isDeleting ? 'Deleting...' : 'Delete Account'}</span>
-              </button>
-            </div>
+          {/* Action Buttons */}
+          <div className="flex gap-1.5 mt-1">
+            <button onClick={handleLogout} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-neutral-50 hover:bg-neutral-100 border border-neutral-100 text-neutral-700 rounded-xl transition-colors text-[12px] font-semibold active:scale-[0.98] shadow-sm">
+              <LogOut size={13} />
+              Sign Out
+            </button>
+            <button disabled={isDeleting} onClick={() => { setDeleteInput(''); setShowDeleteConfirm(true); }} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-red-50 hover:bg-red-100 border border-red-100 text-red-600 rounded-xl transition-colors text-[12px] font-semibold active:scale-[0.98] disabled:opacity-50 shadow-sm">
+              <Trash2 size={13} />
+              Delete
+            </button>
           </div>
+          
         </div>
       </div>
       <LegalDocsModal isOpen={!!openLegalDoc} onClose={() => setOpenLegalDoc(null)} defaultTab={openLegalDoc || 'terms'} />

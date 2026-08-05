@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import React, { useMemo, useState, useEffect } from 'react';
 import getCareReminders from '../careReminderRules';
 import { useAppStore } from '../store';
-import { Target, Hexagon, Circle, X, FileText, ChevronRight, ChevronDown, Droplet, Plus, ArrowUp, ArrowDown, Users, Check, Activity, HeartPulse, User, Flame, AlertCircle } from 'lucide-react';
+import { Pin, Target, Hexagon, Circle, X, FileText, ChevronRight, ChevronDown, Droplet, Plus, ArrowUp, ArrowDown, Users, Check, Activity, HeartPulse, User, Flame, AlertCircle } from 'lucide-react';
 import { parseISO, isAfter, subDays } from 'date-fns';
 import { cn, safeFormat } from '../lib/utils';
 import { TIER_1, calculateStatus, isCoreBiomarkerPresent, getCoreBiomarkersByCategory, hydrateBiomarker } from '../lib/biomarkerUtils';
@@ -16,14 +16,21 @@ import { auth } from '../lib/firebase';
 
 import { DashboardHealthDial } from './DashboardHealthDial';
 import { getDailyDashboardQuote } from './dailyThoughts';
-import { getAdjustedMemberStreak } from '../lib/familyUtils';
+
 
 import { calculateGoalsStreak, getWeeklyActivity } from "../lib/goalUtils";
 
 export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => void }) {
  const { profile, glucoseReadings, labReports, weightEntries, goals, goalLogs, addWeightEntry, addGlucoseReading, familySummaries } = useAppStore();
  const currentUserId = auth.currentUser?.uid;
-   const isGlucoseTracking = (profile as any)?.glucoseEnabled || glucoseReadings.length > 0;
+   const isGlucoseTracking = true;
+  
+  const [pinnedSection, setPinnedSection] = useState<'health'|'glucose'|'weight'>(() => (localStorage.getItem('pinnedSection') as any) || 'health');
+
+  useEffect(() => {
+    localStorage.setItem('pinnedSection', pinnedSection);
+  }, [pinnedSection]);
+
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showAllReminders, setShowAllReminders] = useState(false);
   const [quickAddAction, setQuickAddAction] = useState<'none'|'report'|'glucose'|'weight'>('none');
@@ -310,11 +317,32 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
         </div>
       </header>
 
- {/* 2. HEALTH SNAPSHOT */}
+ 
+
+ 
+        
+
+        
+
+ 
+        {pinnedSection === 'health' && (
+          <>
+            {/* 2. HEALTH SNAPSHOT */}
  <section 
  onClick={() => onNavigate('biomarkers')}
  className="bg-theme-card px-4 py-2 sm:px-6 sm:py-4 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all relative group"
  >
+        <button 
+          onClick={(e) => { e.stopPropagation(); setPinnedSection('health'); }}
+          className={cn(
+            "absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors z-20",
+            pinnedSection === 'health' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+          )}
+          title="Pin to top"
+        >
+          <Pin size={16} className={pinnedSection === 'health' ? "fill-current" : ""} />
+        </button>
+
  <div className="relative z-10 flex flex-col items-center">
  <DashboardHealthDial score={score} scoreDiff={scoreDiff} />
  </div>
@@ -363,16 +391,23 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
   )}
 </div>
  </section>
-
- 
-        {/* GLUCOSE DASHBOARD CARDS */}
-        {isGlucoseTracking && (
-          <section 
+            {/* GLUCOSE DASHBOARD CARDS */}
+        <section 
             onClick={() => onNavigate('glucose')}
             className="bg-theme-card px-5 py-5 sm:px-6 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all group flex flex-col gap-4"
           >
             <div className="flex items-center justify-between">
               <h2 className="text-[17px] font-bold text-theme-text">Glucose</h2>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setPinnedSection('glucose'); }}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                  pinnedSection === 'glucose' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+                )}
+                title="Pin to top"
+              >
+                <Pin size={16} className={pinnedSection === 'glucose' ? "fill-current" : ""} />
+              </button>
             </div>
             <div className="flex min-h-[120px] relative overflow-hidden -mx-2">
               <div className="flex-1 px-2 sm:px-4 flex flex-col justify-between relative">
@@ -436,12 +471,312 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
               </div>
             </div>
           </section>
+            {/* WEIGHT CARD */}
+        <WeightCard isPinned={pinnedSection === 'weight'} onPin={() => setPinnedSection('weight')} />
+          </>
+        )}
+        {pinnedSection === 'glucose' && (
+          <>
+            {/* GLUCOSE DASHBOARD CARDS */}
+        <section 
+            onClick={() => onNavigate('glucose')}
+            className="bg-theme-card px-5 py-5 sm:px-6 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all group flex flex-col gap-4"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-[17px] font-bold text-theme-text">Glucose</h2>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setPinnedSection('glucose'); }}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                  pinnedSection === 'glucose' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+                )}
+                title="Pin to top"
+              >
+                <Pin size={16} className={pinnedSection === 'glucose' ? "fill-current" : ""} />
+              </button>
+            </div>
+            <div className="flex min-h-[120px] relative overflow-hidden -mx-2">
+              <div className="flex-1 px-2 sm:px-4 flex flex-col justify-between relative">
+                <div className="absolute top-0 right-0 p-2 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                  <Droplet size={80} fill="currentColor" />
+                </div>
+                <div className="relative z-10 flex items-center justify-between mb-2">
+                  <p className="text-[14px] font-semibold text-theme-text-sec">Today's Reading</p>
+                  <div className="w-8 h-8 rounded-xl bg-theme-accent/10 border border-theme-accent/20 flex items-center justify-center">
+                    <Droplet className="text-theme-accent" size={16} fill="currentColor" fillOpacity={0.2} />
+                  </div>
+                </div>
+                
+                <div className="relative z-10">
+                  {todayUniqueReadings.length > 0 ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{todayUniqueReadings[0].value}</span>
+                      <span className="text-sm font-bold text-theme-text-sec">mg/dL</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
+                      <span className="text-sm font-bold text-theme-text-sec opacity-20">mg/dL</span>
+                    </div>
+                  )}
+                  <p className="text-xs font-medium text-theme-text-sec mt-1">
+                    {todayUniqueReadings.length > 0 ? `${todayUniqueReadings.length} reading${todayUniqueReadings.length > 1 ? 's' : ''} today` : 'No readings today'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-[1px] bg-theme-border/50 my-2" />
+
+              <div className="flex-1 px-2 sm:px-4 flex flex-col justify-between relative">
+                <div className="absolute top-0 right-0 p-2 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                  <Hexagon size={80} fill="currentColor" />
+                </div>
+                <div className="relative z-10 flex items-center justify-between mb-2">
+                  <p className="text-[14px] font-semibold text-theme-text-sec">Latest HbA1c</p>
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                    <Hexagon className="text-purple-500" size={16} fill="currentColor" fillOpacity={0.2} />
+                  </div>
+                </div>
+
+                <div className="relative z-10">
+                  {latestHba1c ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{latestHba1c.value}</span>
+                      <span className="text-sm font-bold text-theme-text-sec">%</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
+                      <span className="text-sm font-bold text-theme-text-sec opacity-20">%</span>
+                    </div>
+                  )}
+                  <p className="text-xs font-medium text-theme-text-sec mt-1">
+                    {latestHba1c ? `Tested ${safeFormat(latestHba1c.date, 'MMM d, yyyy')}` : 'Upload a lab report'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+            {/* 2. HEALTH SNAPSHOT */}
+ <section 
+ onClick={() => onNavigate('biomarkers')}
+ className="bg-theme-card px-4 py-2 sm:px-6 sm:py-4 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all relative group"
+ >
+        <button 
+          onClick={(e) => { e.stopPropagation(); setPinnedSection('health'); }}
+          className={cn(
+            "absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors z-20",
+            pinnedSection === 'health' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+          )}
+          title="Pin to top"
+        >
+          <Pin size={16} className={pinnedSection === 'health' ? "fill-current" : ""} />
+        </button>
+
+ <div className="relative z-10 flex flex-col items-center">
+ <DashboardHealthDial score={score} scoreDiff={scoreDiff} />
+ </div>
+
+ <div className="mt-8 mb-2 relative z-10 w-full flex justify-center">
+ {score === null ? (
+ <p className="text-sm text-theme-text-sec font-medium mt-6 pt-6 border-t border-theme-border/60">Upload a lab report to generate your Health Score</p>
+ ) : (
+ <div className="flex items-center justify-center gap-6 sm:gap-8 w-full animate-in fade-in slide-in-from-bottom-2 duration-700 mt-2">
+      {/* Optimal */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex items-center justify-center">
+          <div className="absolute w-3 h-3 rounded-full bg-emerald-500/20 dark:bg-emerald-400/20 blur-[2px]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 relative z-10" />
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-theme-text font-display font-medium text-[15px] leading-none">{optimalCount}</span>
+          <span className="text-theme-text-sec font-sans text-[12px] font-medium">Optimal</span>
+        </div>
+      </div>
+      
+      {/* Borderline */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex items-center justify-center">
+          <div className="absolute w-3 h-3 rounded-full bg-amber-500/20 dark:bg-amber-400/20 blur-[2px]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 relative z-10" />
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-theme-text font-display font-medium text-[15px] leading-none">{borderlineCount}</span>
+          <span className="text-theme-text-sec font-sans text-[12px] font-medium">Borderline</span>
+        </div>
+      </div>
+
+      {/* Attention */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex items-center justify-center">
+          <div className="absolute w-3 h-3 rounded-full bg-red-500/20 dark:bg-red-400/20 blur-[2px]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-red-500 dark:bg-red-400 relative z-10" />
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-theme-text font-display font-medium text-[15px] leading-none">{highLowCount}</span>
+          <span className="text-theme-text-sec font-sans text-[12px] font-medium">Attention</span>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+ </section>
+            {/* WEIGHT CARD */}
+        <WeightCard isPinned={pinnedSection === 'weight'} onPin={() => setPinnedSection('weight')} />
+          </>
+        )}
+        {pinnedSection === 'weight' && (
+          <>
+            {/* WEIGHT CARD */}
+        <WeightCard isPinned={pinnedSection === 'weight'} onPin={() => setPinnedSection('weight')} />
+            {/* 2. HEALTH SNAPSHOT */}
+ <section 
+ onClick={() => onNavigate('biomarkers')}
+ className="bg-theme-card px-4 py-2 sm:px-6 sm:py-4 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all relative group"
+ >
+        <button 
+          onClick={(e) => { e.stopPropagation(); setPinnedSection('health'); }}
+          className={cn(
+            "absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors z-20",
+            pinnedSection === 'health' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+          )}
+          title="Pin to top"
+        >
+          <Pin size={16} className={pinnedSection === 'health' ? "fill-current" : ""} />
+        </button>
+
+ <div className="relative z-10 flex flex-col items-center">
+ <DashboardHealthDial score={score} scoreDiff={scoreDiff} />
+ </div>
+
+ <div className="mt-8 mb-2 relative z-10 w-full flex justify-center">
+ {score === null ? (
+ <p className="text-sm text-theme-text-sec font-medium mt-6 pt-6 border-t border-theme-border/60">Upload a lab report to generate your Health Score</p>
+ ) : (
+ <div className="flex items-center justify-center gap-6 sm:gap-8 w-full animate-in fade-in slide-in-from-bottom-2 duration-700 mt-2">
+      {/* Optimal */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex items-center justify-center">
+          <div className="absolute w-3 h-3 rounded-full bg-emerald-500/20 dark:bg-emerald-400/20 blur-[2px]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 relative z-10" />
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-theme-text font-display font-medium text-[15px] leading-none">{optimalCount}</span>
+          <span className="text-theme-text-sec font-sans text-[12px] font-medium">Optimal</span>
+        </div>
+      </div>
+      
+      {/* Borderline */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex items-center justify-center">
+          <div className="absolute w-3 h-3 rounded-full bg-amber-500/20 dark:bg-amber-400/20 blur-[2px]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 relative z-10" />
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-theme-text font-display font-medium text-[15px] leading-none">{borderlineCount}</span>
+          <span className="text-theme-text-sec font-sans text-[12px] font-medium">Borderline</span>
+        </div>
+      </div>
+
+      {/* Attention */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex items-center justify-center">
+          <div className="absolute w-3 h-3 rounded-full bg-red-500/20 dark:bg-red-400/20 blur-[2px]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-red-500 dark:bg-red-400 relative z-10" />
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-theme-text font-display font-medium text-[15px] leading-none">{highLowCount}</span>
+          <span className="text-theme-text-sec font-sans text-[12px] font-medium">Attention</span>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+ </section>
+            {/* GLUCOSE DASHBOARD CARDS */}
+        <section 
+            onClick={() => onNavigate('glucose')}
+            className="bg-theme-card px-5 py-5 sm:px-6 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all group flex flex-col gap-4"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-[17px] font-bold text-theme-text">Glucose</h2>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setPinnedSection('glucose'); }}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                  pinnedSection === 'glucose' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+                )}
+                title="Pin to top"
+              >
+                <Pin size={16} className={pinnedSection === 'glucose' ? "fill-current" : ""} />
+              </button>
+            </div>
+            <div className="flex min-h-[120px] relative overflow-hidden -mx-2">
+              <div className="flex-1 px-2 sm:px-4 flex flex-col justify-between relative">
+                <div className="absolute top-0 right-0 p-2 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                  <Droplet size={80} fill="currentColor" />
+                </div>
+                <div className="relative z-10 flex items-center justify-between mb-2">
+                  <p className="text-[14px] font-semibold text-theme-text-sec">Today's Reading</p>
+                  <div className="w-8 h-8 rounded-xl bg-theme-accent/10 border border-theme-accent/20 flex items-center justify-center">
+                    <Droplet className="text-theme-accent" size={16} fill="currentColor" fillOpacity={0.2} />
+                  </div>
+                </div>
+                
+                <div className="relative z-10">
+                  {todayUniqueReadings.length > 0 ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{todayUniqueReadings[0].value}</span>
+                      <span className="text-sm font-bold text-theme-text-sec">mg/dL</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
+                      <span className="text-sm font-bold text-theme-text-sec opacity-20">mg/dL</span>
+                    </div>
+                  )}
+                  <p className="text-xs font-medium text-theme-text-sec mt-1">
+                    {todayUniqueReadings.length > 0 ? `${todayUniqueReadings.length} reading${todayUniqueReadings.length > 1 ? 's' : ''} today` : 'No readings today'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-[1px] bg-theme-border/50 my-2" />
+
+              <div className="flex-1 px-2 sm:px-4 flex flex-col justify-between relative">
+                <div className="absolute top-0 right-0 p-2 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                  <Hexagon size={80} fill="currentColor" />
+                </div>
+                <div className="relative z-10 flex items-center justify-between mb-2">
+                  <p className="text-[14px] font-semibold text-theme-text-sec">Latest HbA1c</p>
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                    <Hexagon className="text-purple-500" size={16} fill="currentColor" fillOpacity={0.2} />
+                  </div>
+                </div>
+
+                <div className="relative z-10">
+                  {latestHba1c ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight">{latestHba1c.value}</span>
+                      <span className="text-sm font-bold text-theme-text-sec">%</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-display font-medium text-theme-text tracking-tight opacity-20">--</span>
+                      <span className="text-sm font-bold text-theme-text-sec opacity-20">%</span>
+                    </div>
+                  )}
+                  <p className="text-xs font-medium text-theme-text-sec mt-1">
+                    {latestHba1c ? `Tested ${safeFormat(latestHba1c.date, 'MMM d, yyyy')}` : 'Upload a lab report'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+          </>
         )}
 
-        {/* WEIGHT CARD */}
-        <WeightCard />
-
- {/* 4. CARE REMINDERS */}
+        {/* 4. CARE REMINDERS */}
         <section ref={remindersRef} className="mt-8 relative">
           <div className="flex items-center justify-between px-2 mb-3">
             <div className="flex items-center gap-2">

@@ -9,9 +9,7 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase App Check
 // Enforcement is disabled for now, but ready for production
 
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId); // CRITICAL
+export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId); // CRITICAL
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 

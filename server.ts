@@ -5,6 +5,9 @@ import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
+// @ts-ignore
+import pdfParse from "pdf-parse";
+import sharp from "sharp";
 import { GoogleGenAI } from "@google/genai";
 import { Type } from "@google/genai";
 import multer from "multer";
@@ -12,9 +15,27 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 import firebaseConfig from './firebase-applet-config.json';
+import nodemailer from 'nodemailer';
 
 let aiClient: GoogleGenAI | null = null;
+let mailTransporter: nodemailer.Transporter | null = null;
+
+function getMailTransporter(): nodemailer.Transporter | null {
+  if (!mailTransporter && process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    mailTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: Number(process.env.SMTP_PORT) === 465, // true for 465, false for other ports
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+  return mailTransporter;
+}
 
 function getAiClient(): GoogleGenAI {
   if (!aiClient) {
@@ -74,6 +95,10 @@ const upload = multer({
 });
 
 async function generateContentWithRetry(options: any, maxRetries = 5) {
+  if (options.model && typeof options.model === 'string' && options.model.includes('3.6')) {
+    options.config = options.config || {};
+    options.config.thinkingConfig = { thinkingLevel: "minimal" };
+  }
   const ai = getAiClient();
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -82,8 +107,15 @@ async function generateContentWithRetry(options: any, maxRetries = 5) {
       const errorStr = JSON.stringify(error) + (error?.message || '');
       if (errorStr.includes('503') || errorStr.includes('UNAVAILABLE') || errorStr.includes('high demand') || errorStr.includes('429') || errorStr.toLowerCase().includes('rate') || errorStr.toLowerCase().includes('quota')) {
         if (i === maxRetries - 1) throw error;
+        
+        // Fallback to a stable model if the current one is overloaded
+        if (options.model === 'gemini-2.5-flash') {
+          console.log(`[Gemini API] Falling back from ${options.model} to gemini-2.5-flash`);
+          options.model = 'gemini-2.5-flash';
+        }
+
         const waitMs = Math.pow(2, i + 1) * 1000 + Math.random() * 2000;
-        console.log(`[Gemini API] Rate limit or high demand (503/429). Retrying in ${Math.round(waitMs / 1000)}s... (Attempt ${i + 1}/${maxRetries})`);
+        console.log(`[Gemini API] Rate limit or high demand (503/429). Retrying with model ${options.model} in ${Math.round(waitMs / 1000)}s... (Attempt ${i + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, waitMs));
       } else {
         throw error;
@@ -309,11 +341,11 @@ async function startServer() {
         
         let promptText = "";
         let schema: any = {};
-        let modelToUse = "gemini-3.6-flash"; // Default to cheaper capable model
+        let modelToUse = "gemini-2.5-flash"; // Default to cheaper capable model
         
         if (type === "glucose") {
           promptText = GLUCOSE_PROMPT;
-          modelToUse = "gemini-3.5-flash-lite"; // Route simple tasks to cheapest 8b model
+          modelToUse = "gemini-2.5-flash"; // Route simple tasks to cheapest 8b model
           schema = {
             type: Type.OBJECT,
             properties: {
@@ -518,7 +550,7 @@ Here are the lab reports: ${JSON.stringify(reports)}`;
       };
 
       const response = await generateContentWithRetry({
-        model: "gemini-3.5-flash-lite", // Route insights to cheaper 8b model
+        model: "gemini-2.5-flash", // Route insights to cheaper 8b model
         contents: [{ role: "user", parts: [{ text: promptText }] }],
         config: {
           responseMimeType: "application/json",
@@ -531,6 +563,49 @@ Here are the lab reports: ${JSON.stringify(reports)}`;
     } catch (error: any) {
       console.error("AI Insights error:", error.message || "Unknown error");
       res.status(500).json({ error: "Failed to generate AI insights" });
+    }
+  });
+
+  app.post("/api/feedback", express.json(), async (req, res) => {
+    try {
+      const { subject, message, userEmail } = req.body;
+      if (!subject || !message) {
+        return res.status(400).json({ error: "Subject and message are required" });
+      }
+
+      try {
+        const db = getFirestore();
+        await db.collection('feedbacks').add({
+          subject,
+          message,
+          userEmail: userEmail || 'Anonymous',
+          createdAt: new Date().toISOString(),
+        });
+      } catch (dbError) {
+        console.error("Failed to save feedback to database:", dbError);
+      }
+
+      const transporter = getMailTransporter();
+      if (!transporter) {
+        console.warn("SMTP credentials are not fully configured. Feedback would be:", { subject, message, userEmail });
+        // Simulate success if no key (so frontend works while setting up)
+        return res.json({ success: true, simulated: true });
+      }
+
+      const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "hello@bluepin.in";
+
+      await transporter.sendMail({
+        from: `"Bluepin Feedback" <${fromEmail}>`,
+        to: 'sparsh@bluepin.in',
+        subject: subject,
+        text: `From: ${userEmail || 'Anonymous'}\n\nMessage:\n${message}`,
+        replyTo: userEmail || undefined
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Feedback error:", error.message);
+      res.status(500).json({ error: "Internal Server Error" });
     }
   });
 

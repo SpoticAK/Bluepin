@@ -86,36 +86,42 @@ export default function AuthScreen() {
  return (
  <div className="min-h-screen bg-theme-card flex flex-col items-center justify-center p-4 sm:p-8">
  <div className="w-full max-w-sm text-center">
- <div className="flex items-center justify-center gap-1.5 mb-2" style={{ animation: 'float 5s ease-in-out infinite' }}>
- <img src="/Bluepin.png" alt="Bluepin Logo" className="w-14 h-14 object-contain scale-110" />
- <h1 className="text-[40px] font-display tracking-tight text-theme-text">
-  <span className="font-bold">Blue</span><span className="font-medium opacity-80">pin.</span>
- </h1>
+ <div className="flex justify-center mb-2">
+   <div className="flex items-center gap-2" style={{ animation: 'float 5s ease-in-out infinite' }}>
+     <img src="/Bluepin.png" alt="Bluepin Logo" className="w-12 h-12 object-contain" />
+     <h1 className="text-5xl font-display tracking-tight text-theme-text">
+      <span className="font-bold">Blue</span><span className="font-medium opacity-80">pin.</span>
+     </h1>
+   </div>
  </div>
- <p className="text-theme-text-sec mb-8 text-[15px] font-medium">Your family's health, all in one place.</p>
+ <div className="text-center mb-8">
+   <p className="text-[20px] md:text-[21px] text-black leading-tight" style={{ fontFamily: 'Inter, sans-serif' }}>
+     Managing <span className="bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent font-medium">diabetes</span> just got simpler.
+   </p>
+ </div>
  
  {error && <div className="p-3 mb-6 text-sm text-theme-critical bg-theme-critical/10 rounded-xl border border-theme-critical text-left">{error}</div>}
 
  <form onSubmit={handleEmailAuth} className="space-y-4 mb-6 text-left">
  <div>
- <label className="block text-xs font-bold text-theme-text-sec mb-1">Email</label>
+ <label className="block text-xs font-bold text-black mb-1">Email</label>
  <input 
  type="email" required
  value={email} onChange={e => setEmail(e.target.value)}
- className="w-full px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-border"
+ className="w-full px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-border text-black"
  />
  </div>
  <div>
- <label className="block text-xs font-bold text-theme-text-sec mb-1">Password</label>
+ <label className="block text-xs font-bold text-black mb-1">Password</label>
  <input 
  type="password" required minLength={6}
  value={password} onChange={e => setPassword(e.target.value)}
- className="w-full px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-border"
+ className="w-full px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-border text-black"
  />
  </div>
 {showConsentError && !isLogin && !canSignUp && (<p className="text-xs text-theme-critical font-medium mb-3">* Please give the required consents in the section below.</p>)}
 <button type="submit" disabled={loading}
- className="w-full py-3 bg-theme-accent text-white hover:opacity-90 font-medium rounded-xl transition-opacity disabled:opacity-50"
+ className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2"
  >
  {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
  </button>

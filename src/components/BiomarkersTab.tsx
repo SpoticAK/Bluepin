@@ -1,4 +1,5 @@
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useAppStore } from '../store';
@@ -159,6 +160,25 @@ export default function BiomarkersTab() {
        relevantReports = sortedReports;
      }
 
+     const uid = auth.currentUser?.uid;
+     if (!uid) throw new Error("User not authenticated");
+
+     // Generate a hash based on the IDs of the reports used
+     const reportHash = relevantReports.map(r => r.id).join('_');
+     const cacheRef = doc(db, `users/${uid}/insights`, reportHash);
+     
+     try {
+       const cachedDoc = await getDoc(cacheRef);
+       if (cachedDoc.exists()) {
+         setAiInsights(cachedDoc.data() as AiInsights);
+         setIsAiInsightsCollapsed(false);
+         setIsAnalyzing(false);
+         return;
+       }
+     } catch (e) {
+       console.warn("Could not check cache", e);
+     }
+
      // Simplify reports to save tokens
      const simplifiedReports = relevantReports.map(r => ({
        date: r.date,
@@ -184,6 +204,18 @@ export default function BiomarkersTab() {
      }
      
      const data = await res.json();
+     
+     // Save to cache
+     try {
+       await setDoc(cacheRef, {
+         ...data,
+         createdAt: serverTimestamp(),
+         reportIds: relevantReports.map(r => r.id)
+       });
+     } catch (e) {
+       console.warn("Could not save to cache", e);
+     }
+
      setAiInsights(data);
      setIsAiInsightsCollapsed(false);
    } catch (err: any) {
@@ -572,7 +604,15 @@ export default function BiomarkersTab() {
       {/* Section: Parameters */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-theme-text">Parameters</h3>
+          <div className="flex items-center gap-2 group">
+            <h3 className="text-xl font-bold text-theme-text">Parameters</h3>
+            <div className="relative flex items-center cursor-help">
+              <Info className="w-4 h-4 text-theme-text-sec transition-colors" />
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-[280px] bg-theme-card text-theme-text text-xs p-3 rounded-lg border border-theme-border shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                AI extraction may occasionally misclassify values or statuses. We are continuously improving accuracy with newer models.
+              </div>
+            </div>
+          </div>
         </div>
         <div className="bg-theme-card rounded-[24px] border border-theme-border overflow-hidden shadow-sm divide-y divide-theme-border/50 flex flex-col">
           {CATEGORIES.map(category => {

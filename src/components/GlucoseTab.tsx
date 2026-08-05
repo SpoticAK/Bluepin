@@ -2,8 +2,8 @@ import { auth } from '../lib/firebase';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea, ReferenceLine } from 'recharts';
-import { subDays, subMonths, parseISO, isAfter, startOfDay, format } from 'date-fns';
-import { Activity, CheckCircle2, UploadCloud, Camera, Plus, Loader2, Info, Edit, Trash2, Droplet, Check, AlertTriangle, AlertCircle, Hexagon, X, Asterisk, ChevronRight, Triangle } from 'lucide-react';
+import { subDays, subMonths, parseISO, isAfter, startOfDay, format, startOfWeek, subWeeks } from 'date-fns';
+import { Activity, CheckCircle2, UploadCloud, Camera, Plus, Loader2, Info, Edit, Trash2, Droplet, Check, AlertTriangle, AlertCircle, Hexagon, X, Asterisk, ChevronRight, Triangle, TrendingUp, TrendingDown } from 'lucide-react';
 import { GlucoseReading, MealTiming } from '../types';
 import { v4 as uuidv4 } from "uuid";
 import { cn, safeFormat } from '../lib/utils';
@@ -29,10 +29,10 @@ export default function GlucoseTab() {
  const sixtyDaysAgo = subDays(now, 60);
  
  const recentLogs = history.filter(h => {
- try { return new Date(h.date) >= thirtyDaysAgo; } catch(e) { return false; }
+ try { return parseISO(h.date) >= thirtyDaysAgo; } catch(e) { return false; }
  });
  const previousLogs = history.filter(h => {
- try { const d = new Date(h.date); return d >= sixtyDaysAgo && d < thirtyDaysAgo; } catch(e) { return false; }
+ try { const d = parseISO(h.date); return d >= sixtyDaysAgo && d < thirtyDaysAgo; } catch(e) { return false; }
  });
  
  const getStats = (logs: typeof history, type: string) => {
@@ -50,6 +50,63 @@ export default function GlucoseTab() {
  
  const recentRandom = getStats(recentLogs, 'Random');
  const prevRandom = getStats(previousLogs, 'Random');
+ const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+ const previousWeekStart = subWeeks(currentWeekStart, 1);
+ const previousWeekSameDay = subWeeks(now, 1);
+
+ const currentWeekLogs = history.filter(h => {
+ try {
+ const d = parseISO(h.date);
+ return d >= currentWeekStart && d <= now;
+ } catch(e) { return false; }
+ });
+ const previousWeekLogsWTD = history.filter(h => {
+ try {
+ const d = parseISO(h.date);
+ return d >= previousWeekStart && d <= previousWeekSameDay;
+ } catch(e) { return false; }
+ });
+ const previousWeekLogsFull = history.filter(h => {
+ try {
+ const d = parseISO(h.date);
+ return d >= previousWeekStart && d < currentWeekStart;
+ } catch(e) { return false; }
+ });
+
+ const currentWeekFasting = getStats(currentWeekLogs, 'Fasting');
+ const prevWeekFastingFull = getStats(previousWeekLogsFull, 'Fasting');
+ const currentWeekPP = getStats(currentWeekLogs, 'Post-Prandial');
+ const prevWeekPPFull = getStats(previousWeekLogsFull, 'Post-Prandial');
+
+ const trends: string[] = [];
+
+ if (currentWeekFasting.count > 0 && prevWeekFastingFull.count > 0 && currentWeekFasting.avg !== null && prevWeekFastingFull.avg !== null) {
+ const diff = Math.round(Math.abs(currentWeekFasting.avg - prevWeekFastingFull.avg));
+ if (currentWeekFasting.avg < prevWeekFastingFull.avg) {
+ trends.push(`Fasting average decreased by ${diff} mg/dL compared to last week's average.`);
+ } else if (currentWeekFasting.avg > prevWeekFastingFull.avg) {
+ trends.push(`Fasting average increased by ${diff} mg/dL compared to last week's average.`);
+ }
+ }
+
+ if (currentWeekPP.count > 0 && prevWeekPPFull.count > 0 && currentWeekPP.avg !== null && prevWeekPPFull.avg !== null) {
+ const diff = Math.round(Math.abs(currentWeekPP.avg - prevWeekPPFull.avg));
+ if (currentWeekPP.avg < prevWeekPPFull.avg) {
+ trends.push(`Post-prandial average decreased by ${diff} mg/dL compared to last week's average.`);
+ } else if (currentWeekPP.avg > prevWeekPPFull.avg) {
+ trends.push(`Post-prandial average increased by ${diff} mg/dL compared to last week's average.`);
+ }
+ }
+
+ const countDiff = currentWeekLogs.length - previousWeekLogsWTD.length;
+ if (countDiff > 0) {
+ trends.push(`You logged ${countDiff} more reading${countDiff > 1 ? 's' : ''} this week compared to the same time last week.`);
+ } else if (countDiff < 0) {
+ trends.push(`You logged ${Math.abs(countDiff)} fewer reading${Math.abs(countDiff) > 1 ? 's' : ''} this week compared to the same time last week.`);
+ } else if (currentWeekLogs.length > 0 && previousWeekLogsWTD.length > 0) {
+ trends.push(`You logged the same number of readings this week as you did by this time last week.`);
+ }
+
 
  const recentAvg = recentLogs.length > 0 ? recentLogs.reduce((acc, cur) => acc + cur.value, 0) / recentLogs.length : 0;
  const previousAvg = previousLogs.length > 0 ? previousLogs.reduce((acc, cur) => acc + cur.value, 0) / previousLogs.length : 0;
@@ -79,10 +136,10 @@ export default function GlucoseTab() {
  const fastingLimit = 99;
  const otherLimit = 140;
 
- const allRecentValues = recentLogs.map(h => h.value);
- const allPreviousValues = previousLogs.map(h => h.value);
- const recentVariability = allRecentValues.length > 1 ? Math.max(...allRecentValues) - Math.min(...allRecentValues) : 0;
- const previousVariability = allPreviousValues.length > 1 ? Math.max(...allPreviousValues) - Math.min(...allPreviousValues) : 0;
+ const calcVar = (items: any[]) => items.length > 1 ? Math.max(...items.map(i => i.value)) - Math.min(...items.map(i => i.value)) : 0;
+ 
+ const recentVariability = Math.max(calcVar(recentFasting.items), calcVar(recentPP.items), calcVar(recentRandom.items));
+ const previousVariability = Math.max(calcVar(prevFasting.items), calcVar(prevPP.items), calcVar(prevRandom.items));
 
  const hypoLogs = recentLogs.filter(h => h.value < 70);
  const hyperLogs = recentLogs.filter(h => h.value > 250);
@@ -158,10 +215,10 @@ export default function GlucoseTab() {
  }
 
  const weekendLogs = recentLogs.filter(h => {
- try { const day = new Date(h.date).getDay(); return day === 0 || day === 6; } catch { return false; }
+ try { const day = parseISO(h.date).getDay(); return day === 0 || day === 6; } catch { return false; }
  });
  const weekdayLogs = recentLogs.filter(h => {
- try { const day = new Date(h.date).getDay(); return day > 0 && day < 6; } catch { return false; }
+ try { const day = parseISO(h.date).getDay(); return day > 0 && day < 6; } catch { return false; }
  });
  const weekendAvg = weekendLogs.length ? weekendLogs.reduce((acc, cur) => acc + cur.value, 0) / weekendLogs.length : 0;
  const weekdayAvg = weekdayLogs.length ? weekdayLogs.reduce((acc, cur) => acc + cur.value, 0) / weekdayLogs.length : 0;
@@ -200,7 +257,7 @@ export default function GlucoseTab() {
 
  const needsQuality = attention.some(a => a.includes('Too few') || a.includes('random') || a.includes('Long gaps') || a.includes('consistency has declined') || a.includes('No glucose readings'));
  
- const hasRecentHbA1c = glucoseReadings.some(h => h.timing === 'HbA1c' && (() => { try { return new Date(h.date) >= subMonths(now, 4); } catch{return false;} })());
+ const hasRecentHbA1c = glucoseReadings.some(h => h.timing === 'HbA1c' && (() => { try { return parseISO(h.date) >= subMonths(now, 4); } catch{return false;} })()) || (labReports && labReports.some(report => report.biomarkers?.some(b => b.name.toLowerCase().includes('hba1c') || b.name.toLowerCase().includes('a1c')) && (() => { try { return parseISO(report.date) >= subMonths(now, 4); } catch{return false;} })()));
 
  if (needsQuality) {
  if (recentFasting.count < 4) recommendations.push("Record fasting glucose before breakfast on at least 4 mornings each week.");
@@ -246,9 +303,11 @@ export default function GlucoseTab() {
  cards,
  better: uniqueBetter.slice(0, 4),
  attention: uniqueAttention.slice(0, 4),
- recommendations: recommendations.slice(0, 3)
+ recommendations: recommendations.slice(0, 3),
+trends,
+currentWeekTotal: currentWeekLogs.length
  };
- }, [glucoseReadings]);
+ }, [glucoseReadings, labReports]);
 
  const expectedHba1cData = useMemo(() => {
     const today = startOfDay(new Date());
@@ -357,7 +416,7 @@ export default function GlucoseTab() {
       isEligible: false, daysTracked: 0, missedDays: 0, totalReadings: 0, fastingCount: 0, postPrandialCount: 0, expectedHba1c: 0,
       neededDays: 28, neededTotal: 32, neededFasting: 12, neededPP: 12
     };
- }, [glucoseReadings]);
+ }, [glucoseReadings, labReports]);
 
  useEffect(() => {
  if (selectedType === 'HbA1c' && timeFilter < 90) {
@@ -399,7 +458,7 @@ export default function GlucoseTab() {
  }
  }
  return unique;
- }, [glucoseReadings]);
+ }, [glucoseReadings, labReports]);
 
  const todayUniqueReadings = useMemo(() => {
  const todayStr = safeFormat(new Date(), 'yyyy-MM-dd');
@@ -441,7 +500,7 @@ export default function GlucoseTab() {
  return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
  } catch { return 0; }
  });
- }, [glucoseReadings]);
+ }, [glucoseReadings, labReports]);
 
  // Statistics for selected type
  const stats = useMemo(() => {
@@ -1029,6 +1088,16 @@ export default function GlucoseTab() {
  {sugarInsights ? (
  <div className="space-y-8">
 
+  <div className="flex flex-col mb-4">
+ <div className="flex justify-center mb-6">
+ <div className="bg-black text-white dark:bg-white dark:text-black px-4 py-1.5 rounded-full text-xs font-bold shadow-sm">
+ {sugarInsights.currentWeekTotal} reading{sugarInsights.currentWeekTotal !== 1 ? 's' : ''} this week
+ </div>
+ </div>
+ <div className="w-full text-left">
+ <span className="text-sm font-medium text-black dark:text-white">averages this month</span>
+ </div>
+ </div>
  <div className="grid grid-cols-3 gap-3">
  {[
  { label: 'Fasting', data: sugarInsights.cards.fasting, color: 'text-green-500', bg: 'bg-green-500/10' },
@@ -1079,6 +1148,18 @@ export default function GlucoseTab() {
  </div>
  )}
 
+ {sugarInsights.trends && sugarInsights.trends.length > 0 && (
+ <div className="space-y-3">
+ <h4 className="text-lg font-bold text-theme-text tracking-tight flex items-center gap-2">
+ <TrendingUp className="text-blue-500" size={18} /> Trends
+ </h4>
+ <ul className="space-y-2 text-theme-text-sec text-sm list-disc list-inside marker:text-blue-500/50">
+ {sugarInsights.trends.map((item, i) => (
+ <li key={i} className="pl-1">{item}</li>
+ ))}
+ </ul>
+ </div>
+ )}
  {sugarInsights.recommendations.length > 0 && (
  <div className="space-y-3">
  <h4 className="text-lg font-bold text-theme-text tracking-tight flex items-center gap-2">

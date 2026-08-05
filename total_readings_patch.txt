@@ -1,0 +1,7 @@
+ <div className="flex items-center justify-between mb-4">
+ <span className="text-sm font-bold text-theme-text-sec">Averages this month</span>
+ <span className="text-sm font-bold text-theme-text-sec px-3 py-1 bg-theme-bg rounded-full border border-theme-border">
+ {sugarInsights.currentWeekTotal} reading{sugarInsights.currentWeekTotal !== 1 ? 's' : ''} this week
+ </span>
+ </div>
+ <div className="grid grid-cols-3 gap-3">

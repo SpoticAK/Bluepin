@@ -1,27 +1,43 @@
 const fs = require('fs');
-let code = fs.readFileSync('src/App.tsx', 'utf8');
 
-code = code.replace(/import FitnessTab from "\.\/components\/FitnessTab";\n/g, '');
-code = code.replace(/import FamilyTab from "\.\/components\/FamilyTab";\n/g, '');
+let content = fs.readFileSync('src/App.tsx', 'utf8');
 
-code = code.replace(/type TabType = "dashboard" \| "family" \| "glucose" \| "biomarkers" \| "fitness";/g, 'type TabType = "dashboard" | "glucose" | "biomarkers";');
+// 1. Add import for AdminFeedbackView
+if (!content.includes('AdminFeedbackView')) {
+  content = content.replace(/import \{ LegalDocType \} from '\.\/lib\/consentManager';/, "import { LegalDocType } from './lib/consentManager';\nimport AdminFeedbackView from './components/AdminFeedbackView';");
+}
 
-const fitnessNavItemRegex = /<NavItem\s*icon={<Flame \/>}\s*label="Fitness"[\s\S]*?\/>\s*/;
-code = code.replace(fitnessNavItemRegex, '');
+// 2. Add "admin" to TabType
+content = content.replace(/type TabType = "dashboard" \| "glucose" \| "biomarkers";/, 'type TabType = "dashboard" | "glucose" | "biomarkers" | "admin";');
 
-const familyNavItemRegex = /<NavItem\s*icon={<Users \/>}\s*label="Family"[\s\S]*?\/>\s*/;
-code = code.replace(familyNavItemRegex, '');
+// 3. Add Settings/Admin icon if needed, but we already have Users or MessageSquare from lucide-react. MessageSquare is imported. Let's add Shield.
+content = content.replace(/MessageSquare,/, 'MessageSquare, Shield,');
 
-const fitnessMobileRegex = /<MobileNavItem\s*icon={<Flame size=\{20\} \/>}\s*label="Fitness"[\s\S]*?\/>\s*/;
-code = code.replace(fitnessMobileRegex, '');
+// 4. In MainLayout, determine if admin
+if (!content.includes('const isAdmin = auth.currentUser?.email')) {
+  content = content.replace(/const { theme, toggleTheme } = useTheme\(\);/, `const { theme, toggleTheme } = useTheme();\n  const isAdmin = auth.currentUser?.email === 'sparsh190204@gmail.com';`);
+}
 
-const familyMobileRegex = /<MobileNavItem\s*icon={<Users size=\{20\} \/>}\s*label="Family"[\s\S]*?\/>\s*/;
-code = code.replace(familyMobileRegex, '');
+// 5. Add NavItem for Admin
+const adminNav = `
+          {isAdmin && (
+            <NavItem
+              icon={<Shield />}
+              label="Admin"
+              isActive={activeTab === "admin"}
+              onClick={() => setActiveTab("admin")}
+              isCollapsed={isSidebarCollapsed}
+              colorClass="text-purple-500"
+            />
+          )}
+          </nav>`;
+content = content.replace(/<\/nav>/, adminNav);
 
-const fitnessRenderRegex = /\{activeTab === "fitness" && <FitnessTab \/>\}\s*/;
-code = code.replace(fitnessRenderRegex, '');
+// 6. Render Admin view
+const adminView = `
+        {activeTab === "admin" && isAdmin && <AdminFeedbackView />}
+        <footer`;
+content = content.replace(/<footer/, adminView);
 
-const familyRenderRegex = /\{activeTab === "family" && \(\s*<FamilyTab onNavigate=\{\(tab: TabType\) => setActiveTab\(tab\)\} \/>\s*\)\}\s*/;
-code = code.replace(familyRenderRegex, '');
-
-fs.writeFileSync('src/App.tsx', code);
+fs.writeFileSync('src/App.tsx', content);
+console.log("Patched App.tsx");

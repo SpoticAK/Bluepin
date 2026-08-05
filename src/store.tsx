@@ -12,8 +12,6 @@ const defaultState: AppState = {
   goalLogs: {},
   profile: { heightCm: 170 }, // Default height
   deletedDummyGlucoseIds: [],
-  family: null,
-  familySummaries: {},
 };
 
 interface AppContextType extends AppState {
@@ -138,6 +136,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const uid = auth.currentUser?.uid;
 
   
+  
+  const getDiabetesStatusFromHbA1c = (val: number): 'Yes' | 'Pre diabetes' | 'No' => {
+    if (val >= 6.5) return 'Yes';
+    if (val >= 5.7) return 'Pre diabetes';
+    return 'No';
+  };
+
   const updateLimits = async (batch: any, type: 'glucose' | 'report_add' | 'report_delete', userId: string, deletedReportId?: string) => {
     const limitsRef = doc(db, `users/${userId}/stats/limits`);
     const snap = await getDoc(limitsRef);
@@ -212,6 +217,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         userId: uid,
         createdAt: serverTimestamp()
       }));
+      
+      // Auto-update diabetes status if HbA1c
+      if (reading.timing === 'HbA1c' as any) {
+        const newStatus = getDiabetesStatusFromHbA1c(reading.value);
+        if (stateRef.current.profile.diabetesStatus !== newStatus) {
+           const profRef = doc(db, `users/${uid}`);
+           batch.update(profRef, { diabetesStatus: newStatus });
+        }
+      }
       await batch.commit();
     } catch (e: any) {
       alert(e.message || "Failed to add glucose reading");
@@ -254,6 +268,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           status: bm.status,
           createdAt: serverTimestamp()
         }));
+      }
+      
+      // Auto-update diabetes status if HbA1c exists in lab report
+      const hba1cBiomarker = report.biomarkers.find(b => b.name.toLowerCase().includes('hba1c') || b.name.toLowerCase().includes('a1c'));
+      if (hba1cBiomarker && typeof hba1cBiomarker.value === 'number' && !isNaN(hba1cBiomarker.value)) {
+         const val = hba1cBiomarker.value;
+         const newStatus = getDiabetesStatusFromHbA1c(val);
+         if (stateRef.current.profile.diabetesStatus !== newStatus) {
+            const profRef = doc(db, `users/${uid}`);
+            batch.update(profRef, { diabetesStatus: newStatus });
+         }
       }
       await batch.commit();
     } catch (e: any) {

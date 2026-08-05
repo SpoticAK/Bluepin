@@ -1,0 +1,10 @@
+ <div className="flex flex-col mb-4">
+ <div className="flex justify-center mb-6">
+ <div className="bg-black text-white dark:bg-white dark:text-black px-4 py-1.5 rounded-full text-xs font-bold shadow-sm">
+ {sugarInsights.currentWeekTotal} reading{sugarInsights.currentWeekTotal !== 1 ? 's' : ''} this week
+ </div>
+ </div>
+ <div className="w-full text-left">
+ <span className="text-sm font-medium text-black dark:text-white">averages this month</span>
+ </div>
+ </div>

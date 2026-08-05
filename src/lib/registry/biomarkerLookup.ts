@@ -60,6 +60,43 @@ export type MatchContext = {
 
 export function matchBiomarker(name: string, context: MatchContext = {}) {
   const normalized = normalizeAlias(name);
+
+  // Custom Regex pattern matching for Glucose variations
+  if (/fasting/.test(normalized) && /(glucose|sugar)/.test(normalized)) {
+    const candidate = biomarkerById.get('glucose_fasting');
+    if (candidate) {
+      return { biomarkerId: candidate.id, canonicalName: candidate.canonicalName, profile: candidate.profile, confidence: 'High', matchedBy: 'regex_pattern' };
+    }
+  }
+
+  if (/post[\s-]*prandial/.test(normalized) && /(glucose|sugar)/.test(normalized)) {
+    const candidate = biomarkerById.get('glucose_pp');
+    if (candidate) {
+      return { biomarkerId: candidate.id, canonicalName: candidate.canonicalName, profile: candidate.profile, confidence: 'High', matchedBy: 'regex_pattern' };
+    }
+  }
+
+  if (/random/.test(normalized) && /(glucose|sugar)/.test(normalized)) {
+    const candidate = biomarkerById.get('glucose_random');
+    if (candidate) {
+      return { biomarkerId: candidate.id, canonicalName: candidate.canonicalName, profile: candidate.profile, confidence: 'High', matchedBy: 'regex_pattern' };
+    }
+  }
+
+  if (/hba1c|hemoglobin\s*a1c|glycosylated\s*hemoglobin/.test(normalized)) {
+    const candidate = biomarkerById.get('hba1c');
+    if (candidate) {
+      return { biomarkerId: candidate.id, canonicalName: candidate.canonicalName, profile: candidate.profile, confidence: 'High', matchedBy: 'regex_pattern' };
+    }
+  }
+
+  if (/eag|estimated\s*average\s*glucose/.test(normalized)) {
+    const candidate = biomarkerById.get('eag');
+    if (candidate) {
+      return { biomarkerId: candidate.id, canonicalName: candidate.canonicalName, profile: candidate.profile, confidence: 'High', matchedBy: 'regex_pattern' };
+    }
+  }
+
   let candidates = biomarkerByAlias.get(normalized);
   let matchedBy = 'exact_alias';
 

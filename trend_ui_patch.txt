@@ -1,0 +1,12 @@
+ {sugarInsights.trends && sugarInsights.trends.length > 0 && (
+ <div className="space-y-3">
+ <h4 className="text-lg font-bold text-theme-text tracking-tight flex items-center gap-2">
+ <TrendingUp className="text-blue-500" size={18} /> Trends
+ </h4>
+ <ul className="space-y-2 text-theme-text-sec text-sm list-disc list-inside marker:text-blue-500/50">
+ {sugarInsights.trends.map((item, i) => (
+ <li key={i} className="pl-1">{item}</li>
+ ))}
+ </ul>
+ </div>
+ )}

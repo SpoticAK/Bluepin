@@ -1,21 +1,45 @@
 const fs = require('fs');
 let code = fs.readFileSync('src/store.tsx', 'utf8');
 
-code = code.replace(/import \{ buildFamilySummary \} from "\.\/lib\/familyUtils";\n/g, '');
-code = code.replace(/,\s*Family,\s*FamilySummary/g, '');
-code = code.replace(/createFamily: \(name: string\) => Promise<void>;\n/g, '');
-code = code.replace(/joinFamily: \(invitationId: string\) => Promise<void>;\n/g, '');
-code = code.replace(/leaveFamily: \(\) => Promise<void>;\n/g, '');
-code = code.replace(/createInvitation: \(\) => Promise<string \| null>;\n/g, '');
-code = code.replace(/loadMemberDetailedData: \(memberId: string\) => Promise<any>;\n/g, '');
+// Helper to determine status
+const statusHelper = `
+  const getDiabetesStatusFromHbA1c = (val: number): 'Yes' | 'Pre diabetes' | 'No' => {
+    if (val >= 6.5) return 'Yes';
+    if (val >= 5.7) return 'Pre diabetes';
+    return 'No';
+  };
+`;
 
-const block1Regex = /useEffect\(\(\) => \{\n\s*if \(\!auth\.currentUser\) return;\n\s*const uid = auth\.currentUser\.uid;\n\s*const s = stateRef\.current;\n\s*if \(\!s\.profile\.familyId\) return;\s*const newSummary = buildFamilySummary\(s\);[\s\S]*?\}, \[state\.glucoseReadings, state\.labReports, state\.weightEntries, state\.goals, state\.goalLogs, state\.profile\.name, state\.profile\.profileColor, state\.profile\.photoUrl, state\.profile\.glucoseEnabled, state\.profile\.familyId, state\.profile\.heightCm\]\);\n\n/g;
-code = code.replace(block1Regex, '');
+// Insert helper inside createStore
+code = code.replace(/const updateLimits = async/, statusHelper + '\n  const updateLimits = async');
 
-const block2Regex = /\s*\/\/ Family listeners\s*useEffect\(\(\) => \{[\s\S]*?\}, \[state\.profile\.familyId\]\);\n/g;
-code = code.replace(block2Regex, '');
+// Patch addGlucoseReading
+code = code.replace(/await batch\.commit\(\);\s*\}\s*catch/g, `
+      // Auto-update diabetes status if HbA1c
+      if (reading.timing === 'HbA1c' as any) {
+        const newStatus = getDiabetesStatusFromHbA1c(reading.value);
+        if (stateRef.current.profile.diabetesStatus !== newStatus) {
+           const profRef = doc(db, \`users/\${uid}\`);
+           batch.update(profRef, { diabetesStatus: newStatus });
+        }
+      }
+      await batch.commit();
+    } catch`);
 
-const familyFnsRegex = /const createFamily = async[\s\S]*?return \{ \{ labReports: sortedReports, glucoseReadings: \[\], goals: \[\], goalLogs: \{\}, weightEntries: \[\] \} as any \}\n\s*\};\n/g;
-// Wait, the regex `return \{ \{ labReports...` might not work. I will just use manual replacements for store functions.
+// Patch addLabReport
+code = code.replace(/await batch\.commit\(\);\s*\}\s*catch\s*\(e:\s*any\)\s*\{\s*alert\(e\.message\s*\|\|\s*"Failed to add report"\);/g, `
+      // Auto-update diabetes status if HbA1c exists in lab report
+      const hba1cBiomarker = report.biomarkers.find(b => b.name.toLowerCase().includes('hba1c') || b.name.toLowerCase().includes('a1c'));
+      if (hba1cBiomarker && !isNaN(parseFloat(hba1cBiomarker.value))) {
+         const val = parseFloat(hba1cBiomarker.value);
+         const newStatus = getDiabetesStatusFromHbA1c(val);
+         if (stateRef.current.profile.diabetesStatus !== newStatus) {
+            const profRef = doc(db, \`users/\${uid}\`);
+            batch.update(profRef, { diabetesStatus: newStatus });
+         }
+      }
+      await batch.commit();
+    } catch (e: any) {
+      alert(e.message || "Failed to add report");`);
 
 fs.writeFileSync('src/store.tsx', code);
