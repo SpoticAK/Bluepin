@@ -109,9 +109,9 @@ async function generateContentWithRetry(options: any, maxRetries = 5) {
         if (i === maxRetries - 1) throw error;
         
         // Fallback to a stable model if the current one is overloaded
-        if (options.model === 'gemini-2.5-flash') {
-          console.log(`[Gemini API] Falling back from ${options.model} to gemini-2.5-flash`);
-          options.model = 'gemini-2.5-flash';
+        if (options.model === 'gemini-3.5-flash-lite') {
+          console.log(`[Gemini API] Falling back from ${options.model} to gemini-3.5-flash-lite`);
+          options.model = 'gemini-3.5-flash-lite';
         }
 
         const waitMs = Math.pow(2, i + 1) * 1000 + Math.random() * 2000;
@@ -341,11 +341,11 @@ async function startServer() {
         
         let promptText = "";
         let schema: any = {};
-        let modelToUse = "gemini-2.5-flash"; // Default to cheaper capable model
+        let modelToUse = "gemini-3.5-flash-lite"; // Default to cheaper capable model
         
         if (type === "glucose") {
           promptText = GLUCOSE_PROMPT;
-          modelToUse = "gemini-2.5-flash"; // Route simple tasks to cheapest 8b model
+          modelToUse = "gemini-3.5-flash-lite"; // Route simple tasks to cheapest 8b model
           schema = {
             type: Type.OBJECT,
             properties: {
@@ -550,7 +550,7 @@ Here are the lab reports: ${JSON.stringify(reports)}`;
       };
 
       const response = await generateContentWithRetry({
-        model: "gemini-2.5-flash", // Route insights to cheaper 8b model
+        model: "gemini-3.5-flash-lite", // Route insights to cheaper 8b model
         contents: [{ role: "user", parts: [{ text: promptText }] }],
         config: {
           responseMimeType: "application/json",
