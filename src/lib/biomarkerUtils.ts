@@ -72,10 +72,12 @@ export function calculateStatus(id: string, val: any, minVal?: any, maxVal?: any
   let min = minVal !== undefined && minVal !== null && minVal !== '' ? Number(minVal) : null;
   let max = maxVal !== undefined && maxVal !== null && maxVal !== '' ? Number(maxVal) : null;
   
-  if ((min === null || isNaN(min)) && (max === null || isNaN(max)) && refRangeText) {
+  if (refRangeText) {
     const parsed = parseRefRangeText(refRangeText);
-    min = parsed.min;
-    max = parsed.max;
+    if (parsed.min !== null || parsed.max !== null) {
+      min = parsed.min;
+      max = parsed.max;
+    }
   }
 
   const def = getBiomarkerById(id);
