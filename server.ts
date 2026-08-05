@@ -153,9 +153,21 @@ STEP 3 — Only if no section exists
 Only when a biomarker appears outside any recognized section should standard fallback definitions be used.
 Example (Standalone): 'Albumin' -> 'Liver Function', 'Glucose' -> 'Glucose Profile', 'RBC' -> 'Blood Profile'
 
+STEP 4 — Mathematical Status Classification
+You MUST apply explicit mathematical logic to determine the 'status' ('Low', 'Normal', 'High', or 'Borderline').
+1. Extract the patient's 'value' as a numerical number (if it is numerical).
+2. Extract the reference range's minimum and maximum values.
+3. Compare the value strictly against the min and max:
+   - If value < min, status = 'Low'
+   - If value > max, status = 'High'
+   - If min <= value <= max, status = 'Normal'
+4. If a result is flagged with '*' or bolded in the report to indicate it's out of bounds, prioritize that indicator (e.g. status='High' or 'Low').
+5. If the reference range is less than or greater than a threshold (e.g. < 130), apply the > or < mathematically.
+6. For qualitative results (e.g. Negative/Positive, Absent/Present), map them contextually (e.g. if normally Negative, but report says Positive, status is High/Abnormal).
+
 Important Rule: The report structure is the strongest source of truth. It is the primary source. Standard definitions are only a fallback. The parser should never ignore explicit report sections.
 
-CRITICAL: Complete biomarker names must ALWAYS be taken exactly as written in the report (e.g. 'Blood Urea Nitrogen', NOT 'Urea'). Whenever there is duplicacy of biomarker in the same profile, there should be a quick recheck to ensure you did not accidentally shorten different biomarkers to the same name. Also output 'status' as 'Low', 'Normal', 'High', or 'Borderline'. Do not discard any extracted medical information.`;
+CRITICAL: Complete biomarker names must ALWAYS be taken exactly as written in the report (e.g. 'Blood Urea Nitrogen', NOT 'Urea'). Whenever there is duplicacy of biomarker in the same profile, there should be a quick recheck to ensure you did not accidentally shorten different biomarkers to the same name. Do not discard any extracted medical information.`;
 
 const GLUCOSE_PROMPT = "Extract the glucose reading (mg/dL or mmol/L) from this glucometer display. If there is a date and time, extract those too. If it is obviously not a glucometer reading, indicate that. Respond only in the requested JSON format.";
 
@@ -370,18 +382,7 @@ async function startServer() {
           let activeMimeType = mimeType;
           let activeBase64 = fullBase64;
           
-          // Optimization 1: Extract Text Locally First for PDFs to avoid expensive multimodal tokens
-          if (mimeType === 'application/pdf') {
-            try {
-              const pdfBuffer = Buffer.from(fullBase64, 'base64');
-              const pdfData = await pdfParse(pdfBuffer);
-              if (pdfData.text && pdfData.text.trim().length > 50) {
-                extractedText = pdfData.text;
-              }
-            } catch (err) {
-              console.error("Local PDF parsing failed, falling back to Gemini multimodal.", err);
-            }
-          }
+          // Removed Optimization 1: Extract Text Locally First for PDFs (user requested native processing)
           
           // Optimization 2: Aggressive Image Compression for images (downscale before sending)
           if (mimeType.startsWith('image/')) {
