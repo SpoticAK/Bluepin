@@ -67,7 +67,7 @@ export function AddReportFlow({ onClose, onSuccess }: { onClose: () => void, onS
         reader.onerror = e => reject(e);
       });
       const base64Str = await getBase64(file);
-      const chunkSize = 500 * 1024;
+      const chunkSize = 8 * 1024 * 1024;
       const totalChunks = Math.ceil(base64Str.length / chunkSize);
       const uploadId = uuidv4();
       let data: any = null;

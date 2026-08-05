@@ -284,7 +284,7 @@ async function startServer() {
 
   const aiUserLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
-    max: 30,
+    max: 60,
     keyGenerator: (req) => {
       return (req as any).user?.uid || 'anonymous';
     },
