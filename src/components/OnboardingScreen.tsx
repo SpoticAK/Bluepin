@@ -1,84 +1,51 @@
-import React, { useState, useRef } from 'react';
-import { auth, db, storage } from '../lib/firebase';
-import { User, Camera, ArrowLeft } from 'lucide-react';
-import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import React, { useState } from 'react';
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { auth, db } from '../lib/firebase';
+import { doc, setDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { cn } from '../lib/utils';
 
 export default function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  
   const [data, setData] = useState({
     name: '',
     age: '',
-    gender: 'Prefer not to say',
     height: '',
     weight: '',
-    country: '',
-    photoUrl: '',
-    profileColor: '',
-    diabetesStatus: 'No'
+    diabetesStatus: 'No',
+    profileColor: ['#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'][Math.floor(Math.random() * 5)]
   });
-  
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const generateRandomColor = () => {
-    const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
-    return colors[Math.floor(Math.random() * colors.length)];
+  const handleNext = () => {
+    if (step < 2) setStep(step + 1);
+    else handleSubmit();
+  };
+  
+  const handleBack = () => {
+    if (step > 1) setStep(step - 1);
+    else auth.signOut();
   };
 
-  React.useEffect(() => {
-    setData(prev => ({...prev, profileColor: generateRandomColor()}));
-  }, []);
-
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) {
-        setError("Image must be less than 5MB");
-        return;
-      }
-      setUploading(true);
-      setError('');
-      try {
-        const ext = file.name.split('.').pop() || 'jpg';
-        const storageRef = ref(storage, `users/${auth.currentUser?.uid}/profile.${ext}`);
-        await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(storageRef);
-        setData(prev => ({ ...prev, photoUrl: url }));
-      } catch (err: any) {
-        console.error("Upload error", err);
-        setError("Failed to upload image. " + (err.message || ''));
-      } finally {
-        setUploading(false);
-      }
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async () => {
     if (!auth.currentUser) return;
-
     setLoading(true);
     setError('');
-
+    
     try {
-      const heightNum = Number(data.height);
-      const weightNum = Number(data.weight);
+      const heightNum = Number(data.height) || 0;
+      const weightNum = Number(data.weight) || 0;
       const bmi = heightNum > 0 && weightNum > 0 ? Number((weightNum / Math.pow(heightNum/100, 2)).toFixed(1)) : 0;
-
+      
       const userRef = doc(db, 'users', auth.currentUser.uid);
       await setDoc(userRef, {
         name: data.name,
         age: Number(data.age) || 0,
-        gender: data.gender,
         height: heightNum,
         weight: weightNum,
         bmi,
-        country: data.country,
-        photoUrl: data.photoUrl,
+        photoUrl: '', // Removed photo upload, storing empty string
         profileColor: data.profileColor,
         diabetesStatus: data.diabetesStatus,
         createdAt: serverTimestamp(),
@@ -94,6 +61,7 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
           createdAt: serverTimestamp()
         });
       }
+      
       onComplete();
     } catch (err: any) {
       setError(err.message);
@@ -102,149 +70,153 @@ export default function OnboardingScreen({ onComplete }: { onComplete: () => voi
   };
 
   return (
-    <div className="min-h-[100dvh] bg-white text-gray-900 pb-10 flex flex-col items-center justify-center">
-      <div className="w-full max-w-md px-6 pt-8 pb-6">
-        
+    <div className="min-h-[100dvh] bg-white flex flex-col relative overflow-hidden font-sans">
+      
+      {/* Top Nav */}
+      <div className="w-full max-w-lg mx-auto p-6 pt-10 flex items-center justify-between z-10">
         <button 
-          type="button" 
-          onClick={() => auth.signOut()}
-          className="mb-4 flex items-center text-gray-500 hover:text-gray-900 transition-colors font-medium text-sm"
+          onClick={handleBack}
+          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors text-neutral-600"
         >
-          <ArrowLeft size={18} className="mr-1" /> Back to Sign In
+          <ArrowLeft size={20} />
         </button>
-
-        <div className="mb-6 text-left">
-          <h1 className="text-3xl font-display font-semibold tracking-tight text-gray-900 flex items-center gap-2">
-            Complete your profile <span>👋</span>
-          </h1>
+        <div className="flex gap-1.5">
+          {[1, 2].map(i => (
+            <div 
+              key={i} 
+              className={cn(
+                "h-1.5 rounded-full transition-all duration-300",
+                i === step ? "w-6 bg-blue-500" : (i < step ? "w-1.5 bg-blue-500/40" : "w-1.5 bg-neutral-200")
+              )}
+            />
+          ))}
         </div>
+      </div>
 
-        {error && <div className="p-4 mb-6 text-[15px] text-red-600 bg-red-50 rounded-2xl border border-red-100">{error}</div>}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="bg-gray-50/70 rounded-3xl p-5 sm:p-6 border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            
-            <div className="flex flex-col items-center mb-6">
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleImageChange} 
-                className="hidden" 
-                accept="image/*" 
-              />
-              
-              <div 
-                className="relative w-24 h-24 cursor-pointer group" 
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {data.photoUrl ? (
-                  <img src={data.photoUrl} alt="Profile" className="w-full h-full rounded-full object-cover border-[3px] border-white shadow-sm" />
-                ) : (
-                  <div 
-                    className="w-full h-full rounded-full flex items-center justify-center border-[3px] border-white shadow-sm text-white transition-transform group-hover:scale-[1.02]" 
-                    style={{ backgroundColor: data.profileColor || '#3b82f6' }}
-                  >
-                    <User size={36} />
-                  </div>
-                )}
-                
-                {uploading && (
-                  <div className="absolute inset-0 bg-white/60 rounded-full flex items-center justify-center backdrop-blur-sm">
-                    <div className="w-5 h-5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-
-                <div className="absolute bottom-0 right-0 bg-white text-gray-700 p-2 rounded-full shadow-md border border-gray-100 group-hover:scale-110 transition-transform">
-                  <Camera size={16} />
-                </div>
-              </div>
+      {/* Content */}
+      <div className="flex-1 w-full max-w-lg mx-auto px-8 flex flex-col justify-center pb-32 z-10">
+        <div className="animate-in fade-in slide-in-from-bottom-8 duration-500 delay-100 fill-mode-both">
+          {error && (
+            <div className="p-4 mb-6 text-sm text-red-600 bg-red-50 rounded-2xl border border-red-100">
+              {error}
             </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Full Name</label>
+          )}
+
+          {step === 1 && (
+            <div className="space-y-10">
+              <div className="space-y-3">
+                <h1 className="text-3xl font-display font-semibold text-neutral-900 tracking-tight">Let's get to know you</h1>
+                <p className="text-neutral-500 text-[15px]">What should we call you?</p>
                 <input 
-                  required 
-                  type="text" 
-                  value={data.name} 
-                  onChange={e => setData({...data, name: e.target.value})} 
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-900 transition-all text-gray-900 text-sm" 
-                  placeholder="John Doe"
+                  type="text"
+                  autoFocus
+                  value={data.name}
+                  onChange={e => setData({...data, name: e.target.value})}
+                  className="w-full text-2xl font-medium text-neutral-900 placeholder:text-neutral-300 border-b-2 border-neutral-200 focus:border-blue-500 pb-3 focus:outline-none transition-colors bg-transparent mt-2"
+                  placeholder="Your first name"
+                  onKeyDown={e => e.key === 'Enter' && data.name && handleNext()}
                 />
               </div>
               
-              <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-4 pt-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Age</label>
-                  <input 
-                    required 
-                    type="number" 
-                    min={1} 
-                    max={120} 
-                    value={data.age} 
-                    onChange={e => setData({...data, age: e.target.value})} 
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-900 transition-all text-gray-900 text-sm" 
-                    placeholder="e.g. 35"
-                  />
+                  <h2 className="text-xl font-display font-semibold text-neutral-900 mb-1">Managing diabetes?</h2>
+                  <p className="text-neutral-500 text-[14px]">Select the option that best describes you.</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Height (cm)</label>
-                  <input 
-                    required 
-                    type="number" 
-                    step="0.1" 
-                    value={data.height} 
-                    onChange={e => setData({...data, height: e.target.value})} 
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-900 transition-all text-gray-900 text-sm" 
-                    placeholder="170"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">Weight (kg)</label>
-                  <input 
-                    required 
-                    type="number" 
-                    step="0.1" 
-                    value={data.weight} 
-                    onChange={e => setData({...data, weight: e.target.value})} 
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-900 transition-all text-gray-900 text-sm" 
-                    placeholder="70"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2 ml-1 mt-2">Diabetic Status</label>
-                <div className="flex gap-2">
-                  {['No', 'Pre diabetes', 'Yes'].map((status) => (
+                <div className="flex flex-col gap-3">
+                  {['No', 'Pre diabetes', 'Yes'].map(status => (
                     <button
                       key={status}
-                      type="button"
-                      onClick={() => setData({ ...data, diabetesStatus: status })}
-                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      onClick={() => setData({...data, diabetesStatus: status})}
+                      className={cn(
+                        "p-4 rounded-2xl flex items-center justify-between transition-all border-2 text-left",
                         data.diabetesStatus === status 
-                          ? 'bg-gray-900 text-white shadow-md' 
-                          : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
-                      }`}
+                          ? "border-blue-500 bg-blue-50/50 text-blue-700"
+                          : "border-neutral-100 hover:border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+                      )}
                     >
-                      {status}
+                      <span className="font-medium text-[16px]">{status}</span>
+                      {data.diabetesStatus === status && <Check size={20} className="text-blue-500" />}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
-          <button 
-            type="submit" 
-            disabled={uploading || loading || !data.name || !data.age || !data.height || !data.weight} 
-            className="w-full py-3.5 bg-gray-900 hover:bg-black text-white font-medium rounded-xl transition-all shadow-lg shadow-gray-900/20 disabled:opacity-50 disabled:shadow-none text-base"
-          >
-            {loading ? 'Saving...' : 'Complete Profile'}
-          </button>
-        </form>
+          {step === 2 && (
+            <div className="space-y-8">
+              <div>
+                <h1 className="text-3xl font-display font-semibold text-neutral-900 mb-3 tracking-tight">Your basic stats</h1>
+                <p className="text-neutral-500 text-[15px]">This helps us personalize your health insights.</p>
+              </div>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-[13px] font-medium text-neutral-500 mb-2">Age</label>
+                  <input 
+                    type="number"
+                    autoFocus
+                    value={data.age}
+                    onChange={e => setData({...data, age: e.target.value})}
+                    className="w-full text-xl font-medium text-neutral-900 placeholder:text-neutral-300 border-b-2 border-neutral-200 focus:border-blue-500 pb-2 focus:outline-none transition-colors bg-transparent"
+                    placeholder="e.g. 30"
+                  />
+                </div>
+                <div className="flex gap-6">
+                  <div className="flex-1">
+                    <label className="block text-[13px] font-medium text-neutral-500 mb-2">Height (cm)</label>
+                    <input 
+                      type="number"
+                      value={data.height}
+                      onChange={e => setData({...data, height: e.target.value})}
+                      className="w-full text-xl font-medium text-neutral-900 placeholder:text-neutral-300 border-b-2 border-neutral-200 focus:border-blue-500 pb-2 focus:outline-none transition-colors bg-transparent"
+                      placeholder="175"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[13px] font-medium text-neutral-500 mb-2">Weight (kg)</label>
+                    <input 
+                      type="number"
+                      value={data.weight}
+                      onChange={e => setData({...data, weight: e.target.value})}
+                      className="w-full text-xl font-medium text-neutral-900 placeholder:text-neutral-300 border-b-2 border-neutral-200 focus:border-blue-500 pb-2 focus:outline-none transition-colors bg-transparent"
+                      placeholder="70"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Bottom Floating Action */}
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent pb-10 z-20 pointer-events-none">
+        <div className="w-full max-w-lg mx-auto flex justify-end pointer-events-auto">
+          <button
+            onClick={handleNext}
+            disabled={
+              loading ||
+              (step === 1 && !data.name) ||
+              (step === 2 && (!data.age || !data.height || !data.weight))
+            }
+            className="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-full transition-all shadow-[0_8px_20px_-6px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Saving...
+              </span>
+            ) : (
+              <>
+                {step === 2 ? 'Complete Profile' : 'Continue'}
+                {step < 2 && <ArrowRight size={18} />}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }

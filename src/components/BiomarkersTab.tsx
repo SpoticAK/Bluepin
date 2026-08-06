@@ -92,8 +92,12 @@ export default function BiomarkersTab() {
  // Sorting reports chronologically for accurate timelines
  const sortedReports = useMemo(() => sortLabReports(labReports), [labReports]);
 
+ useEffect(() => {
+   setAiInsights(null);
+   setIsAiInsightsCollapsed(false);
+ }, [labReports.length]);
  
- 
+
  const { score, prevScore, needsAttention, highLowCount, borderlineCount, latestBiomarkers: allBiomarkersLatest } = useMemo(() => {
     return getCanvasHealthScore(sortedReports);
   }, [sortedReports]);
@@ -884,7 +888,7 @@ export default function BiomarkersTab() {
  <ResponsiveContainer width="100%" height="100%">
  <LineChart data={selectedBiomarker.history} margin={{ top: 20, right: 20, left: -10, bottom: 0 }}>
  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-theme-border)" />
- <XAxis dataKey="date" tickFormatter={(t) => safeFormat(t, 'MMM yy')} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-theme-text-sec)', fontWeight: 500 }} dy={10} minTickGap={20} />
+ <XAxis dataKey="date" tickFormatter={(t) => safeFormat(t, "dd MMM ''yy")} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--color-theme-text-sec)', fontWeight: 500 }} dy={10} minTickGap={20} />
  <YAxis 
  domain={[
  (dataMin: number) => {

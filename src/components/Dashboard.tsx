@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import React, { useMemo, useState, useEffect } from 'react';
 import getCareReminders from '../careReminderRules';
 import { useAppStore } from '../store';
-import { Pin, Target, Hexagon, Circle, X, FileText, ChevronRight, ChevronDown, Droplet, Plus, ArrowUp, ArrowDown, Users, Check, Activity, HeartPulse, User, Flame, AlertCircle } from 'lucide-react';
+import { Pin, Target, Hexagon, Circle, X, FileText, ChevronRight, ChevronDown, Droplet, Plus, ArrowUp, ArrowDown, Users, Check, Activity, HeartPulse, User, Flame } from 'lucide-react';
 import { parseISO, isAfter, subDays } from 'date-fns';
 import { cn, safeFormat } from '../lib/utils';
 import { TIER_1, calculateStatus, isCoreBiomarkerPresent, getCoreBiomarkersByCategory, hydrateBiomarker } from '../lib/biomarkerUtils';
@@ -303,6 +303,61 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
   const weeklyActivity = getWeeklyActivity(goals, goalLogs);
 
   
+  const careRemindersNode = (
+<section ref={remindersRef} className="mt-8 relative">
+          <div className="flex items-center justify-between px-2 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-amber-400 dark:bg-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]" style={{ animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+              <h2 className="text-[17px] font-bold text-theme-text">Care Reminders</h2>
+            </div>
+            {activeReminders.length > 0 && (
+              <span className="text-[12px] font-medium text-theme-text-sec/60">{activeReminders.length}</span>
+            )}
+          </div>
+          
+          <div className="bg-theme-card border border-theme-border/50 rounded-[20px] overflow-hidden shadow-sm">
+            {activeReminders.length > 0 ? (
+              <div className="flex flex-col">
+                {(showAllReminders ? activeReminders : activeReminders.slice(0, 3)).map((reminder, idx) => (
+                  <div 
+                    key={reminder.id}
+                    onClick={() => {
+                      if (reminder.action === 'log_glucose') onNavigate('glucose');
+                      else if (reminder.action === 'log_weight') onNavigate('fitness');
+                      else if (reminder.action === 'upload_report') onNavigate('biomarkers');
+                    }}
+                    className={cn(
+                      "flex items-start sm:items-center justify-between p-3.5 sm:px-4 sm:py-3 cursor-pointer hover:bg-theme-bg/50 transition-colors group",
+                      idx < (showAllReminders ? activeReminders.length : Math.min(activeReminders.length, 3)) - 1 ? "border-b border-theme-border/20" : ""
+                    )}
+                  >
+                    <div className="flex flex-col pr-4">
+                      <h3 className="text-[14px] font-semibold text-theme-text leading-tight mb-0.5">{reminder.title}</h3>
+                      <p className="text-[12px] font-normal text-theme-text-sec/80 leading-snug">{reminder.message}</p>
+                    </div>
+                    <ChevronRight size={14} className="text-theme-text-sec/30 group-hover:text-theme-text-sec/60 transition-colors shrink-0 mt-0.5 sm:mt-0" />
+                  </div>
+                ))}
+                
+                {activeReminders.length > 3 && !showAllReminders && (
+                  <button 
+                    onClick={() => setShowAllReminders(true)}
+                    className="w-full py-2.5 text-[12px] font-medium text-theme-text-sec hover:text-theme-text bg-theme-bg/20 hover:bg-theme-bg/40 transition-colors border-t border-theme-border/20"
+                  >
+                    View all {activeReminders.length} reminders
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 flex items-center justify-center text-center">
+                <p className="text-[13px] font-medium text-theme-text-sec/70">Nothing needs your attention right now.</p>
+              </div>
+            )}
+          </div>
+        </section>
+);
+
+
   return (
     <div className="w-full max-w-2xl mx-auto pt-0 pb-24 space-y-8 animate-in fade-in -mt-4 md:-mt-5">
       {/* 1. TOP HEADER */}
@@ -391,6 +446,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
   )}
 </div>
  </section>
+            {careRemindersNode}
             {/* GLUCOSE DASHBOARD CARDS */}
         <section 
             onClick={() => onNavigate('glucose')}
@@ -557,6 +613,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
               </div>
             </div>
           </section>
+            {careRemindersNode}
             {/* 2. HEALTH SNAPSHOT */}
  <section 
  onClick={() => onNavigate('biomarkers')}
@@ -629,6 +686,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           <>
             {/* WEIGHT CARD */}
         <WeightCard isPinned={pinnedSection === 'weight'} onPin={() => setPinnedSection('weight')} />
+            {careRemindersNode}
             {/* 2. HEALTH SNAPSHOT */}
  <section 
  onClick={() => onNavigate('biomarkers')}
@@ -776,90 +834,10 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           </>
         )}
 
-        {/* 4. CARE REMINDERS */}
-        <section ref={remindersRef} className="mt-8 relative">
-          <div className="flex items-center justify-between px-2 mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-amber-400 dark:bg-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]" style={{ animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-              <h2 className="text-[17px] font-bold text-theme-text">Care Reminders</h2>
-            </div>
-            {activeReminders.length > 0 && (
-              <span className="text-[12px] font-medium text-theme-text-sec/60">{activeReminders.length}</span>
-            )}
-          </div>
-          
-          <div className="bg-theme-card border border-theme-border/50 rounded-[20px] overflow-hidden shadow-sm">
-            {activeReminders.length > 0 ? (
-              <div className="flex flex-col">
-                {(showAllReminders ? activeReminders : activeReminders.slice(0, 3)).map((reminder, idx) => (
-                  <div 
-                    key={reminder.id}
-                    onClick={() => {
-                      if (reminder.action === 'log_glucose') onNavigate('glucose');
-                      else if (reminder.action === 'log_weight') onNavigate('fitness');
-                      else if (reminder.action === 'upload_report') onNavigate('biomarkers');
-                    }}
-                    className={cn(
-                      "flex items-start sm:items-center justify-between p-3.5 sm:px-4 sm:py-3 cursor-pointer hover:bg-theme-bg/50 transition-colors group",
-                      idx < (showAllReminders ? activeReminders.length : Math.min(activeReminders.length, 3)) - 1 ? "border-b border-theme-border/20" : ""
-                    )}
-                  >
-                    <div className="flex flex-col pr-4">
-                      <h3 className="text-[14px] font-semibold text-theme-text leading-tight mb-0.5">{reminder.title}</h3>
-                      <p className="text-[12px] font-normal text-theme-text-sec/80 leading-snug">{reminder.message}</p>
-                    </div>
-                    <ChevronRight size={14} className="text-theme-text-sec/30 group-hover:text-theme-text-sec/60 transition-colors shrink-0 mt-0.5 sm:mt-0" />
-                  </div>
-                ))}
-                
-                {activeReminders.length > 3 && !showAllReminders && (
-                  <button 
-                    onClick={() => setShowAllReminders(true)}
-                    className="w-full py-2.5 text-[12px] font-medium text-theme-text-sec hover:text-theme-text bg-theme-bg/20 hover:bg-theme-bg/40 transition-colors border-t border-theme-border/20"
-                  >
-                    View all {activeReminders.length} reminders
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="p-4 flex items-center justify-center text-center">
-                <p className="text-[13px] font-medium text-theme-text-sec/70">Nothing needs your attention right now.</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-      
-      {/* FLOATING ACTION BUTTONS */}
+        {/* FLOATING ACTION BUTTONS */}
       <div className="fixed bottom-24 md:bottom-10 left-6 sm:left-8 right-6 sm:right-8 z-40 flex items-center justify-between pointer-events-none">
         
-        {/* PENDING REMINDERS FLOATING NOTIFIER */}
-        <div className="flex-1 flex justify-start">
-          <AnimatePresence>
-            {activeReminders.length > 0 && !hasSeenReminders && showNotifierReady && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                className="pointer-events-auto"
-              >
-                <div className="bg-white/95 dark:bg-[#1a2332]/95 backdrop-blur-md p-2 px-3 rounded-[32px] shadow-[0_12px_40px_rgba(0,0,0,0.12)] border border-theme-border/50 flex flex-col items-center">
-                  <button
-                    onClick={() => {
-                      remindersRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }}
-                    className="flex flex-col items-center gap-1 hover:scale-105 active:scale-95 transition-transform pt-1"
-                  >
-                    <div className="w-10 h-10 bg-amber-400 dark:bg-amber-500 rounded-full flex items-center justify-center shadow-[0_4px_16px_rgba(251,191,36,0.4)] animate-bounce border-2 border-white dark:border-[#1a2332]">
-                      <AlertCircle size={20} className="text-white dark:text-[#0f172a]" />
-                    </div>
-                    <ChevronDown size={16} className="text-amber-500 dark:text-amber-400 -mt-2 animate-bounce" style={{ animationDelay: '0.1s' }} />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        
 
         {/* QUICK ADD FLOATING BUTTON */}
         <div className="flex-1 flex justify-end">

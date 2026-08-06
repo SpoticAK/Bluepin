@@ -1,7 +1,8 @@
 import { getHealthScoreTheme } from '../lib/scoreColor';
 import React, { useState, useEffect } from 'react';
+import elementImg from '../Element.png';
 import { cn } from '../lib/utils';
-import { ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, Lock } from 'lucide-react';
 
 interface HealthDialProps {
   score: number | null;
@@ -83,7 +84,7 @@ export const DashboardHealthDial: React.FC<HealthDialProps> = ({ score, scoreDif
           )}
         >
           <img 
-            src="/Element.png" 
+            src={elementImg} 
             alt="Health Status Background" 
             className="w-[280px] h-[280px] object-cover transition-all duration-1000 animate-gentle-float health-blob"
             style={{ 
@@ -104,6 +105,9 @@ export const DashboardHealthDial: React.FC<HealthDialProps> = ({ score, scoreDif
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
              <div className="w-[150px] h-[150px] bg-white/60 dark:bg-[#171717]/60 blur-[28px] rounded-full" />
           </div>
+          <span className="text-xs font-normal text-[#171717] dark:text-white/80 mb-0.5 z-10">
+            Health Score
+          </span>
           {details && (
             <span 
               className="text-base font-semibold text-[#171717] dark:text-white mb-1 z-10" 
@@ -113,11 +117,15 @@ export const DashboardHealthDial: React.FC<HealthDialProps> = ({ score, scoreDif
           )}
           
           <div className="flex items-center justify-center relative -my-1 z-10">
-            <span 
-              className="text-[4.5rem] font-display font-semibold leading-none tracking-tight text-[#171717] dark:text-white"
-            >
-              {score !== null ? animatedScore : '--'}
-            </span>
+            <div className="flex items-center justify-center">
+              {score !== null ? (
+                <span className="text-[4.5rem] font-display font-semibold leading-none tracking-tight text-[#171717] dark:text-white">
+                  {animatedScore}
+                </span>
+              ) : (
+                <Lock size={64} className="text-[#171717]/30 dark:text-white/30" />
+              )}
+            </div>
           </div>
 
           <div className="flex items-center justify-center gap-1.5 mt-2 z-10">

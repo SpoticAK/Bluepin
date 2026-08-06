@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet } from 'lucide-react';
 import { useAppStore } from '../store';
 import { auth } from '../lib/firebase';
+import { deleteUser } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { LegalDocsModal } from './LegalDocsModal';
 import { LegalDocType } from '../lib/consentManager';
@@ -31,7 +32,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     setIsDeleting(true);
     try {
       if (user) {
-        await user.delete();
+        await deleteUser(user);
       }
     } catch (e: any) {
       alert("Failed to delete account. You may need to sign in again first. " + e.message);

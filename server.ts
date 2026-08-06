@@ -403,12 +403,25 @@ async function startServer() {
               }
             });
           } else {
-            // Fallback: send the optimized image or original PDF
-            if (activeBase64.length > 2 * 1024 * 1024) { // Use File API for base64 > 2MB
-              const tmpFilePath = path.join('/tmp', `${userScopedUploadId.replace(/[^a-zA-Z0-9_]/g, '')}.tmp`);
+            const isPdf = activeMimeType === 'application/pdf';
+            if (isPdf || activeBase64.length > 2 * 1024 * 1024) { // Use File API for PDFs or large files
+              const ext = isPdf ? '.pdf' : '.tmp';
+              const tmpFilePath = path.join('/tmp', `${userScopedUploadId.replace(/[^a-zA-Z0-9_]/g, '')}${ext}`);
               fs.writeFileSync(tmpFilePath, Buffer.from(activeBase64, 'base64'));
               try {
                 fileInfo = await getAiClient().files.upload({ file: tmpFilePath, config: { mimeType: activeMimeType } });
+                
+                // Wait for the file to finish processing (especially important for PDFs)
+                let getResponse = await getAiClient().files.get({ name: fileInfo.name });
+                let attempts = 0;
+                while (getResponse.state === 'PROCESSING' && attempts < 30) {
+                  await new Promise((resolve) => setTimeout(resolve, 2000));
+                  getResponse = await getAiClient().files.get({ name: fileInfo.name });
+                  attempts++;
+                }
+                if (getResponse.state === 'FAILED') {
+                  throw new Error("File processing failed on the server.");
+                }
               } finally {
                 if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
               }
@@ -462,8 +475,19 @@ async function startServer() {
       return res.json({ status: "chunk_received" });
     } catch (error: any) {
       chunkStore.delete(userScopedUploadId);
-      console.error("Chunk extraction error:", error.message || "Unknown error");
-      return res.status(500).json({ error: "Failed to extract from chunks: " + (error.message || "Unknown error") });
+      const errStr = typeof error === 'object' ? JSON.stringify(error) : String(error);
+      const errMsg = error.message || errStr;
+      console.error("Chunk extraction error:", errMsg);
+      let userMsg = errMsg;
+      const errLower = errMsg.toLowerCase();
+      if (errLower.includes("the document has no pages") || errLower.includes("invalid argument") || errLower.includes("400")) {
+        userMsg = "The uploaded file could not be parsed by the AI. If this is a PDF, it might be too large, encrypted, or contain unsupported images. Please try taking screenshots of the report and uploading them as images instead.";
+      } else if (errLower.includes("rate") || errLower.includes("quota") || errLower.includes("429") || errLower.includes("503")) {
+        userMsg = "The AI service is currently busy. Please try again in a few moments.";
+      } else {
+        userMsg = "An error occurred while analyzing the document. Please try uploading an image instead of a PDF.";
+      }
+      return res.status(400).json({ error: userMsg });
     }
   });
 

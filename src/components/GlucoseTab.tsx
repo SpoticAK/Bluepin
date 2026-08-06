@@ -1266,6 +1266,13 @@ export function AddGlucoseModal({ onClose, onAdd }: { onClose: () => void, onAdd
 
  let data: any = null;
 
+ let detectedMimeType = file.type;
+ const ext = file.name.toLowerCase().split('.').pop();
+ if (ext === 'pdf') detectedMimeType = 'application/pdf';
+ else if (ext === 'png') detectedMimeType = 'image/png';
+ else if (ext === 'jpg' || ext === 'jpeg') detectedMimeType = 'image/jpeg';
+ else if (!detectedMimeType) detectedMimeType = 'image/jpeg';
+
  for (let i = 0; i < totalChunks; i++) {
  const chunkData = base64Str.slice(i * chunkSize, (i + 1) * chunkSize);
  
@@ -1277,7 +1284,7 @@ export function AddGlucoseModal({ onClose, onAdd }: { onClose: () => void, onAdd
  chunkIndex: i,
  totalChunks,
  chunkData,
- mimeType: file.type || 'image/jpeg',
+ mimeType: detectedMimeType,
  type: 'glucose'
  })
  });

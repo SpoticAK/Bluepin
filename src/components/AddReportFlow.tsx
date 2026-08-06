@@ -1,12 +1,13 @@
 import { auth, storage } from '../lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '../store';
 import { LabReport } from '../types';
-import { UploadCloud, Loader2, X, File as FileIcon } from 'lucide-react';
+import { UploadCloud, Loader2, X, File as FileIcon, CheckCircle2, Circle, FileSearch } from 'lucide-react';
 import { cn, safeFormat } from '../lib/utils';
 import { calculateStatus } from '../lib/biomarkerUtils';
+import { DnaLoader } from './DnaLoader';
 
 export function AddReportFlow({ onClose, onSuccess }: { onClose: () => void, onSuccess?: () => void }) {
   const { addLabReport } = useAppStore();
@@ -15,9 +16,37 @@ export function AddReportFlow({ onClose, onSuccess }: { onClose: () => void, onS
   const [reportDate, setReportDate] = useState(safeFormat(new Date(), 'yyyy-MM-dd'));
     const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [uploadPhase, setUploadPhase] = useState<'uploading' | 'scanning' | 'extracting' | 'finalizing'>('uploading');
+  const [simulatedBiomarkers, setSimulatedBiomarkers] = useState<{name: string, status: 'pending'|'done'}[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    if (uploadPhase === 'extracting') {
+      const coreBiomarkers = [
+        "Hemoglobin", "Total Cholesterol", "Vitamin D", "Glucose", 
+        "Creatinine", "White Blood Cells"
+      ];
+      let currentIndex = 0;
+      setSimulatedBiomarkers(coreBiomarkers.map(b => ({ name: b, status: 'pending' })));
+
+      const interval = setInterval(() => {
+        setSimulatedBiomarkers(prev => {
+          const next = [...prev];
+          if (currentIndex < next.length) {
+            next[currentIndex].status = 'done';
+            currentIndex++;
+          } else {
+            setUploadPhase('finalizing');
+            clearInterval(interval);
+          }
+          return next;
+        });
+      }, 1500);
+      return () => clearInterval(interval);
+    }
+  }, [uploadPhase]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -86,17 +115,31 @@ export function AddReportFlow({ onClose, onSuccess }: { onClose: () => void, onS
           downloadUrl = `data:${file.type};base64,${base64Str}`;
         }
       }
+      setUploadPhase('uploading');
+      let detectedMimeType = file.type;
+      const ext = file.name.toLowerCase().split('.').pop();
+      if (ext === 'pdf') detectedMimeType = 'application/pdf';
+      else if (ext === 'png') detectedMimeType = 'image/png';
+      else if (ext === 'jpg' || ext === 'jpeg') detectedMimeType = 'image/jpeg';
+      else if (!detectedMimeType) detectedMimeType = 'application/pdf';
+
       for (let i = 0; i < totalChunks; i++) {
         if (i === totalChunks - 1) {
-          setUploadStatus('Analyzing with AI (this may take up to a minute)...');
+          setUploadPhase('scanning');
+          setUploadStatus('Reading medical document context...');
+          // Move to extracting phase after a short delay
+          setTimeout(() => {
+            setUploadPhase('extracting');
+            setUploadStatus('Extracting key biomarkers...');
+          }, 2500);
         } else {
-          setUploadStatus(`Uploading chunk ${i + 1} of ${totalChunks}...`);
+          setUploadStatus(`Uploading securely (${Math.round(((i + 1) / totalChunks) * 100)}%)...`);
         }
         const chunkData = base64Str.slice(i * chunkSize, (i + 1) * chunkSize);
         const res = await fetch('/api/upload-chunk', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${await auth.currentUser?.getIdToken()}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uploadId, chunkIndex: i, totalChunks, chunkData, mimeType: file.type || 'application/pdf', type: 'lab-report' })
+          body: JSON.stringify({ uploadId, chunkIndex: i, totalChunks, chunkData, mimeType: detectedMimeType, type: 'lab-report' })
         });
         if (!res.ok) {
           const text = await res.text();
@@ -162,10 +205,30 @@ export function AddReportFlow({ onClose, onSuccess }: { onClose: () => void, onS
           className="bg-theme-card max-w-md w-full rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
         >
           {isUploading ? (
-            <div className="p-8 flex flex-col items-center justify-center min-h-[300px]">
-              <Loader2 size={48} className="animate-spin text-theme-accent mb-4" />
-              <h3 className="text-xl font-bold text-theme-text">Processing Report...</h3>
-              <p className="text-theme-text-sec text-sm mt-2 text-center">{uploadStatus}</p>
+            <div className="p-8 flex flex-col items-center justify-center min-h-[350px] relative">
+              <DnaLoader className="mb-8 scale-110" />
+              <h3 className="text-[22px] font-bold text-theme-text mb-2 text-center">
+                {uploadPhase === 'uploading' && 'Uploading Securely'}
+                {uploadPhase === 'scanning' && 'Scanning Content'}
+                {uploadPhase === 'extracting' && 'Extracting Biomarkers'}
+                {uploadPhase === 'finalizing' && 'Finalizing Results'}
+              </h3>
+              <p className="text-theme-text-sec text-sm mb-6 text-center">{uploadStatus}</p>
+
+              <div className="w-full max-w-[240px] space-y-3 mt-2">
+                {simulatedBiomarkers.map((b, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-sm animate-in fade-in slide-in-from-bottom-2 duration-500" style={{ animationFillMode: 'both' }}>
+                    <span className={b.status === 'done' ? 'text-theme-text font-medium' : 'text-theme-text-sec'}>
+                      {b.name}
+                    </span>
+                    {b.status === 'done' ? (
+                      <CheckCircle2 size={16} className="text-emerald-500 animate-in zoom-in duration-300" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-theme-border/50 animate-pulse" />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : errorMsg ? (
             <div className="p-8 text-center min-h-[300px] flex flex-col items-center justify-center relative">
