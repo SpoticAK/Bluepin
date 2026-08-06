@@ -1482,7 +1482,7 @@ return (
          
          <div className="flex gap-3 pt-2">
            <button type="button" onClick={onClose} className="flex-1 py-3 px-4 bg-theme-card-sec border border-theme-border text-theme-text rounded-xl font-bold hover:bg-theme-border transition-colors">Cancel</button>
-           <button type="submit" disabled={!val} className="flex-1 py-3 px-4 bg-gradient-to-r from-theme-accent to-theme-accent/80 text-white rounded-xl font-bold hover:opacity-90 transition-colors shadow-lg shadow-theme-accent/20 disabled:opacity-50">Save</button>
+           <button type="submit" disabled={!val || isSubmitting} className="flex-1 py-3 px-4 bg-gradient-to-r from-theme-accent to-theme-accent/80 text-white rounded-xl font-bold hover:opacity-90 transition-colors shadow-lg shadow-theme-accent/20 disabled:opacity-50">{isSubmitting ? 'Saving...' : 'Save'}</button>
          </div>
        </form>
      </div>

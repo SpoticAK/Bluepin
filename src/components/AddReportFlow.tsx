@@ -127,10 +127,28 @@ export function AddReportFlow({ onClose, onSuccess }: { onClose: () => void, onS
         if (i === totalChunks - 1) {
           setUploadPhase('scanning');
           setUploadStatus('Reading medical document context...');
-          // Move to extracting phase after a short delay
+          
+          let aiMessageIndex = 0;
+          const aiMessages = [
+            'Extracting key biomarkers...',
+            'Analyzing clinical values...',
+            'Formatting health insights...',
+            'Comparing against standard ranges...',
+            'Finalizing report parameters...'
+          ];
+          
           setTimeout(() => {
             setUploadPhase('extracting');
-            setUploadStatus('Extracting key biomarkers...');
+            setUploadStatus(aiMessages[0]);
+            
+            // Start rotating messages every 6 seconds
+            const rotateInterval = setInterval(() => {
+              aiMessageIndex = (aiMessageIndex + 1) % aiMessages.length;
+              setUploadStatus(aiMessages[aiMessageIndex]);
+            }, 6000);
+            
+            // Attach interval to window so we can clear it
+            window.__uploadInterval = rotateInterval;
           }, 2500);
         } else {
           setUploadStatus(`Uploading securely (${Math.round(((i + 1) / totalChunks) * 100)}%)...`);
@@ -152,6 +170,7 @@ export function AddReportFlow({ onClose, onSuccess }: { onClose: () => void, onS
         if (i === totalChunks - 1) data = resData;
       }
       
+      if (window.__uploadInterval) clearInterval(window.__uploadInterval);
       if (data?.success && data.biomarkers && data.biomarkers.length > 0) {
         const extractedBiomarkers = data.biomarkers.map((b: any) => {
           const statusResult = calculateStatus(b.biomarkerId || b.name, b.value, b.refMin, b.refMax, b.status, b.refRangeText);
