@@ -53,9 +53,10 @@ function getAiClient(): GoogleGenAI {
 
 
 // Initialize Firebase Admin
+const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
 if (!getApps().length) {
   initializeApp({
-    projectId: firebaseConfig.projectId,
+    projectId: firebaseProjectId,
   });
 }
 
@@ -270,7 +271,7 @@ async function startServer() {
       }
     }
   }));
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.set('trust proxy', 1);
 
