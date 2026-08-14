@@ -28,30 +28,30 @@ export default function AuthScreen() {
   const [showConsentError, setShowConsentError] = useState(false);
   const canSignUp = agreeTerms && agreePrivacy && agreeConsent;
 
-  useEffect(() => {
-    const checkRedirect = async () => {
-      try {
-        const userCred = await getRedirectResult(auth);
-        if (userCred) {
-          const additionalInfo = getAdditionalUserInfo(userCred);
-          if (additionalInfo?.isNewUser) {
-            await setDoc(
-              doc(db, "users", userCred.user.uid),
-              {
-                consent: getConsentPayload(navigator.userAgent),
-              },
-              { merge: true },
-            );
-          }
-        }
-      } catch (err: any) {
-        if (err.code !== "auth/redirect-cancelled-by-user") {
-          setError(err.message || "An error occurred during authentication.");
-        }
-      }
-    };
-    checkRedirect();
-  }, []);
+  // useEffect(() => {
+  //   const checkRedirect = async () => {
+  //     try {
+  //       const userCred = await getRedirectResult(auth);
+  //       if (userCred) {
+  //         const additionalInfo = getAdditionalUserInfo(userCred);
+  //         if (additionalInfo?.isNewUser) {
+  //           await setDoc(
+  //             doc(db, "users", userCred.user.uid),
+  //             {
+  //               consent: getConsentPayload(navigator.userAgent),
+  //             },
+  //             { merge: true },
+  //           );
+  //         }
+  //       }
+  //     } catch (err: any) {
+  //       if (err.code !== "auth/redirect-cancelled-by-user") {
+  //         setError(err.message || "An error occurred during authentication.");
+  //       }
+  //     }
+  //   };
+  //   checkRedirect();
+  // }, []);
 
   const handleToggleMode = () => {
     setIsLogin((prev) => !prev);
