@@ -53,9 +53,10 @@ function getAiClient(): GoogleGenAI {
 
 
 // Initialize Firebase Admin
+const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
 if (!getApps().length) {
   initializeApp({
-    projectId: firebaseConfig.projectId,
+    projectId: firebaseProjectId,
   });
 }
 

@@ -9,3 +9,5 @@ coverage
 *.log
 !dist
 !dist/
+
+firebase-adminsdk.json

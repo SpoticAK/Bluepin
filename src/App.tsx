@@ -384,28 +384,84 @@ function AppContent() {
   const [sessionUser, setSessionUser] = useState<any>(undefined);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authTimedOut, setAuthTimedOut] = useState(false);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        try {
-          const docRef = doc(db, "users", u.uid);
-          const docSnap = await getDoc(docRef);
-          setNeedsOnboarding(!docSnap.exists() || !docSnap.data()?.name);
-        } catch (e) {
-          console.error(e);
-          setNeedsOnboarding(true);
+    const timer = setTimeout(() => {
+      setAuthTimedOut(true);
+    }, 8000);
+
+    const unsub = onAuthStateChanged(
+      auth,
+      async (u) => {
+        clearTimeout(timer);
+        setAuthTimedOut(false);
+        setAuthError(null);
+        if (u) {
+          try {
+            const docRef = doc(db, "users", u.uid);
+            const docSnap = await getDoc(docRef);
+            setNeedsOnboarding(!docSnap.exists() || !docSnap.data()?.name);
+          } catch (e) {
+            console.error("Firestore user doc fetch error:", e);
+            setNeedsOnboarding(true);
+          }
         }
+        setSessionUser(u);
+      },
+      (error) => {
+        clearTimeout(timer);
+        console.error("Firebase auth state error:", error);
+        setAuthError(error.message || "Failed to initialize authentication.");
+        setSessionUser(null);
       }
-      setSessionUser(u);
-    });
-    return unsub;
+    );
+
+    return () => {
+      clearTimeout(timer);
+      unsub();
+    };
   }, []);
 
   if (sessionUser === undefined) {
+    if (authTimedOut || authError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-theme-bg text-theme-text">
+          <div className="max-w-sm w-full bg-theme-card border border-theme-border rounded-2xl p-6 text-center shadow-lg">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center mb-4">
+              <Shield size={24} />
+            </div>
+            <h2 className="text-lg font-bold mb-2">Connection Timeout</h2>
+            <p className="text-sm text-theme-text-sec mb-6 leading-relaxed">
+              {authError || "Unable to reach authentication services. Please check your internet connection and try again."}
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium py-3 rounded-xl transition-all shadow-sm"
+              >
+                Retry
+              </button>
+              <button
+                onClick={() => {
+                  setAuthTimedOut(false);
+                  setSessionUser(null);
+                }}
+                className="w-full bg-theme-card border border-theme-border hover:bg-theme-card-sec text-theme-text-sec text-sm font-medium py-2.5 rounded-xl transition-colors"
+              >
+                Continue to Sign In
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-        Loading...
+      <div className="min-h-screen flex flex-col items-center justify-center bg-theme-bg text-theme-text gap-4">
+        <img src="/Bluepin.png" alt="Bluepin Logo" className="w-12 h-12 object-contain animate-pulse" />
+        <p className="text-sm text-theme-text-sec font-medium">Loading Bluepin...</p>
       </div>
     );
   }
@@ -422,14 +478,16 @@ function AppContent() {
   }
 
   return (
-    <ThemeProvider>
-      <AppProvider>
-        <MainLayout />
-      </AppProvider>
-    </ThemeProvider>
+    <AppProvider>
+      <MainLayout />
+    </AppProvider>
   );
 }
 
 export default function App() {
-  return <AppContent />;
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
 }
