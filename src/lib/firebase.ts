@@ -4,15 +4,17 @@ import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import defaultConfig from '../../firebase-applet-config.json';
 
+const cleanEnv = (val?: string) => val ? val.trim().replace(/^["']|["']$/g, '') : undefined;
+
 export const firebaseConfig = {
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || defaultConfig.projectId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || defaultConfig.appId,
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || defaultConfig.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || defaultConfig.authDomain,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || defaultConfig.storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || defaultConfig.messagingSenderId,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || defaultConfig.measurementId,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID || (defaultConfig as Record<string, any>).firestoreDatabaseId || '(default)',
+  projectId: cleanEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID) || defaultConfig.projectId,
+  appId: cleanEnv(import.meta.env.VITE_FIREBASE_APP_ID) || defaultConfig.appId,
+  apiKey: cleanEnv(import.meta.env.VITE_FIREBASE_API_KEY) || defaultConfig.apiKey,
+  authDomain: cleanEnv(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN) || defaultConfig.authDomain,
+  storageBucket: cleanEnv(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET) || defaultConfig.storageBucket,
+  messagingSenderId: cleanEnv(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID) || defaultConfig.messagingSenderId,
+  measurementId: cleanEnv(import.meta.env.VITE_FIREBASE_MEASUREMENT_ID) || defaultConfig.measurementId,
+  firestoreDatabaseId: cleanEnv(import.meta.env.VITE_FIREBASE_DATABASE_ID) || (defaultConfig as Record<string, any>).firestoreDatabaseId || '(default)',
 };
 
 const app = initializeApp(firebaseConfig);
