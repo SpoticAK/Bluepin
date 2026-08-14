@@ -453,13 +453,16 @@ function AppContent() {
         if (userCred) {
           const additionalInfo = getAdditionalUserInfo(userCred);
           if (additionalInfo?.isNewUser) {
-            await setDoc(
-              doc(db, "users", userCred.user.uid),
-              { consent: getConsentPayload(navigator.userAgent) },
-              { merge: true },
-            );
+            try {
+              await setDoc(
+                doc(db, "users", userCred.user.uid),
+                { consent: getConsentPayload(navigator.userAgent) },
+                { merge: true },
+              );
+            } catch (e: any) {
+              console.error("Error saving consent:", e);
+            }
           }
-          // onAuthStateChanged will fire automatically after this resolves
         }
       })
       .catch((err) => {
@@ -468,7 +471,9 @@ function AppContent() {
         }
       });
 
-    const timer = setTimeout(() => setAuthTimedOut(true), 8000);
+    const timer = setTimeout(() => {
+      setAuthTimedOut(true);
+    }, 8000);
 
     const unsub = onAuthStateChanged(
       auth,
@@ -481,7 +486,7 @@ function AppContent() {
             const docRef = doc(db, "users", u.uid);
             const docSnap = await getDoc(docRef);
             setNeedsOnboarding(!docSnap.exists() || !docSnap.data()?.name);
-          } catch (e) {
+          } catch (e: any) {
             console.error("Firestore user doc fetch error:", e);
             setNeedsOnboarding(true);
           }
@@ -504,7 +509,7 @@ function AppContent() {
   if (sessionUser === undefined) {
     if (authTimedOut || authError) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-theme-bg text-theme-text">
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-theme-bg text-theme-text relative">
           <div className="max-w-sm w-full bg-theme-card border border-theme-border rounded-2xl p-6 text-center shadow-lg">
             <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center mb-4">
               <Shield size={24} />
@@ -537,7 +542,7 @@ function AppContent() {
     }
 
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-theme-bg text-theme-text gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-theme-bg text-theme-text gap-4 relative">
         <img
           src="/Bluepin.png"
           alt="Bluepin Logo"

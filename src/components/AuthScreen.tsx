@@ -8,6 +8,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   getAdditionalUserInfo,
+  setPersistence,
+  browserLocalPersistence,
+  inMemoryPersistence,
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
@@ -118,13 +121,23 @@ export default function AuthScreen() {
     const provider = new GoogleAuthProvider();
     try {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
       if (isMobile) {
-        await signInWithRedirect(auth, provider);
-        // Do not set googleLoading to false, as the page will redirect
-      } else {
-        const userCred = await signInWithPopup(auth, provider);
-        const additionalInfo = getAdditionalUserInfo(userCred);
-        if (additionalInfo?.isNewUser) {
+        // Use in-memory persistence for the popup to avoid IndexedDB closing bug on mobile
+        await setPersistence(auth, inMemoryPersistence);
+      }
+
+      const userCred = await signInWithPopup(auth, provider);
+
+      if (isMobile) {
+        // Switch back to local persistence and save the user
+        await setPersistence(auth, browserLocalPersistence);
+      }
+
+      const additionalInfo = getAdditionalUserInfo(userCred);
+      
+      if (additionalInfo?.isNewUser) {
+        try {
           // Record DPDP compliant consent automatically upon Google sign-up
           await setDoc(
             doc(db, "users", userCred.user.uid),
@@ -133,18 +146,20 @@ export default function AuthScreen() {
             },
             { merge: true },
           );
+        } catch (dbError: any) {
+          console.warn("Could not save initial consent due to DB state, it will be saved later:", dbError);
         }
-        setGoogleLoading(false);
       }
+      // Do NOT call setGoogleLoading(false) here on success.
+      // This allows the button to stay in the 'Loading...' state for the 
+      // brief moment before the App component detects the auth state change 
+      // and unmounts this screen, preventing a UI flash.
     } catch (err: any) {
       if (err.code === "auth/popup-blocked") {
         setError(
-          'Popup blocked by your browser. Please click the "Open in new tab" button (top right of the preview) to use Google Sign-In, or allow popups for this site.',
+          "Popup blocked by browser. Please open the app in a new tab (using the button in the top right) to sign in with Google, or allow popups.",
         );
-      } else if (
-        err.code === "auth/cancelled-popup-request" ||
-        err.code === "auth/popup-closed-by-user"
-      ) {
+      } else if (err.code === "auth/cancelled-popup-request" || err.code === "auth/popup-closed-by-user") {
         setError(
           "Google Sign-In popup was closed or cancelled. If you are in the preview, try opening the app in a new tab (top right icon) to use Google Sign-In.",
         );
