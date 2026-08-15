@@ -1,25 +1,20 @@
-import { matchBiomarker } from './src/lib/registry/biomarkerLookup';
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
-// @ts-ignore
-import pdfParse from "pdf-parse";
-import sharp from "sharp";
-import { GoogleGenAI } from "@google/genai";
 import { Type } from "@google/genai";
-import multer from "multer";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
-import { initializeApp, getApps } from 'firebase-admin/app';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 import nodemailer from 'nodemailer';
+import { generateContentWithRetry } from './server/gemini';
+import { handleUploadChunk } from './server/upload';
 
-let aiClient: GoogleGenAI | null = null;
 let mailTransporter: nodemailer.Transporter | null = null;
 
 function getMailTransporter(): nodemailer.Transporter | null {
@@ -37,31 +32,26 @@ function getMailTransporter(): nodemailer.Transporter | null {
   return mailTransporter;
 }
 
-function getAiClient(): GoogleGenAI {
-  if (!aiClient) {
-    aiClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
-  }
-  return aiClient;
-}
-
-
 // Initialize Firebase Admin
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
 if (!getApps().length) {
-  initializeApp({
+  let adminConfig: any = {
     projectId: firebaseProjectId,
-  });
+  };
+  const serviceAccountPath = path.resolve(process.cwd(), 'firebase-adminsdk.json');
+  if (fs.existsSync(serviceAccountPath)) {
+    try {
+      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+      adminConfig.credential = cert(serviceAccount);
+    } catch (e) {
+      console.warn("Could not load service account from firebase-adminsdk.json:", e);
+    }
+  }
+  initializeApp(adminConfig);
 }
 
 // Authentication Middleware
-const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+export const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: "Unauthorized: Missing or invalid Authorization header" });
@@ -77,173 +67,6 @@ const requireAuth = async (req: express.Request, res: express.Response, next: ex
     return res.status(401).json({ error: "Unauthorized: Invalid token" });
   }
 };
-
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
-  fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
-    if (!allowedMimeTypes.includes(file.mimetype)) {
-      return cb(new Error('INVALID_FILE_TYPE'));
-    }
-    const ext = file.originalname.split('.').pop()?.toLowerCase();
-    const allowedExtensions = ['pdf', 'png', 'jpeg', 'jpg'];
-    if (!ext || !allowedExtensions.includes(ext)) {
-      return cb(new Error('INVALID_FILE_TYPE'));
-    }
-    cb(null, true);
-  }
-});
-
-async function generateContentWithRetry(options: any, maxRetries = 5) {
-  if (options.model && typeof options.model === 'string' && options.model.includes('3.6')) {
-    options.config = options.config || {};
-    options.config.thinkingConfig = { thinkingLevel: "minimal" };
-  }
-  const ai = getAiClient();
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await ai.models.generateContent(options);
-    } catch (error: any) {
-      const errorStr = JSON.stringify(error) + (error?.message || '');
-      if (errorStr.includes('503') || errorStr.includes('UNAVAILABLE') || errorStr.includes('high demand') || errorStr.includes('429') || errorStr.toLowerCase().includes('rate') || errorStr.toLowerCase().includes('quota')) {
-        if (i === maxRetries - 1) throw error;
-        
-        // Fallback to a stable model if the current one is overloaded
-        if (options.model === 'gemini-3.5-flash-lite') {
-          console.log(`[Gemini API] Falling back from ${options.model} to gemini-3.5-flash-lite`);
-          options.model = 'gemini-3.5-flash-lite';
-        }
-
-        const waitMs = Math.pow(2, i + 1) * 1000 + Math.random() * 2000;
-        console.log(`[Gemini API] Rate limit or high demand (503/429). Retrying with model ${options.model} in ${Math.round(waitMs / 1000)}s... (Attempt ${i + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, waitMs));
-      } else {
-        throw error;
-      }
-    }
-  }
-}
-
-const LAB_REPORT_PROMPT = `Extract biomarker values from this lab report. For each identified biomarker, provide its name, value, unit, and the reference minimum/maximum normally listed.
-
-CATEGORIZATION RULES:
-You must categorize each biomarker into one of these EXACT categories: 'Blood Profile', 'Glucose Profile', 'Lipid Profile', 'Liver Function', 'Kidney Function', 'Thyroid Function', 'Vitamins', 'Urine Analysis', or 'Others'. Do not create any custom categories.
-
-The parser should NOT immediately classify biomarkers. Instead it should work in this order:
-
-STEP 1 — Parse the report structure
-Before categorizing a single biomarker, detect the report hierarchy. Recognize common section headers such as:
-- Complete Blood Count, CBC, Hemogram, Blood Profile -> Blood Profile
-- Urine Routine, Urine Analysis, Urine Routine Examination, Urinalysis -> Urine Analysis
-- Liver Function Test, Liver Profile, LFT -> Liver Function
-- Kidney Function Test, Renal Function Test, KFT, RFT -> Kidney Function
-- Lipid Profile -> Lipid Profile
-- Diabetes Profile -> Glucose Profile
-- Thyroid Profile -> Thyroid Profile
-- Electrolytes -> Kidney Function
-
-Every biomarker that appears beneath a section header should inherit that section until another section header is encountered. Do NOT flatten the report. Preserve the hierarchy.
-
-STEP 2 — Categorize using section context
-If a biomarker belongs to a recognized section, the section ALWAYS wins.
-Example: Under 'URINE ROUTINE', 'Albumin', 'Protein', 'Glucose', 'RBC', 'WBC', 'Ketones' all belong to 'Urine Analysis'.
-Example: Under 'LIVER FUNCTION TEST', 'Albumin' belongs to 'Liver Function'.
-
-STEP 3 — Only if no section exists
-Only when a biomarker appears outside any recognized section should standard fallback definitions be used.
-Example (Standalone): 'Albumin' -> 'Liver Function', 'Glucose' -> 'Glucose Profile', 'RBC' -> 'Blood Profile'
-
-Important Rule: The report structure is the strongest source of truth. It is the primary source. Standard definitions are only a fallback. The parser should never ignore explicit report sections.
-
-CRITICAL: Complete biomarker names must ALWAYS be taken exactly as written in the report (e.g. 'Blood Urea Nitrogen', NOT 'Urea'). Whenever there is duplicacy of biomarker in the same profile, there should be a quick recheck to ensure you did not accidentally shorten different biomarkers to the same name. Also output 'status' as 'Low', 'Normal', 'High', or 'Borderline'. Do not discard any extracted medical information.`;
-
-const GLUCOSE_PROMPT = "Extract the glucose reading (mg/dL or mmol/L) from this glucometer display. If there is a date and time, extract those too. If it is obviously not a glucometer reading, indicate that. Respond only in the requested JSON format.";
-
-const LAB_REPORT_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    success: { type: Type.BOOLEAN, description: "True if any lab results were found." },
-    reportDate: { type: Type.STRING, description: "The date of the report in YYYY-MM-DD format, if available." },
-    reportType: { type: Type.STRING, description: "Infer report type, e.g. CBC, LFT, KFT, LIPID, URINE_ROUTINE, THYROID, GLUCOSE, VITAMINS, UNKNOWN" },
-    specimenType: { type: Type.STRING, description: "Infer primary specimen type, e.g. Blood, Urine, Saliva, Stool, Unknown" },
-    sections: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          sectionName: { type: Type.STRING, description: "The header of the section (e.g. 'URINE ROUTINE', 'LIVER FUNCTION TEST'). If standalone, use 'Standalone'" },
-          category: { type: Type.STRING, description: "The categorized profile for this section from EXACT categories (e.g., 'Urine Analysis', 'Liver Function')" },
-          biomarkers: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                value: { type: Type.NUMBER },
-                unit: { type: Type.STRING },
-                refMin: { type: Type.NUMBER, description: "Numeric minimum. For '< X', use 0." },
-                refMax: { type: Type.NUMBER, description: "Numeric maximum. For '< X', use X." },
-                refRangeText: { type: Type.STRING, description: "The exact reference range string from the report. ALWAYS extract this if present." },
-                status: { type: Type.STRING, description: "One of: 'Low', 'Normal', 'High'" },
-                categoryFallback: { type: Type.STRING, description: "Only used if this biomarker is completely standalone without any section header. Otherwise leave empty." }
-              },
-              required: ["name", "value", "unit", "refRangeText"]
-            }
-          }
-        },
-        required: ["sectionName", "category", "biomarkers"]
-      }
-    }
-  },
-  required: ["success", "sections"]
-};
-
-function processLabReportResult(result: any) {
-  if (!result || !result.sections) return result;
-  
-  const biomarkers: any[] = [];
-  for (const section of result.sections) {
-    for (const b of section.biomarkers || []) {
-       let cat = section.category;
-       if (!cat || cat === 'Others') {
-          cat = b.categoryFallback || cat || 'Others';
-       }
-       biomarkers.push({
-         ...b,
-         category: cat
-       });
-    }
-  }
-  
-  result.biomarkers = biomarkers.map((b: any) => {
-    const match = matchBiomarker(b.name, {
-      reportType: result.reportType,
-      section: b.category,
-      unit: b.unit,
-    });
-    
-    const validCategories = ['Blood Profile', 'Glucose Profile', 'Lipid Profile', 'Liver Function', 'Kidney Function', 'Thyroid Function', 'Vitamins', 'Urine Analysis', 'Others'];
-    let finalCategory = b.category;
-    if (!validCategories.includes(finalCategory)) {
-        finalCategory = match.profile;
-    } else if (finalCategory === 'Others' && match.profile && match.profile !== 'Others') {
-        finalCategory = match.profile;
-    }
-    return {
-      ...b,
-      originalName: b.name,
-      name: match.canonicalName || b.name,
-      biomarkerId: match.biomarkerId,
-      category: finalCategory,
-      confidence: match.confidence,
-      matchedBy: match.matchedBy
-    };
-  });
-  
-  delete result.sections;
-  return result;
-}
 
 async function startServer() {
             const app = express();
@@ -299,198 +122,8 @@ async function startServer() {
 
   app.use("/api", globalIpLimiter);
 
-  // API constraints for extracting metrics from images
-  const chunkStore = new Map<string, string[]>();
-
-  app.post("/api/upload-chunk", requireAuth, aiUserLimiter, express.json({ limit: "50mb" }), async (req, res) => {
-    
-    
-    const UploadChunkSchema = z.object({
-      uploadId: z.string().min(1).max(100),
-      chunkIndex: z.number().int().min(0),
-      totalChunks: z.number().int().min(1).max(100),
-      chunkData: z.string().max(14 * 1024 * 1024), // ~10MB in base64
-      mimeType: z.enum(['application/pdf', 'image/png', 'image/jpeg', 'image/jpg']),
-      type: z.enum(["glucose", "lab-report"])
-    });
-    const parsedBody = UploadChunkSchema.safeParse(req.body);
-    if (!parsedBody.success) {
-      return res.status(400).json({ error: "Invalid request body", details: parsedBody.error.format() });
-    }
-    const { uploadId, chunkIndex, totalChunks, chunkData, mimeType, type } = parsedBody.data;
-
-
-    
-    // Security: Scope the uploadId to the authenticated user to prevent cross-user chunk corruption
-    const userScopedUploadId = `${(req as any).user.uid}_${uploadId}`;
-
-    if (!chunkStore.has(userScopedUploadId)) {
-      chunkStore.set(userScopedUploadId, []);
-    }
-    const chunks = chunkStore.get(userScopedUploadId)!;
-    chunks[chunkIndex] = chunkData;
-
-    try {
-      if (chunks.filter(Boolean).length === totalChunks) {
-        let fullBase64 = chunks.join('');
-        const estimatedSize = (fullBase64.length * 3) / 4;
-        if (estimatedSize > 10 * 1024 * 1024) {
-          chunkStore.delete(userScopedUploadId);
-          return res.status(400).json({ error: "File too large. Maximum size is 10MB." });
-        }
-        chunkStore.delete(userScopedUploadId);
-        
-        let promptText = "";
-        let schema: any = {};
-        let modelToUse = "gemini-3.5-flash-lite"; // Default to cheaper capable model
-        
-        if (type === "glucose") {
-          promptText = GLUCOSE_PROMPT;
-          modelToUse = "gemini-3.5-flash-lite"; // Route simple tasks to cheapest 8b model
-          schema = {
-            type: Type.OBJECT,
-            properties: {
-              success: { type: Type.BOOLEAN },
-              value: { type: Type.NUMBER },
-              unit: { type: Type.STRING },
-              readingDate: { type: Type.STRING },
-              readingTime: { type: Type.STRING },
-              errorMsg: { type: Type.STRING }
-            },
-            required: ["success"]
-          };
-        } else {
-          promptText = LAB_REPORT_PROMPT;
-          schema = LAB_REPORT_SCHEMA;
-        }
-
-        let response;
-        let fileInfo = null;
-        try {
-          let extractedText = null;
-          let activeMimeType = mimeType;
-          let activeBase64 = fullBase64;
-          
-          // Removed Optimization 1: Extract Text Locally First for PDFs (user requested native processing)
-          
-          // Optimization 2: Aggressive Image Compression for images (downscale before sending)
-          if (mimeType.startsWith('image/')) {
-            try {
-              const imageBuffer = Buffer.from(fullBase64, 'base64');
-              const compressedBuffer = await sharp(imageBuffer)
-                .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true }) // Downscale to max 1024x1024
-                .jpeg({ quality: 65 }) // Heavily compress
-                .toBuffer();
-              activeBase64 = compressedBuffer.toString('base64');
-              activeMimeType = 'image/jpeg';
-            } catch (err) {
-              console.error("Local image compression failed, proceeding with original.", err);
-            }
-          }
-
-          if (extractedText) {
-            // We successfully extracted text, send text tokens (costs pennies) instead of PDF tokens
-            response = await generateContentWithRetry({
-              model: modelToUse,
-              contents: [{
-                parts: [
-                  { text: promptText },
-                  { text: "\n--- DOCUMENT CONTENT ---\n" + extractedText }
-                ]
-              }],
-              config: {
-                responseMimeType: "application/json",
-                responseSchema: schema
-              }
-            });
-          } else {
-            const isPdf = activeMimeType === 'application/pdf';
-            if (isPdf || activeBase64.length > 2 * 1024 * 1024) { // Use File API for PDFs or large files
-              const ext = isPdf ? '.pdf' : '.tmp';
-              const tmpFilePath = path.join('/tmp', `${userScopedUploadId.replace(/[^a-zA-Z0-9_]/g, '')}${ext}`);
-              fs.writeFileSync(tmpFilePath, Buffer.from(activeBase64, 'base64'));
-              try {
-                fileInfo = await getAiClient().files.upload({ file: tmpFilePath, config: { mimeType: activeMimeType } });
-                
-                // Wait for the file to finish processing (especially important for PDFs)
-                let getResponse = await getAiClient().files.get({ name: fileInfo.name });
-                let attempts = 0;
-                while (getResponse.state === 'PROCESSING' && attempts < 30) {
-                  await new Promise((resolve) => setTimeout(resolve, 2000));
-                  getResponse = await getAiClient().files.get({ name: fileInfo.name });
-                  attempts++;
-                }
-                if (getResponse.state === 'FAILED') {
-                  throw new Error("File processing failed on the server.");
-                }
-              } finally {
-                if (fs.existsSync(tmpFilePath)) fs.unlinkSync(tmpFilePath);
-              }
-              response = await generateContentWithRetry({
-                model: modelToUse,
-                contents: [{
-                  parts: [
-                    { text: promptText },
-                    { fileData: { fileUri: fileInfo.uri, mimeType: activeMimeType } }
-                  ]
-                }],
-                config: {
-                  responseMimeType: "application/json",
-                  responseSchema: schema
-                }
-              });
-            } else {
-              response = await generateContentWithRetry({
-                model: modelToUse,
-                contents: [{
-                  parts: [
-                    { text: promptText },
-                    { inlineData: { data: activeBase64, mimeType: activeMimeType } }
-                  ]
-                }],
-                config: {
-                  responseMimeType: "application/json",
-                  responseSchema: schema
-                }
-              });
-            }
-          }
-        } finally {
-          if (fileInfo) {
-            try {
-              await getAiClient().files.delete({ name: fileInfo.name });
-            } catch (e) {
-              console.error("Failed to delete temp file from Gemini:", e);
-            }
-          }
-        }
-
-        let result = JSON.parse(response.text || "{}");
-        
-        if (type !== "glucose") {
-          result = processLabReportResult(result);
-        }
-        
-        return res.json(result);
-      }
-      return res.json({ status: "chunk_received" });
-    } catch (error: any) {
-      chunkStore.delete(userScopedUploadId);
-      const errStr = typeof error === 'object' ? JSON.stringify(error) : String(error);
-      const errMsg = error.message || errStr;
-      console.error("Chunk extraction error:", errMsg);
-      let userMsg = errMsg;
-      const errLower = errMsg.toLowerCase();
-      if (errLower.includes("the document has no pages") || errLower.includes("invalid argument") || errLower.includes("400")) {
-        userMsg = "The uploaded file could not be parsed by the AI. If this is a PDF, it might be too large, encrypted, or contain unsupported images. Please try taking screenshots of the report and uploading them as images instead.";
-      } else if (errLower.includes("rate") || errLower.includes("quota") || errLower.includes("429") || errLower.includes("503")) {
-        userMsg = "The AI service is currently busy. Please try again in a few moments.";
-      } else {
-        userMsg = "An error occurred while analyzing the document. Please try uploading an image instead of a PDF.";
-      }
-      return res.status(400).json({ error: userMsg });
-    }
-  });
+  // Upload route
+  app.post("/api/upload-chunk", requireAuth, aiUserLimiter, express.json({ limit: "50mb" }), handleUploadChunk);
 
   app.post("/api/generate-insights", requireAuth, aiUserLimiter, express.json({ limit: "5mb" }), async (req, res) => {
     try {
