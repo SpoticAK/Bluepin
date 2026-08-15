@@ -1,7 +1,7 @@
-import { createHash } from "crypto";
 import { Type } from "@google/genai";
 import sharp from "sharp";
 import { client } from "../gemini";
+import { createLruCache, hashBuffer } from "../utils/cache";
 
 // ─── Prompt & Schema ────────────────────────────────────────────────────────
 
@@ -38,36 +38,7 @@ export interface GlucoseExtractionResult {
 
 // ─── Image Hash Cache ────────────────────────────────────────────────────────
 
-const CACHE_MAX_SIZE = 100; // max entries kept in memory
-
-/**
- * Simple LRU cache backed by a Map (insertion-order iteration).
- * On a hit the entry is promoted to most-recently-used by re-insertion.
- */
-const extractionCache = new Map<string, GlucoseExtractionResult>();
-
-function cacheGet(key: string): GlucoseExtractionResult | undefined {
-  const value = extractionCache.get(key);
-  if (value !== undefined) {
-    // Promote to MRU position
-    extractionCache.delete(key);
-    extractionCache.set(key, value);
-  }
-  return value;
-}
-
-function cacheSet(key: string, value: GlucoseExtractionResult): void {
-  if (extractionCache.has(key)) extractionCache.delete(key);
-  else if (extractionCache.size >= CACHE_MAX_SIZE) {
-    // Evict least-recently-used (first entry in insertion order)
-    extractionCache.delete(extractionCache.keys().next().value!);
-  }
-  extractionCache.set(key, value);
-}
-
-function hashBuffer(buf: Buffer): string {
-  return createHash("sha256").update(buf).digest("hex");
-}
+const extractionCache = createLruCache<GlucoseExtractionResult>(100);
 
 const TARGET_WIDTH = 350; // px — enough for any glucometer display
 const JPEG_QUALITY = 82; // good balance of size vs. legibility
@@ -81,8 +52,7 @@ interface OptimisedImage {
 /**
  * Prepares an image for AI processing:
  * - Images wider than TARGET_WIDTH are downscaled.
- * - Images already at or below TARGET_WIDTH are left at their original size
- *   (withoutEnlargement ensures we never upscale).
+ * - Images already at or below TARGET_WIDTH are left at their original size.
  * - Output is always converted to JPEG for consistent, compact encoding.
  */
 async function optimiseImage(
@@ -93,14 +63,13 @@ async function optimiseImage(
 
   const metadata = await sharp(inputBuffer).metadata();
   const originalWidth = metadata.width ?? 0;
-
   const needsResize = originalWidth > TARGET_WIDTH;
 
   const outputBuffer = await sharp(inputBuffer)
     .resize(
       needsResize
         ? { width: TARGET_WIDTH, withoutEnlargement: true }
-        : undefined, // skip resize entirely for small images
+        : undefined,
     )
     .jpeg({ quality: JPEG_QUALITY })
     .toBuffer();
@@ -127,8 +96,7 @@ async function optimiseImage(
 /**
  * Extracts glucose readings from a base64 encoded image using Gemini AI.
  * Optimises the image before sending to minimise token usage.
- * Results are cached by the SHA-256 hash of the optimised JPEG buffer so that
- * re-uploading the same image never triggers a second API call.
+ * Results are cached by the SHA-256 hash of the optimised JPEG buffer.
  */
 export async function extractGlucoseFromBase64(
   base64Data: string,
@@ -138,11 +106,11 @@ export async function extractGlucoseFromBase64(
 
   // ── Cache lookup ─────────────────────────────────────────────────────────
   const imageHash = hashBuffer(optimised.buffer);
-  const cached = cacheGet(imageHash);
+  const cached = extractionCache.get(imageHash);
   if (cached) {
     if (process.env.NODE_ENV !== "production") {
       console.log(
-        `[GlucoseCache] HIT  ${imageHash.slice(0, 12)}… (${extractionCache.size}/${CACHE_MAX_SIZE} entries)`,
+        `[GlucoseCache] HIT  ${imageHash.slice(0, 12)}… (${extractionCache.size()}/100 entries)`,
       );
     }
     return cached;
@@ -178,9 +146,6 @@ export async function extractGlucoseFromBase64(
     },
   });
 
-  // console.log(response.usage);
-  // console.log(response.output_text);
-
   const rawText = (response as any)?.output_text ?? (response as any)?.text;
 
   if (!response || !rawText) {
@@ -192,7 +157,6 @@ export async function extractGlucoseFromBase64(
   if (result.value != null) {
     const num = parseFloat(result.value as unknown as string);
     if (!isNaN(num)) {
-      // mg/dL is always a whole number; mmol/L keeps one decimal place
       result.value =
         result.unit === "mmol/L" ? Math.round(num * 10) / 10 : Math.round(num);
     }
@@ -200,7 +164,7 @@ export async function extractGlucoseFromBase64(
 
   // Only cache successful extractions; errors may be transient
   if (result.success) {
-    cacheSet(imageHash, result);
+    extractionCache.set(imageHash, result);
   }
 
   return result;
