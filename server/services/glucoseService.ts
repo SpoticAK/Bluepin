@@ -1,12 +1,18 @@
+import { createHash } from "crypto";
 import { Type } from "@google/genai";
 import sharp from "sharp";
 import { client } from "../gemini";
 
 // ─── Prompt & Schema ────────────────────────────────────────────────────────
 
-export const GLUCOSE_PROMPT = `Extract from this glucometer image: glucose value, unit (mg/dL or mmol/L), date (YYYY-MM-DD), time (HH:mm).
-If not a glucometer or unreadable, set success=false and errorMsg to a user-friendly message.
-Respond in the given JSON schema.`;
+export const GLUCOSE_PROMPT = `Extract data from this glucometer image and return ONLY a JSON object matching the schema.
+- success: true if readable glucometer image, false otherwise
+- value: the glucose reading as a plain numeric string only, e.g. "108" or "5.4" — no explanations, no extra text
+- unit: exactly "mg/dL" or "mmol/L"
+- readingDate: YYYY-MM-DD if the full date including year is visible, otherwise omit
+- readingTime: HH:mm 24-hour format if visible, otherwise omit
+- errorMsg: user-friendly message only when success is false
+Do not include any reasoning, notes, or explanation in any field.`;
 
 export const GLUCOSE_SCHEMA = {
   type: Type.OBJECT,
@@ -30,12 +36,44 @@ export interface GlucoseExtractionResult {
   errorMsg?: string;
 }
 
-// ─── Image Optimisation ─────────────────────────────────────────────────────
+// ─── Image Hash Cache ────────────────────────────────────────────────────────
+
+const CACHE_MAX_SIZE = 100; // max entries kept in memory
+
+/**
+ * Simple LRU cache backed by a Map (insertion-order iteration).
+ * On a hit the entry is promoted to most-recently-used by re-insertion.
+ */
+const extractionCache = new Map<string, GlucoseExtractionResult>();
+
+function cacheGet(key: string): GlucoseExtractionResult | undefined {
+  const value = extractionCache.get(key);
+  if (value !== undefined) {
+    // Promote to MRU position
+    extractionCache.delete(key);
+    extractionCache.set(key, value);
+  }
+  return value;
+}
+
+function cacheSet(key: string, value: GlucoseExtractionResult): void {
+  if (extractionCache.has(key)) extractionCache.delete(key);
+  else if (extractionCache.size >= CACHE_MAX_SIZE) {
+    // Evict least-recently-used (first entry in insertion order)
+    extractionCache.delete(extractionCache.keys().next().value!);
+  }
+  extractionCache.set(key, value);
+}
+
+function hashBuffer(buf: Buffer): string {
+  return createHash("sha256").update(buf).digest("hex");
+}
 
 const TARGET_WIDTH = 350; // px — enough for any glucometer display
 const JPEG_QUALITY = 82; // good balance of size vs. legibility
 
 interface OptimisedImage {
+  buffer: Buffer;
   base64Data: string;
   mimeType: "image/jpeg";
 }
@@ -78,6 +116,7 @@ async function optimiseImage(
   }
 
   return {
+    buffer: outputBuffer,
     base64Data: outputBuffer.toString("base64"),
     mimeType: "image/jpeg",
   };
@@ -88,12 +127,31 @@ async function optimiseImage(
 /**
  * Extracts glucose readings from a base64 encoded image using Gemini AI.
  * Optimises the image before sending to minimise token usage.
+ * Results are cached by the SHA-256 hash of the optimised JPEG buffer so that
+ * re-uploading the same image never triggers a second API call.
  */
 export async function extractGlucoseFromBase64(
   base64Data: string,
   mimeType: string,
 ): Promise<GlucoseExtractionResult> {
   const optimised = await optimiseImage(base64Data, mimeType);
+
+  // ── Cache lookup ─────────────────────────────────────────────────────────
+  const imageHash = hashBuffer(optimised.buffer);
+  const cached = cacheGet(imageHash);
+  if (cached) {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        `[GlucoseCache] HIT  ${imageHash.slice(0, 12)}… (${extractionCache.size}/${CACHE_MAX_SIZE} entries)`,
+      );
+    }
+    return cached;
+  }
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `[GlucoseCache] MISS ${imageHash.slice(0, 12)}… — calling Gemini`,
+    );
+  }
 
   const response = await client.interactions.create({
     model: "gemini-3.5-flash-lite",
@@ -120,8 +178,8 @@ export async function extractGlucoseFromBase64(
     },
   });
 
-  console.log(response.usage);
-  console.log(response.output_text);
+  // console.log(response.usage);
+  // console.log(response.output_text);
 
   const rawText = (response as any)?.output_text ?? (response as any)?.text;
 
@@ -138,6 +196,11 @@ export async function extractGlucoseFromBase64(
       result.value =
         result.unit === "mmol/L" ? Math.round(num * 10) / 10 : Math.round(num);
     }
+  }
+
+  // Only cache successful extractions; errors may be transient
+  if (result.success) {
+    cacheSet(imageHash, result);
   }
 
   return result;
