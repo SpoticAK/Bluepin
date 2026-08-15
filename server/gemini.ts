@@ -51,4 +51,5 @@ export async function generateContentWithRetry(options: any, maxRetries = 5) {
       }
     }
   }
+  throw new Error("Failed to generate content: max retries reached");
 }
