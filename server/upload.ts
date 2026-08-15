@@ -7,6 +7,7 @@ import path from "path";
 import { Type } from "@google/genai";
 import { matchBiomarker } from "../src/lib/registry/biomarkerLookup";
 import { getAiClient, generateContentWithRetry } from "./gemini";
+import { extractGlucoseFromBase64 } from "./services/glucoseService";
 
 // Multer configuration for file uploads
 export const upload = multer({ 
@@ -60,7 +61,6 @@ Important Rule: The report structure is the strongest source of truth. It is the
 
 CRITICAL: Complete biomarker names must ALWAYS be taken exactly as written in the report (e.g. 'Blood Urea Nitrogen', NOT 'Urea'). Whenever there is duplicacy of biomarker in the same profile, there should be a quick recheck to ensure you did not accidentally shorten different biomarkers to the same name. Also output 'status' as 'Low', 'Normal', 'High', or 'Borderline'. Do not discard any extracted medical information.`;
 
-export const GLUCOSE_PROMPT = "Extract the glucose reading (mg/dL or mmol/L) from this glucometer display. If there is a date and time, extract those too. If it is obviously not a glucometer reading, indicate that. Respond only in the requested JSON format.";
 
 export const LAB_REPORT_SCHEMA = {
   type: Type.OBJECT,
@@ -187,15 +187,9 @@ export async function handleUploadChunk(req: Request, res: Response) {
       
       console.log(`[Upload Chunk Test] File assembled successfully. User: ${userScopedUploadId}, Type: ${type}, MimeType: ${mimeType}, Size: ~${Math.round(estimatedSize / 1024)} KB`);
 
-      // Mock test response to verify upload pipeline without hitting AI
       if (type === "glucose") {
-        return res.json({
-          success: true,
-          value: 120,
-          unit: "mg/dL",
-          readingDate: new Date().toISOString().split('T')[0],
-          readingTime: "09:00"
-        });
+        const result = await extractGlucoseFromBase64(fullBase64, mimeType);
+        return res.json(result);
       } else {
         return res.json({
           success: true,
@@ -236,11 +230,15 @@ export async function handleUploadChunk(req: Request, res: Response) {
     let userMsg = errMsg;
     const errLower = errMsg.toLowerCase();
     if (errLower.includes("the document has no pages") || errLower.includes("invalid argument") || errLower.includes("400")) {
-      userMsg = "The uploaded file could not be parsed by the AI. If this is a PDF, it might be too large, encrypted, or contain unsupported images. Please try taking screenshots of the report and uploading them as images instead.";
+      userMsg = type === "glucose" 
+        ? "Could not read the glucose value from the image. Please ensure the display is clear and legible." 
+        : "The uploaded file could not be processed. If this is a PDF, it might be too large, encrypted, or contain unsupported images. Please try taking a screenshot or photo of the report instead.";
     } else if (errLower.includes("rate") || errLower.includes("quota") || errLower.includes("429") || errLower.includes("503")) {
-      userMsg = "The AI service is currently busy. Please try again in a few moments.";
+      userMsg = "Service is currently busy. Please try again in a few moments.";
     } else {
-      userMsg = "An error occurred while analyzing the document. Please try uploading an image instead of a PDF.";
+      userMsg = type === "glucose"
+        ? "An error occurred while reading the image. Please try again or enter the value manually."
+        : "An error occurred while analyzing the document. Please try uploading an image instead of a PDF.";
     }
     return res.status(400).json({ error: userMsg });
   }

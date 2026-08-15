@@ -1,11 +1,16 @@
+import "./env";
 import { GoogleGenAI } from "@google/genai";
 
 let aiClient: GoogleGenAI | null = null;
 
 export function getAiClient(): GoogleGenAI {
   if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("[Gemini API] WARNING: GEMINI_API_KEY is not set in environment variables or .env file!");
+    }
     aiClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey: apiKey || "",
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
