@@ -13,7 +13,7 @@ import { Type } from "@google/genai";
 import multer from "multer";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
-import { initializeApp, getApps } from 'firebase-admin/app';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import firebaseConfig from './firebase-applet-config.json';
@@ -55,9 +55,19 @@ function getAiClient(): GoogleGenAI {
 // Initialize Firebase Admin
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId;
 if (!getApps().length) {
-  initializeApp({
+  let adminConfig: any = {
     projectId: firebaseProjectId,
-  });
+  };
+  const serviceAccountPath = path.resolve(process.cwd(), 'firebase-adminsdk.json');
+  if (fs.existsSync(serviceAccountPath)) {
+    try {
+      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+      adminConfig.credential = cert(serviceAccount);
+    } catch (e) {
+      console.warn("Could not load service account from firebase-adminsdk.json:", e);
+    }
+  }
+  initializeApp(adminConfig);
 }
 
 // Authentication Middleware
@@ -340,6 +350,10 @@ async function startServer() {
         }
         chunkStore.delete(userScopedUploadId);
         
+        console.log(`[Upload Chunk Test] File assembled successfully. User: ${userScopedUploadId}, Type: ${type}, MimeType: ${mimeType}, Size: ~${Math.round(estimatedSize / 1024)} KB`);
+
+        // TEMPORARILY DISABLED AI CALLS FOR TESTING UPLOAD PIPELINE
+        /*
         let promptText = "";
         let schema: any = {};
         let modelToUse = "gemini-3.5-flash-lite"; // Default to cheaper capable model
@@ -472,6 +486,47 @@ async function startServer() {
         }
         
         return res.json(result);
+        */
+
+        // Mock test response to verify upload pipeline without hitting AI
+        if (type === "glucose") {
+          return res.json({
+            success: true,
+            value: 120,
+            unit: "mg/dL",
+            readingDate: new Date().toISOString().split('T')[0],
+            readingTime: "09:00"
+          });
+        } else {
+          return res.json({
+            success: true,
+            testDate: new Date().toISOString().split('T')[0],
+            biomarkers: [
+              {
+                id: "test-hba1c",
+                name: "HbA1c",
+                originalName: "Hemoglobin A1c",
+                value: 5.6,
+                unit: "%",
+                refMin: 4.0,
+                refMax: 5.6,
+                status: "Normal",
+                refRangeText: "4.0 - 5.6"
+              },
+              {
+                id: "test-fasting-glucose",
+                name: "Fasting Blood Sugar",
+                originalName: "Fasting Blood Glucose",
+                value: 95,
+                unit: "mg/dL",
+                refMin: 70,
+                refMax: 99,
+                status: "Normal",
+                refRangeText: "70 - 99"
+              }
+            ]
+          });
+        }
       }
       return res.json({ status: "chunk_received" });
     } catch (error: any) {
