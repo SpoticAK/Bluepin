@@ -209,9 +209,31 @@ export function AddReportFlow({
     };
   }, [uploadState.phase]);
 
-  // ── File Handlers ──────────────────────────────────────────────────────────
+  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+  const ALLOWED_EXTENSIONS = ["pdf", "png", "jpg", "jpeg"];
+
+  const validateFile = (f: File): string | null => {
+    if (f.size === 0) {
+      return "The selected file appears to be empty.";
+    }
+    if (f.size > MAX_FILE_SIZE_BYTES) {
+      return "File size exceeds 10MB limit. Please upload a smaller file.";
+    }
+    const ext = f.name.toLowerCase().split(".").pop() || "";
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return "Invalid file format. Only PDF, PNG, and JPEG files are supported.";
+    }
+    return null;
+  };
 
   const applyFile = useCallback((f: File) => {
+    const error = validateFile(f);
+    if (error) {
+      setErrorMsg(error);
+      setFile(null);
+      return;
+    }
+    setErrorMsg(null);
     setFile(f);
     // Only auto-fill name if the user hasn't typed one yet
     setReportName((prev) => prev || f.name.replace(/\.[^/.]+$/, ""));
@@ -263,9 +285,9 @@ export function AddReportFlow({
   const processFile = async () => {
     if (!file || !reportName.trim() || !reportDate) return;
 
-    // Fix #9: explicit empty-file guard
-    if (file.size === 0) {
-      setErrorMsg("The selected file appears to be empty.");
+    const validationError = validateFile(file);
+    if (validationError) {
+      setErrorMsg(validationError);
       return;
     }
 
