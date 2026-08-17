@@ -1,10 +1,8 @@
 import { Type } from "@google/genai";
-import pdfParse from "pdf-parse";
 import sharp from "sharp";
 import { matchBiomarker } from "../../src/lib/registry/biomarkerLookup";
 import { client } from "../gemini";
 import { createLruCache, hashBuffer } from "../utils/cache";
-import { extractPdfToMarkdown } from "./pdfMarkdownService";
 import fs from "fs/promises";
 import path from "path";
 import { jsonrepair } from "jsonrepair";
@@ -134,14 +132,14 @@ export const LAB_REPORT_SCHEMA = {
                   description: "Unit of measurement. Empty string if none.",
                 },
                 refMin: {
-                  type: Type.NUMBER,
+                  type: Type.STRING,
                   description:
-                    "Numeric minimum of reference range. For '< X' ranges, use 0.",
+                    "Numeric minimum of reference range as string (e.g. '0', '13.5'). For '< X' ranges, use '0'.",
                 },
                 refMax: {
-                  type: Type.NUMBER,
+                  type: Type.STRING,
                   description:
-                    "Numeric maximum of reference range. For '> X' or '< X' ranges, use X.",
+                    "Numeric maximum of reference range as string (e.g. '150', '4.5'). For '> X' or '< X' ranges, use 'X'.",
                 },
                 refRangeText: {
                   type: Type.STRING,
@@ -201,11 +199,8 @@ export function processLabReportResult(result: any) {
       let inheritedCategory: string;
 
       if (isMixed) {
-        // Mixed sections: each biomarker declares its own category via categoryOverride
-        // Fall back to "Others" if not provided — matchBiomarker will correct it
         inheritedCategory = b.categoryOverride || "Others";
       } else {
-        // Typed sections: inherit section category
         inheritedCategory = section.category || "Others";
       }
 
@@ -223,6 +218,12 @@ export function processLabReportResult(result: any) {
     const numericValue = parseFloat(rawValue);
     const isQualitative = isNaN(numericValue);
 
+    // ── Ref min/max parsing ────────────────────────────────────────────────
+    const refMin =
+      b.refMin != null ? parseFloat(b.refMin.toFixed(4)) : undefined;
+    const refMax =
+      b.refMax != null ? parseFloat(b.refMax.toFixed(4)) : undefined;
+
     // ── Biomarker identity matching ────────────────────────────────────────
     const match = matchBiomarker(b.name, {
       reportType: result.reportType,
@@ -231,18 +232,9 @@ export function processLabReportResult(result: any) {
     });
 
     // ── Category resolution ────────────────────────────────────────────────
-    // Priority order:
-    // 1. For typed sections (non-mixed): trust section inheritance — it's
-    //    the most reliable signal. Only let matchBiomarker win if the
-    //    inherited category itself is invalid or "Others".
-    // 2. For mixed sections: trust matchBiomarker (High confidence) since
-    //    the section gave no categorical guidance. Fall back to categoryOverride
-    //    if match confidence is not High.
-
     let finalCategory: string = b._inheritedCategory;
 
     if (b._sectionIsMixed) {
-      // Mixed section: biomarker identity is the source of truth
       if (
         match.confidence === "High" &&
         match.profile &&
@@ -250,12 +242,11 @@ export function processLabReportResult(result: any) {
       ) {
         finalCategory = match.profile;
       } else if (isValidCategory(b._inheritedCategory)) {
-        finalCategory = b._inheritedCategory; // use categoryOverride from AI if valid
+        finalCategory = b._inheritedCategory;
       } else {
         finalCategory = "Others";
       }
     } else {
-      // Typed section: only override if inherited category is unusable
       if (!isValidCategory(finalCategory) || finalCategory === "Others") {
         if (match.profile && isValidCategory(match.profile)) {
           finalCategory = match.profile;
@@ -263,7 +254,6 @@ export function processLabReportResult(result: any) {
           finalCategory = "Others";
         }
       }
-      // else: inherited section category is valid and trusted — keep it
     }
 
     // ── Clean up internal fields ───────────────────────────────────────────
@@ -278,11 +268,11 @@ export function processLabReportResult(result: any) {
       ...cleanBiomarker,
       originalName: b.name,
       name: match.canonicalName || b.name,
-      // Numeric value for calculations; null if qualitative
       value: isQualitative ? null : numericValue,
-      // Preserve the raw string for display and qualitative results
       rawValue,
       isQualitative,
+      refMin,
+      refMax,
       biomarkerId: match.biomarkerId,
       category: finalCategory,
       confidence: match.confidence,
@@ -332,9 +322,10 @@ export async function extractLabReportFromUrl(
   }
 
   const arrayBuffer = await fileRes.arrayBuffer();
-  let buffer = Buffer.from(arrayBuffer);
-  if (buffer.length > 10 * 1024 * 1024) {
-    throw new Error("File exceeds 10MB limit.");
+  const buffer = Buffer.from(arrayBuffer);
+  if (buffer.length > 20 * 1024 * 1024) {
+    // Increased to 20MB for larger native PDFs
+    throw new Error("File exceeds size limit.");
   }
 
   // ── Cache lookup ─────────────────────────────────────────────────────────
@@ -364,39 +355,8 @@ export async function extractLabReportFromUrl(
 
   let payloadData = buffer.toString("base64");
 
-  // 1. If PDF, extract markdown using PyMuPDF4LLM (with pdfParse fallback)
-  let extractedText = "";
-  if (detectedMime === "application/pdf") {
-    try {
-      const markdown = await extractPdfToMarkdown({ buffer, fileUrl });
-      if (markdown && markdown.length >= 20) {
-        extractedText = markdown;
-        if (process.env.NODE_ENV !== "production") {
-          console.log(
-            `[PyMuPDF4LLM] Successfully extracted ${markdown.length} chars of structured Markdown.`,
-          );
-        }
-      } else {
-        const parsedPdf = await pdfParse(buffer);
-        if (parsedPdf.text && parsedPdf.text.trim().length >= 50) {
-          extractedText = parsedPdf.text.trim();
-        }
-      }
-    } catch {
-      // Fallback to pdfParse or visual document analysis
-      try {
-        const parsedPdf = await pdfParse(buffer);
-        if (parsedPdf.text && parsedPdf.text.trim().length >= 50) {
-          extractedText = parsedPdf.text.trim();
-        }
-      } catch {
-        /* Scanned PDF / non-extractable text falls back to visual document analysis */
-      }
-    }
-  }
-
-  // 2. If image, optimize resolution and compress to compact JPEG
-  if (!extractedText && detectedMime.startsWith("image/")) {
+  // If image, optimize resolution and compress to compact JPEG
+  if (detectedMime.startsWith("image/")) {
     try {
       const optimised = await optimiseReportImage(buffer);
       payloadData = optimised.buffer.toString("base64");
@@ -406,27 +366,18 @@ export async function extractLabReportFromUrl(
     }
   }
 
-  const preparedText = prepareMarkdownForModel(extractedText);
-
-  // 3. Build input parts: text prompt for digital PDFs/markdown, base64 document/image for visual files
-  const input = preparedText
-    ? [
-        {
-          type: "text",
-          text: `${LAB_REPORT_PROMPT}\n\nLAB REPORT STRUCTURED CONTENT:\n${preparedText}`,
-        },
-      ]
-    : [
-        {
-          type: detectedMime === "application/pdf" ? "document" : "image",
-          mime_type: detectedMime,
-          data: payloadData,
-        },
-        {
-          type: "text",
-          text: LAB_REPORT_PROMPT,
-        },
-      ];
+  // Build input parts: base64 document/image alongside the prompt
+  const input = [
+    {
+      type: detectedMime === "application/pdf" ? "document" : "image",
+      mime_type: detectedMime,
+      data: payloadData,
+    },
+    {
+      type: "text",
+      text: LAB_REPORT_PROMPT,
+    },
+  ];
 
   const response = await (client as any).interactions.create({
     model: "gemini-3.5-flash-lite",
@@ -447,116 +398,26 @@ export async function extractLabReportFromUrl(
   if (!rawText) {
     throw new Error("No response from AI model");
   }
-  // console.log(response.usage);
 
-  // const rawResult = JSON.parse(rawText);
+  console.log(response.usage);
+
   const rawResult = safeParseJSON(rawText);
   const result = processLabReportResult(rawResult);
 
   if (result.success) {
-    reportCache.set(fileHash, result);
+    reportCache.set(fileHash, structuredClone(result));
   }
 
   // ── Write output to a JSON file ──────────────────────────────────────────
   const outputDir = path.join(process.cwd(), "output");
-  await fs.mkdir(outputDir, { recursive: true }); // Ensure the directory exists
+  await fs.mkdir(outputDir, { recursive: true });
 
-  const filePath = path.join(outputDir, `lab-report-md-input.json`);
+  const filePath = path.join(outputDir, `lab-report-direct-input.json`);
 
-  // Format with 2-space indentation for human readability
   await fs.writeFile(filePath, JSON.stringify(result, null, 2), "utf-8");
-
   console.log(`Saved JSON output to: ${filePath}`);
 
   return result;
-}
-
-export function cleanLabReportMarkdown(markdown: string): string {
-  const lines = markdown.split("\n");
-  const cleaned: string[] = [];
-  const seenLines = new Set<string>();
-
-  // These signal the start of explanatory blocks — skip until next table/header
-  const skipSectionTriggers = [
-    /^#+\s*(explanation|interpretation|summary and uses|limitations|reference|additional information)/i,
-    /^(explanation|interpretation)[\s:-]/i,
-  ];
-
-  // Resume extraction when we see these
-  const resumeTriggers = [
-    /^\|/, // markdown table row
-    /^#{1,3}\s+\w/, // new section header
-    /^\*\*[A-Z]/, // bold header
-  ];
-
-  const noisePatterns = [
-    /scan qr code/i,
-    /electronically authenticated/i,
-    /page \d+ of \d+/i,
-    /^\s*dr[\s.]+\w/i, // doctor name lines
-    /m\.?d\.?\s*(path|pathology)/i,
-    /^\s*[a-z0-9]{1,3}\s*$/i, // stray artifact characters
-    /national reference lab/i,
-    /pathology lab that cares/i,
-  ];
-
-  let skipping = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (trimmed.length < 2) {
-      if (!skipping) cleaned.push(line);
-      continue;
-    }
-
-    // Check if we should start skipping explanatory content
-    if (skipSectionTriggers.some((p) => p.test(trimmed))) {
-      skipping = true;
-      continue;
-    }
-
-    // Check if we should resume (new data section started)
-    if (skipping && resumeTriggers.some((p) => p.test(trimmed))) {
-      skipping = false;
-    }
-
-    if (skipping) continue;
-
-    // Skip noise
-    if (noisePatterns.some((p) => p.test(trimmed))) continue;
-
-    // Deduplicate short repeated lines (patient info, headers)
-    if (trimmed.length < 120) {
-      if (seenLines.has(trimmed)) continue;
-      seenLines.add(trimmed);
-    }
-
-    cleaned.push(line);
-  }
-
-  return cleaned.join("\n").replace(/\n{3,}/g, "\n\n");
-}
-
-const MAX_MARKDOWN_CHARS = 80_000; // tune based on your model's context window
-
-export function prepareMarkdownForModel(markdown: string): string {
-  const cleaned = cleanLabReportMarkdown(markdown);
-
-  if (cleaned.length > MAX_MARKDOWN_CHARS) {
-    console.warn(
-      `[LabReport] Markdown still ${cleaned.length} chars after cleaning, ` +
-        `truncating to ${MAX_MARKDOWN_CHARS}. Consider splitting report pages.`,
-    );
-    // Truncate but try to end at a clean line boundary
-    const truncated = cleaned.slice(0, MAX_MARKDOWN_CHARS);
-    const lastNewline = truncated.lastIndexOf("\n");
-    return lastNewline > MAX_MARKDOWN_CHARS * 0.9
-      ? truncated.slice(0, lastNewline)
-      : truncated;
-  }
-
-  return cleaned;
 }
 
 export function safeParseJSON(raw: string): any {
@@ -592,15 +453,11 @@ export function safeParseJSON(raw: string): any {
 // Attempts to recover a valid sections array even from truncated JSON
 function extractPartialJSON(raw: string): any | null {
   try {
-    // Find the sections array start
     const sectionsStart = raw.indexOf('"sections"');
     if (sectionsStart === -1) return null;
 
-    // Try progressively shorter substrings to find parseable JSON
-    // by closing open brackets
     let attempt = raw;
     for (let i = 0; i < 5; i++) {
-      // Count unclosed brackets and close them
       const openBraces = (attempt.match(/\{/g) || []).length;
       const closeBraces = (attempt.match(/\}/g) || []).length;
       const openBrackets = (attempt.match(/\[/g) || []).length;
@@ -613,7 +470,6 @@ function extractPartialJSON(raw: string): any | null {
       try {
         return JSON.parse(attempt + closing);
       } catch {
-        // Trim to last complete-looking object and retry
         const lastComplete = attempt.lastIndexOf("},");
         if (lastComplete === -1) break;
         attempt = attempt.slice(0, lastComplete + 1);

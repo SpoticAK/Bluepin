@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import multer from "multer";
 import { z } from "zod";
-import { extractLabReportFromUrl } from "./services/labReportService";
+import { extractLabReportFromUrl } from "./services/labReportServiceDirect";
 import { extractGlucoseFromBase64 } from "./services/glucoseService";
 import { extractPdfToMarkdown } from "./services/pdfMarkdownService";
 
@@ -81,7 +81,9 @@ export async function handleExtractPdfMarkdown(req: Request, res: Response) {
   try {
     const markdown = await extractPdfToMarkdown({ fileUrl, fileBase64 });
     if (!markdown) {
-      return res.status(422).json({ error: "Could not extract Markdown from the provided PDF." });
+      return res
+        .status(422)
+        .json({ error: "Could not extract Markdown from the provided PDF." });
     }
     return res.json({ success: true, markdown });
   } catch (error: any) {
