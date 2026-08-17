@@ -219,10 +219,13 @@ export function processLabReportResult(result: any) {
     const isQualitative = isNaN(numericValue);
 
     // ── Ref min/max parsing ────────────────────────────────────────────────
-    const refMin =
-      b.refMin != null ? parseFloat(b.refMin.toFixed(4)) : undefined;
-    const refMax =
-      b.refMax != null ? parseFloat(b.refMax.toFixed(4)) : undefined;
+    const parseRef = (val: any): number | undefined => {
+      if (val == null || val === "") return undefined;
+      const num = typeof val === "number" ? val : parseFloat(String(val).trim());
+      return isNaN(num) ? undefined : parseFloat(num.toFixed(4));
+    };
+    const refMin = parseRef(b.refMin);
+    const refMax = parseRef(b.refMax);
 
     // ── Biomarker identity matching ────────────────────────────────────────
     const match = matchBiomarker(b.name, {
