@@ -2,7 +2,7 @@ import { Router } from "express";
 import express from "express";
 import { requireAuth } from "../firebase";
 import { aiUserLimiter } from "../middleware/security";
-import { handleUploadChunk, handleAnalyzeReport } from "../upload";
+import { handleUploadChunk, handleAnalyzeReport, handleExtractPdfMarkdown } from "../upload";
 
 const router = Router();
 
@@ -20,6 +20,14 @@ router.post(
   aiUserLimiter,
   express.json(),
   handleAnalyzeReport
+);
+
+router.post(
+  "/extract-pdf-markdown",
+  requireAuth,
+  aiUserLimiter,
+  express.json({ limit: "50mb" }),
+  handleExtractPdfMarkdown
 );
 
 export default router;

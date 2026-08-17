@@ -3,6 +3,7 @@ import multer from "multer";
 import { z } from "zod";
 import { extractLabReportFromUrl } from "./services/labReportService";
 import { extractGlucoseFromBase64 } from "./services/glucoseService";
+import { extractPdfToMarkdown } from "./services/pdfMarkdownService";
 
 // Multer configuration for file uploads
 export const upload = multer({
@@ -53,6 +54,40 @@ export async function handleAnalyzeReport(req: Request, res: Response) {
       error:
         error.message ||
         "Failed to analyze document with AI. Please try again.",
+    });
+  }
+}
+
+export const ExtractPdfMarkdownSchema = z.object({
+  fileUrl: z.string().url().optional(),
+  fileBase64: z.string().optional(),
+});
+
+export async function handleExtractPdfMarkdown(req: Request, res: Response) {
+  const parsed = ExtractPdfMarkdownSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "Invalid request body", details: parsed.error.issues });
+  }
+
+  const { fileUrl, fileBase64 } = parsed.data;
+  if (!fileUrl && !fileBase64) {
+    return res
+      .status(400)
+      .json({ error: "Either 'fileUrl' or 'fileBase64' must be provided." });
+  }
+
+  try {
+    const markdown = await extractPdfToMarkdown({ fileUrl, fileBase64 });
+    if (!markdown) {
+      return res.status(422).json({ error: "Could not extract Markdown from the provided PDF." });
+    }
+    return res.json({ success: true, markdown });
+  } catch (error: any) {
+    console.error("PDF Markdown extraction error:", error.message || error);
+    return res.status(500).json({
+      error: error.message || "Failed to extract markdown from PDF.",
     });
   }
 }
