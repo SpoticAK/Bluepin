@@ -3,33 +3,27 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import React, { useState, useMemo, useEffect } from "react";
 import { motion } from "motion/react";
 import { useAppStore } from "../store";
-import { LabReport, Biomarker, BiomarkerCategory } from "../types";
+import { LabReport, Biomarker } from "../types";
 import {
   Plus,
   FileText,
   UploadCloud,
   Loader2,
   ChevronDown,
-  ChevronUp,
   Info,
-  Activity,
   X,
-  ActivitySquare,
-  Calendar,
   ChevronRight,
   FileOutput,
-  Trash2,
   ArrowUp,
   ArrowDown,
   Download,
   Sparkles,
-  AlertCircle,
   Triangle,
 } from "lucide-react";
 import { cn, safeFormat, downloadFile } from "../lib/utils";
 import { DashboardHealthDial } from "./DashboardHealthDial";
 import { AddReportFlow } from "./AddReportFlow";
-import { v4 as uuidv4 } from "uuid";
+
 import { format, parseISO, isAfter, subMonths } from "date-fns";
 import {
   LineChart,
@@ -42,22 +36,14 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from "recharts";
-import {
-  biomarkerRegistry as BIOMARKER_REGISTRY,
-  BiomarkerDefinition,
-} from "../lib/registry/biomarkerRegistry";
+
 import {
   CATEGORIES,
   TIER_1,
-  getCoreBiomarkersByCategory,
-  isCoreBiomarkerPresent,
   calculateStatus,
   hydrateBiomarker,
 } from "../lib/biomarkerUtils";
 import {
-  getHydratedBiomarkers,
-  getDashboardMetrics,
-  getMissedBiomarkers,
   sortLabReports,
   getCanvasHealthScore,
   getReportHealthScore,
@@ -100,25 +86,11 @@ const ProfileLogo = ({ profile }: { profile: string }) => {
     <img
       src={src}
       alt={matchedKey}
-      className="w-7 h-7 sm:w-8 sm:h-8 object-contain flex-shrink-0"
+      className="w-7 h-7 sm:w-8 sm:h-8 object-contain shrink-0"
       title={profile || matchedKey}
     />
   );
 };
-
-const DynamicBubbles = () => (
-  <div className="relative w-5 h-5 flex items-center justify-center mr-1">
-    <div className="absolute w-2.5 h-2.5 bg-theme-success rounded-full opacity-60 animate-[ping_2s_ease-in-out_infinite]" />
-    <div
-      className="absolute w-3.5 h-3.5 bg-purple-500 rounded-full opacity-40 animate-[pulse_3s_ease-in-out_infinite]"
-      style={{ transform: "translate(5px, -5px)" }}
-    />
-    <div
-      className="absolute w-2 h-2 bg-[#d97706] rounded-full opacity-80 animate-[bounce_2s_ease-in-out_infinite]"
-      style={{ transform: "translate(-6px, 4px)" }}
-    />
-  </div>
-);
 
 export default function BiomarkersTab() {
   const { labReports, addLabReport, removeLabReport, updateLabReport } =
@@ -149,7 +121,6 @@ export default function BiomarkersTab() {
     id: string;
     date: string;
   } | null>(null);
-  const [isCompletenessPanelOpen, setIsCompletenessPanelOpen] = useState(false);
 
   const [aiInsights, setAiInsights] = useState<AiInsights | null>(null);
   const [isAiInsightsCollapsed, setIsAiInsightsCollapsed] = useState(false);
@@ -167,34 +138,12 @@ export default function BiomarkersTab() {
   const {
     score,
     prevScore,
-    needsAttention,
     highLowCount,
     borderlineCount,
     latestBiomarkers: allBiomarkersLatest,
   } = useMemo(() => {
     return getCanvasHealthScore(sortedReports);
   }, [sortedReports]);
-
-  const keyFindings = useMemo(() => {
-    if (!allBiomarkersLatest || allBiomarkersLatest.length === 0) return [];
-    return [...allBiomarkersLatest]
-      .sort((a, b) => {
-        const getPriority = (status: string) => {
-          if (status === "Needs Attention") return 3;
-          if (status === "Borderline") return 2;
-          return 1;
-        };
-        const pA = getPriority(a.status);
-        const pB = getPriority(b.status);
-        if (pA !== pB) return pB - pA;
-        const aTier1 = a.biomarkerId ? TIER_1.includes(a.biomarkerId) : false;
-        const bTier1 = b.biomarkerId ? TIER_1.includes(b.biomarkerId) : false;
-        if (aTier1 && !bTier1) return -1;
-        if (!aTier1 && bTier1) return 1;
-        return 0;
-      })
-      .slice(0, 8);
-  }, [allBiomarkersLatest]);
 
   const getHistoryForBiomarker = (biomarkerName: string) => {
     return sortedReports
@@ -325,156 +274,6 @@ export default function BiomarkersTab() {
     }
   };
 
-  const { missingCoreCount, missingCoreCategorized, isComplete } =
-    useMemo(() => {
-      if (!allBiomarkersLatest || allBiomarkersLatest.length === 0)
-        return {
-          missingCoreCount: 0,
-          missingCoreCategorized: {} as Record<string, string[]>,
-          isComplete: true,
-        };
-
-      const availableNames = allBiomarkersLatest.map(
-        (b: any) => b.biomarkerId || b.name,
-      );
-      const missing: Record<string, string[]> = {};
-      let count = 0;
-
-      Object.entries(getCoreBiomarkersByCategory()).forEach(
-        ([category, markers]) => {
-          const missingInCategory = markers.filter(
-            (m) => !isCoreBiomarkerPresent(m, availableNames),
-          );
-          if (missingInCategory.length > 0) {
-            missing[category] = missingInCategory.map((m) =>
-              typeof m === "string"
-                ? m
-                : (m as any).canonicalName || (m as any).id,
-            );
-            count += missingInCategory.length;
-          }
-        },
-      );
-
-      return {
-        missingCoreCount: count,
-        missingCoreCategorized: missing,
-        isComplete: count === 0,
-      };
-    }, [allBiomarkersLatest]);
-
-  const { missedBiomarkers, missedBiomarkersCategorized } = useMemo(() => {
-    return getMissedBiomarkers(sortedReports);
-  }, [sortedReports]);
-
-  const handleExportCSV = (report: LabReport) => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Category,Biomarker,Value,Unit,Status,Reference Range\n";
-    report.biomarkers.forEach((b) => {
-      csvContent += `"${b.category}","${b.name}","${b.value}","${b.unit || ""}","${b.status}","${b.refRangeText || `${b.refMin || ""}-${b.refMax || ""}`}"\n`;
-    });
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `${report.name || "Lab_Report"}_${report.date}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleDownloadFile = async (fileUrl: string, date: string) => {
-    try {
-      let downloadUrl = fileUrl;
-      let extension = "pdf";
-      let isBlobUrl = false;
-
-      if (fileUrl.startsWith("data:")) {
-        const arr = fileUrl.split(",");
-        const mime = arr[0].match(/:(.*?);/)?.[1] || "application/pdf";
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const blob = new Blob([u8arr], { type: mime });
-        downloadUrl = URL.createObjectURL(blob);
-        extension = mime.includes("pdf")
-          ? "pdf"
-          : mime.includes("png")
-            ? "png"
-            : "jpg";
-        isBlobUrl = true;
-      } else {
-        extension = fileUrl.toLowerCase().includes(".pdf")
-          ? "pdf"
-          : fileUrl.toLowerCase().includes(".png")
-            ? "png"
-            : "jpg";
-        try {
-          // Fetch to bypass CORS download attribute limitations
-          const res = await fetch(fileUrl);
-          if (!res.ok) throw new Error("CORS or Network issue");
-          const blob = await res.blob();
-          downloadUrl = URL.createObjectURL(blob);
-          isBlobUrl = true;
-        } catch (err) {
-          console.warn(
-            "Failed to fetch blob, falling back to window.open",
-            err,
-          );
-          window.open(fileUrl, "_blank");
-          return;
-        }
-      }
-
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = `Lab_Report_${safeFormat(date, "yyyy-MM-dd")}.${extension}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      if (isBlobUrl) {
-        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
-      }
-    } catch (e) {
-      console.error("Failed to download file", e);
-      // Fallback
-      window.open(fileUrl, "_blank");
-    }
-  };
-
-  const handleViewFile = (fileUrl: string) => {
-    if (fileUrl.startsWith("data:")) {
-      try {
-        const arr = fileUrl.split(",");
-        const mime = arr[0].match(/:(.*?);/)?.[1] || "application/pdf";
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const blob = new Blob([u8arr], { type: mime });
-        const blobUrl = URL.createObjectURL(blob);
-        setPreviewFile({ url: blobUrl, type: mime });
-      } catch (e) {
-        console.error("Failed to open data URL", e);
-      }
-    } else {
-      setPreviewFile({
-        url: fileUrl,
-        type: fileUrl.toLowerCase().includes(".pdf")
-          ? "application/pdf"
-          : "image/jpeg",
-      });
-    }
-  };
-
   return (
     <div
       className={cn(
@@ -533,7 +332,7 @@ export default function BiomarkersTab() {
               {activeTab === "dashboard" && (
                 <motion.div
                   layoutId="biomarkersTab-active"
-                  className="absolute inset-0 bg-gradient-to-r from-[#C85A17] to-[#DF6D22] rounded-full shadow-md -z-10"
+                  className="absolute inset-0 bg-linear-to-r from-[#C85A17] to-[#DF6D22] rounded-full shadow-md -z-10"
                   transition={{ type: "spring", stiffness: 300, damping: 25 }}
                 />
               )}
@@ -551,7 +350,7 @@ export default function BiomarkersTab() {
               {activeTab === "timeline" && (
                 <motion.div
                   layoutId="biomarkersTab-active"
-                  className="absolute inset-0 bg-gradient-to-r from-[#C85A17] to-[#DF6D22] rounded-full shadow-md -z-10"
+                  className="absolute inset-0 bg-linear-to-r from-[#C85A17] to-[#DF6D22] rounded-full shadow-md -z-10"
                   transition={{ type: "spring", stiffness: 300, damping: 25 }}
                 />
               )}
@@ -562,7 +361,7 @@ export default function BiomarkersTab() {
           <button
             onClick={generateInsights}
             disabled={isAnalyzing}
-            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-full text-white bg-gradient-to-r from-[#9B49FC] to-[#792DF5] transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg shrink-0"
+            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-full text-white bg-linear-to-r from-[#9B49FC] to-[#792DF5] transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg shrink-0"
           >
             {isAnalyzing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -591,7 +390,7 @@ export default function BiomarkersTab() {
       >
         <div className="relative">
           <FileText size={24} strokeWidth={2.5} />
-          <div className="absolute -top-1 -right-1 bg-theme-text rounded-full p-[1px]">
+          <div className="absolute -top-1 -right-1 bg-theme-text rounded-full p-px">
             <Plus size={12} className="text-theme-bg" strokeWidth={4} />
           </div>
         </div>
@@ -606,7 +405,7 @@ export default function BiomarkersTab() {
 
       {/* Upload Confirmation Modal */}
       {uploadConfirmation && (
-        <div className="fixed inset-0 z-[60] bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4 zoom-in-95">
+        <div className="fixed inset-0 z-60 bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4 zoom-in-95">
           <div className="bg-theme-card max-w-md w-full rounded-3xl overflow-hidden shadow-2xl p-6">
             <h3 className="text-xl font-bold text-theme-text mb-2">
               Review Extracted Data
@@ -661,7 +460,7 @@ export default function BiomarkersTab() {
               <button
                 onClick={confirmUpload}
                 disabled={isSubmittingReport}
-                className="flex-1 py-3 px-4 bg-gradient-to-r from-theme-accent to-theme-accent/80 text-white shadow-lg shadow-theme-accent/20 hover:opacity-90 font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-3 px-4 bg-linear-to-r from-theme-accent to-theme-accent/80 text-white shadow-lg shadow-theme-accent/20 hover:opacity-90 font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 {isSubmittingReport ? (
                   <Loader2 className="animate-spin" size={20} />
@@ -716,7 +515,7 @@ export default function BiomarkersTab() {
                 allBiomarkersLatest.length - (highLowCount + borderlineCount);
 
               return (
-                <div className="bg-theme-card rounded-[32px] border border-theme-border p-6 sm:p-10 mb-8 flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-12 relative overflow-hidden">
+                <div className="bg-theme-card rounded-4xl border border-theme-border p-6 sm:p-10 mb-8 flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-12 relative overflow-hidden">
                   {/* Left Column: Circular Progress & Score */}
                   <div className="flex flex-col items-center shrink-0 w-full lg:w-auto">
                     <DashboardHealthDial
@@ -802,11 +601,11 @@ export default function BiomarkersTab() {
                                   key={i}
                                   className="flex items-start gap-3 text-sm sm:text-base text-theme-text-sec"
                                 >
-                                  <ProfileLogo profile={insight.profile} />
+                                  <ProfileLogo profile={insight?.profile} />
                                   <span className="leading-relaxed">
-                                    {typeof insight === "object"
-                                      ? insight.text || JSON.stringify(insight)
-                                      : String(insight)}
+                                    {typeof insight === "object" && insight !== null
+                                      ? (insight as any).text || JSON.stringify(insight)
+                                      : String(insight ?? "")}
                                   </span>
                                 </li>
                               ))}
@@ -826,12 +625,12 @@ export default function BiomarkersTab() {
                                     key={i}
                                     className="flex items-start gap-3 text-sm sm:text-base text-theme-text-sec"
                                   >
-                                    <ProfileLogo profile={insight.profile} />
+                                    <ProfileLogo profile={insight?.profile} />
                                     <span className="leading-relaxed">
-                                      {typeof insight === "object"
-                                        ? insight.text ||
+                                      {typeof insight === "object" && insight !== null
+                                        ? (insight as any).text ||
                                           JSON.stringify(insight)
-                                        : String(insight)}
+                                        : String(insight ?? "")}
                                     </span>
                                   </li>
                                 ))}
@@ -850,11 +649,11 @@ export default function BiomarkersTab() {
                                   key={i}
                                   className="flex items-start gap-3 text-sm text-purple-900/80 dark:text-purple-200/80"
                                 >
-                                  <span className="mt-1.5 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-purple-500/60" />
+                                  <span className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-purple-500/60" />
                                   <span className="leading-relaxed">
-                                    {typeof insight === "object"
-                                      ? insight.text || JSON.stringify(insight)
-                                      : String(insight)}
+                                    {typeof insight === "object" && insight !== null
+                                      ? (insight as any).text || JSON.stringify(insight)
+                                      : String(insight ?? "")}
                                   </span>
                                 </li>
                               ))}
@@ -877,7 +676,7 @@ export default function BiomarkersTab() {
                 </h3>
                 <div className="relative flex items-center cursor-help">
                   <Info className="w-4 h-4 text-theme-text-sec transition-colors" />
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-[280px] bg-theme-card text-theme-text text-xs p-3 rounded-lg border border-theme-border shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-70 bg-theme-card text-theme-text text-xs p-3 rounded-lg border border-theme-border shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
                     AI extraction may occasionally misclassify values or
                     statuses. We are continuously improving accuracy with newer
                     models.
@@ -885,7 +684,7 @@ export default function BiomarkersTab() {
                 </div>
               </div>
             </div>
-            <div className="bg-theme-card rounded-[24px] border border-theme-border overflow-hidden shadow-sm divide-y divide-theme-border/50 flex flex-col">
+            <div className="bg-theme-card rounded-3xl border border-theme-border overflow-hidden shadow-sm divide-y divide-theme-border/50 flex flex-col">
               {CATEGORIES.map((category) => {
                 const categoryBiomarkers = allBiomarkersLatest.filter(
                   (b: any) => (b.category || "Others") === category,
@@ -927,7 +726,7 @@ export default function BiomarkersTab() {
       )}
       {/* Timeline Content */}
       {activeTab === "timeline" && (
-        <div className="space-y-6 animate-in fade-in duration-300 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-theme-border before:to-transparent">
+        <div className="space-y-6 animate-in fade-in duration-300 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-linear-to-b before:from-transparent before:via-theme-border before:to-transparent">
           {sortedReports.length === 0 ? (
             <div className="text-center py-12 relative z-10">
               <p className="text-theme-text-sec">No medical reports found.</p>
@@ -1018,7 +817,7 @@ export default function BiomarkersTab() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmationId && (
-        <div className="fixed inset-0 z-[60] bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-60 bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-theme-card max-w-sm w-full rounded-3xl p-6 shadow-2xl">
             <h3 className="text-xl font-bold text-theme-text mb-2">
               Delete Report
@@ -1067,7 +866,7 @@ export default function BiomarkersTab() {
 
       {/* Edit Date Modal */}
       {editDateReport && (
-        <div className="fixed inset-0 z-[60] bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-60 bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-theme-card max-w-sm w-full rounded-3xl p-6 shadow-2xl">
             <h3 className="text-xl font-bold text-theme-text mb-2">
               Edit Report Date
@@ -1110,7 +909,7 @@ export default function BiomarkersTab() {
 
       {/* Empty State Dashboard */}
       {activeTab === "dashboard" && labReports.length === 0 && !isUploading && (
-        <div className="flex flex-col items-center justify-center py-32 text-theme-text-sec bg-theme-card rounded-[2rem] border border-theme-border border-dashed">
+        <div className="flex flex-col items-center justify-center py-32 text-theme-text-sec bg-theme-card rounded-4xl border border-theme-border border-dashed">
           <FileText size={48} className="opacity-20 mb-4" />
           <p className="font-medium text-theme-text-sec text-lg">
             Your health canvas is empty.
@@ -1124,7 +923,7 @@ export default function BiomarkersTab() {
 
       {/* Modal: View Uploaded File */}
       {previewFile && (
-        <div className="fixed inset-0 z-[80] bg-theme-text/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-80 bg-theme-text/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
           <div className="bg-theme-card w-full h-[90vh] max-w-5xl rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
             <div className="flex justify-between items-center p-4 border-b border-theme-border bg-theme-card-sec/50">
               <h3 className="text-lg font-bold text-theme-text flex items-center gap-2">
@@ -1137,7 +936,7 @@ export default function BiomarkersTab() {
                       downloadFile(previewFile.url, new Date().toISOString());
                     }
                   }}
-                  className="px-3 py-1.5 bg-theme-accent text-white hover:opacity-90 text-xs font-bold rounded-lg hover:opacity-80 transition-colors"
+                  className="px-3 py-1.5 bg-theme-accent text-white hover:opacity-90 text-xs font-bold rounded-lg transition-colors"
                 >
                   Download
                 </button>
@@ -1170,7 +969,7 @@ export default function BiomarkersTab() {
 
       {/* Modal: Single Graph / Details */}
       {selectedBiomarker && (
-        <div className="fixed inset-0 z-[70] bg-theme-text/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-70 bg-theme-text/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
           <div className="bg-theme-card w-full sm:max-w-2xl sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
             <div className="flex justify-between items-center p-6 border-b border-theme-border bg-theme-card-sec/50">
               <div>
@@ -1253,7 +1052,7 @@ export default function BiomarkersTab() {
               TIER_1.includes(
                 selectedBiomarker.biomarker.name.toLowerCase().trim(),
               ) ? (
-                <div className="h-[220px] sm:h-[280px] w-full mt-4">
+                <div className="h-55 sm:h-70 w-full mt-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
                       data={selectedBiomarker.history}
@@ -1451,7 +1250,7 @@ export default function BiomarkersTab() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="h-[120px] flex items-center justify-center text-theme-text-sec bg-theme-card-sec rounded-2xl border border-theme-border border-dashed mt-4">
+                <div className="h-30 flex items-center justify-center text-theme-text-sec bg-theme-card-sec rounded-2xl border border-theme-border border-dashed mt-4">
                   <p className="text-sm font-medium">
                     Add more reports to generate trend highlights.
                   </p>
@@ -1662,7 +1461,7 @@ function BiomarkerRow({
             {diffString}
           </div>
         )}
-        <div className="flex flex-col items-end min-w-[3rem] justify-center">
+        <div className="flex flex-col items-end min-w-12 justify-center">
           <div className="flex items-baseline gap-1">
             <span
               className={cn(
@@ -1689,7 +1488,7 @@ function BiomarkerRow({
             className="text-theme-border group-hover:text-theme-text-sec transition-colors shrink-0"
           />
         ) : (
-          <div className="w-[16px] shrink-0" />
+          <div className="w-4 shrink-0" />
         )}
       </div>
     </div>
