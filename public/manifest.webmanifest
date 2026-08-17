@@ -1,0 +1,53 @@
+{
+  "name": "Bluepin | AI Health Companion",
+  "short_name": "Bluepin",
+  "description": "Bluepin is your AI-powered health companion. Organize medical reports, track glucose, analyze biomarkers, and unlock personalized AI health insights seamlessly.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["health", "medical", "lifestyle"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/maskable-icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Glucose Tracking",
+      "short_name": "Glucose",
+      "description": "Log and track blood glucose levels",
+      "url": "/?tab=glucose",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Upload Medical Report",
+      "short_name": "Upload",
+      "description": "Upload a new lab report or medical document",
+      "url": "/?action=upload",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

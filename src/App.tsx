@@ -41,6 +41,7 @@ import { LegalDocsModal } from "./components/LegalDocsModal";
 import { LegalDocType } from "./lib/consentManager";
 import AdminFeedbackView from "./components/AdminFeedbackView";
 import { getConsentPayload } from "./lib/consentManager";
+import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
 
 type TabType = "dashboard" | "glucose" | "biomarkers" | "admin";
 
@@ -359,6 +360,7 @@ function MainLayout() {
           />
         )}
       </nav>
+      <InstallPWAPrompt />
     </div>
   );
 }
