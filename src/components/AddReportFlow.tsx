@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   UploadCloud,
@@ -14,6 +14,7 @@ import { LabReport } from "../types";
 import { cn } from "../lib/utils";
 import { calculateStatus } from "../lib/biomarkerUtils";
 import { DnaLoader } from "./DnaLoader";
+import { generateId } from "@/server/utils/generateId";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTS = ["pdf", "png", "jpg", "jpeg"];
@@ -45,7 +46,9 @@ export function AddReportFlow({
   const [statusMessage, setStatusMessage] = useState("Uploading file...");
   const [completedCount, setCompletedCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [duplicateWarning, setDuplicateWarning] = useState<LabReport | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<LabReport | null>(
+    null,
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -94,7 +97,7 @@ export function AddReportFlow({
     if (!force) {
       const existing = labReports.find(
         (r) =>
-          r.name.trim().toLowerCase() === reportName.trim().toLowerCase() &&
+          r.name?.trim().toLowerCase() === reportName.trim().toLowerCase() &&
           r.date === reportDate,
       );
       if (existing) {
@@ -124,7 +127,7 @@ export function AddReportFlow({
       // 1. Client → Firebase Storage (binary)
       const fileRef = ref(
         storage,
-        `users/${uid}/labReports/${crypto.randomUUID()}_${file.name}`,
+        `users/${uid}/labReports/${generateId()}_${file.name}`,
       );
       await uploadBytes(fileRef, file);
       const downloadUrl = await getDownloadURL(fileRef);
@@ -181,7 +184,7 @@ export function AddReportFlow({
             b.refRangeText,
           );
           return {
-            id: crypto.randomUUID(),
+            id: generateId(),
             name: b.name,
             originalName: b.originalName,
             biomarkerId: b.biomarkerId,
@@ -199,7 +202,7 @@ export function AddReportFlow({
         });
 
         const report: LabReport = {
-          id: crypto.randomUUID(),
+          id: generateId(),
           name: reportName.trim(),
           fileUrl: downloadUrl,
           date: reportDate,
@@ -247,7 +250,15 @@ export function AddReportFlow({
               Report Already Exists
             </h3>
             <p className="text-theme-text-sec text-sm mb-6 max-w-xs">
-              A report named <span className="font-semibold text-theme-text">{duplicateWarning.name}</span> for <span className="font-semibold text-theme-text">{duplicateWarning.date}</span> is already in your records.
+              A report named{" "}
+              <span className="font-semibold text-theme-text">
+                {duplicateWarning.name}
+              </span>{" "}
+              for{" "}
+              <span className="font-semibold text-theme-text">
+                {duplicateWarning.date}
+              </span>{" "}
+              is already in your records.
             </p>
             <div className="flex gap-3 w-full">
               <button

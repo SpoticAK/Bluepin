@@ -399,7 +399,7 @@ export async function extractLabReportFromUrl(
     throw new Error("No response from AI model");
   }
 
-  console.log(response.usage);
+  // console.log(response.usage);
 
   const rawResult = safeParseJSON(rawText);
   const result = processLabReportResult(rawResult);
@@ -409,13 +409,13 @@ export async function extractLabReportFromUrl(
   }
 
   // ── Write output to a JSON file ──────────────────────────────────────────
-  const outputDir = path.join(process.cwd(), "output");
-  await fs.mkdir(outputDir, { recursive: true });
+  // const outputDir = path.join(process.cwd(), "output");
+  // await fs.mkdir(outputDir, { recursive: true });
 
-  const filePath = path.join(outputDir, `lab-report-direct-input.json`);
+  // const filePath = path.join(outputDir, `lab-report-direct-input.json`);
 
-  await fs.writeFile(filePath, JSON.stringify(result, null, 2), "utf-8");
-  console.log(`Saved JSON output to: ${filePath}`);
+  // await fs.writeFile(filePath, JSON.stringify(result, null, 2), "utf-8");
+  // console.log(`Saved JSON output to: ${filePath}`);
 
   return result;
 }
