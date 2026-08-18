@@ -1,31 +1,23 @@
-import { auth, storage } from "../lib/firebase";
+import { useState, useRef, useEffect } from "react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-  useReducer,
-  useCallback,
-} from "react";
-import { v4 as uuidv4 } from "uuid";
-import { useAppStore } from "../store";
-import { LabReport } from "../types";
 import {
   UploadCloud,
   Loader2,
   X,
   File as FileIcon,
   CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
-import { cn, safeFormat } from "../lib/utils";
+import { auth, storage } from "../lib/firebase";
+import { useAppStore } from "../store";
+import { LabReport } from "../types";
+import { cn } from "../lib/utils";
 import { calculateStatus } from "../lib/biomarkerUtils";
 import { DnaLoader } from "./DnaLoader";
+import { generateId } from "@/server/utils/generateId";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const CHUNK_SIZE = 8 * 1024 * 1024;
-
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_EXTS = ["pdf", "png", "jpg", "jpeg"];
 const CORE_BIOMARKERS = [
   "Hemoglobin",
   "Total Cholesterol",
@@ -35,96 +27,6 @@ const CORE_BIOMARKERS = [
   "White Blood Cells",
 ];
 
-const AI_MESSAGES = [
-  "Extracting key biomarkers...",
-  "Analyzing clinical values...",
-  "Formatting health insights...",
-  "Comparing against standard ranges...",
-  "Finalizing report parameters...",
-];
-
-// ─── Upload State Machine ─────────────────────────────────────────────────────
-
-type UploadPhase = "uploading" | "scanning" | "extracting" | "finalizing";
-
-interface SimulatedBiomarker {
-  name: string;
-  status: "pending" | "done";
-}
-
-interface UploadState {
-  phase: UploadPhase;
-  statusMessage: string;
-  simulatedBiomarkers: SimulatedBiomarker[];
-}
-
-type UploadAction =
-  | { type: "SET_PHASE"; phase: UploadPhase; message?: string }
-  | { type: "SET_STATUS"; message: string }
-  | { type: "INIT_BIOMARKERS"; names: string[] }
-  | { type: "MARK_BIOMARKER_DONE"; index: number };
-
-const INITIAL_UPLOAD_STATE: UploadState = {
-  phase: "uploading",
-  statusMessage: "Initializing upload...",
-  simulatedBiomarkers: [],
-};
-
-function uploadReducer(state: UploadState, action: UploadAction): UploadState {
-  switch (action.type) {
-    case "SET_PHASE":
-      return {
-        ...state,
-        phase: action.phase,
-        statusMessage: action.message ?? state.statusMessage,
-      };
-    case "SET_STATUS":
-      return { ...state, statusMessage: action.message };
-    case "INIT_BIOMARKERS":
-      return {
-        ...state,
-        simulatedBiomarkers: action.names.map((name) => ({
-          name,
-          status: "pending",
-        })),
-      };
-    case "MARK_BIOMARKER_DONE":
-      // Fix #1: creates new objects instead of mutating existing ones
-      return {
-        ...state,
-        simulatedBiomarkers: state.simulatedBiomarkers.map((b, i) =>
-          i === action.index ? { ...b, status: "done" } : b,
-        ),
-      };
-    default:
-      return state;
-  }
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Fix #10: rejects with a proper Error instead of a raw ProgressEvent
-function readFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve((reader.result as string).split(",")[1]);
-    reader.onerror = () =>
-      reject(new Error("Failed to read file. Please try again."));
-  });
-}
-
-// Fix (de-duplicated MIME logic)
-function detectMimeType(file: File): string {
-  const ext = file.name.toLowerCase().split(".").pop();
-  if (ext === "pdf") return "application/pdf";
-  if (ext === "png") return "image/png";
-  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
-  return file.type || "application/pdf";
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function AddReportFlow({
   onClose,
   onSuccess,
@@ -132,157 +34,57 @@ export function AddReportFlow({
   onClose: () => void;
   onSuccess?: () => void;
 }) {
-  const { addLabReport } = useAppStore();
+  const { addLabReport, labReports } = useAppStore();
 
-  // Form state
   const [file, setFile] = useState<File | null>(null);
   const [reportName, setReportName] = useState("");
   const [reportDate, setReportDate] = useState(
-    safeFormat(new Date(), "yyyy-MM-dd"),
+    new Date().toISOString().split("T")[0],
   );
   const [isDragging, setIsDragging] = useState(false);
-
-  // Upload state
   const [isUploading, setIsUploading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("Uploading file...");
+  const [completedCount, setCompletedCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [uploadState, dispatchUpload] = useReducer(
-    uploadReducer,
-    INITIAL_UPLOAD_STATE,
-  );
-
-  // Fix #2, #3, #4: all timers live in refs, never on window
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const rotateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const biomarkerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+  const [duplicateWarning, setDuplicateWarning] = useState<LabReport | null>(
     null,
   );
-  const isMountedRef = useRef(true);
 
-  // Fix #7: detect touch devices to suppress drag-and-drop UI
-  const isTouchDevice = useMemo(
-    () =>
-      typeof window !== "undefined" &&
-      ("ontouchstart" in window || navigator.maxTouchPoints > 0),
-    [],
-  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Fix #4: full cleanup on unmount — cancels fetch, clears all timers
   useEffect(() => {
-    isMountedRef.current = true;
     return () => {
-      isMountedRef.current = false;
-      abortControllerRef.current?.abort();
-      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
-      if (rotateIntervalRef.current) clearInterval(rotateIntervalRef.current);
-      if (biomarkerIntervalRef.current)
-        clearInterval(biomarkerIntervalRef.current);
+      abortRef.current?.abort();
     };
   }, []);
 
-  // Biomarker animation — triggered by reducer phase, cleaned up properly
-  useEffect(() => {
-    if (uploadState.phase !== "extracting") return;
-
-    dispatchUpload({ type: "INIT_BIOMARKERS", names: CORE_BIOMARKERS });
-    let currentIndex = 0;
-
-    biomarkerIntervalRef.current = setInterval(() => {
-      if (!isMountedRef.current) return;
-      if (currentIndex < CORE_BIOMARKERS.length) {
-        dispatchUpload({
-          type: "MARK_BIOMARKER_DONE",
-          index: currentIndex,
-        });
-        currentIndex++;
-      } else {
-        dispatchUpload({ type: "SET_PHASE", phase: "finalizing" });
-        if (biomarkerIntervalRef.current)
-          clearInterval(biomarkerIntervalRef.current);
-      }
-    }, 1500);
-
-    return () => {
-      if (biomarkerIntervalRef.current)
-        clearInterval(biomarkerIntervalRef.current);
-    };
-  }, [uploadState.phase]);
-
-  const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-  const ALLOWED_EXTENSIONS = ["pdf", "png", "jpg", "jpeg"];
-
   const validateFile = (f: File): string | null => {
-    if (f.size === 0) {
-      return "The selected file appears to be empty.";
-    }
-    if (f.size > MAX_FILE_SIZE_BYTES) {
+    if (f.size === 0) return "The selected file appears to be empty.";
+    if (f.size > MAX_FILE_SIZE)
       return "File size exceeds 10MB limit. Please upload a smaller file.";
-    }
     const ext = f.name.toLowerCase().split(".").pop() || "";
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    if (!ALLOWED_EXTS.includes(ext)) {
       return "Invalid file format. Only PDF, PNG, and JPEG files are supported.";
     }
     return null;
   };
 
-  const applyFile = useCallback((f: File) => {
-    const error = validateFile(f);
-    if (error) {
-      setErrorMsg(error);
+  const handleSelectFile = (f: File) => {
+    const err = validateFile(f);
+    if (err) {
+      setErrorMsg(err);
       setFile(null);
       return;
     }
     setErrorMsg(null);
     setFile(f);
-    // Only auto-fill name if the user hasn't typed one yet
-    setReportName((prev) => prev || f.name.replace(/\.[^/.]+$/, ""));
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      const f = e.dataTransfer.files?.[0];
-      if (f) applyFile(f);
-    },
-    [applyFile],
-  );
-
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const f = e.target.files?.[0];
-      if (f) applyFile(f);
-      // Reset so the same file can be re-selected if needed
-      e.target.value = "";
-    },
-    [applyFile],
-  );
-
-  // ── Upload ─────────────────────────────────────────────────────────────────
-
-  const clearTimers = useCallback(() => {
-    if (scanTimeoutRef.current) {
-      clearTimeout(scanTimeoutRef.current);
-      scanTimeoutRef.current = null;
+    if (!reportName.trim()) {
+      setReportName(f.name.replace(/\.[^/.]+$/, ""));
     }
-    if (rotateIntervalRef.current) {
-      clearInterval(rotateIntervalRef.current);
-      rotateIntervalRef.current = null;
-    }
-  }, []);
+  };
 
-  const processFile = async () => {
+  const processFile = async (force = false) => {
     if (!file || !reportName.trim() || !reportDate) return;
 
     const validationError = validateFile(file);
@@ -291,166 +93,116 @@ export function AddReportFlow({
       return;
     }
 
+    // Check for duplicate report in store
+    if (!force) {
+      const existing = labReports.find(
+        (r) =>
+          r.name?.trim().toLowerCase() === reportName.trim().toLowerCase() &&
+          r.date === reportDate,
+      );
+      if (existing) {
+        setDuplicateWarning(existing);
+        return;
+      }
+    }
+
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setErrorMsg("Please sign in to upload health reports.");
+      return;
+    }
+
+    setDuplicateWarning(null);
     setIsUploading(true);
     setErrorMsg(null);
-    dispatchUpload({
-      type: "SET_PHASE",
-      phase: "uploading",
-      message: "Initializing upload...",
-    });
+    setStatusMessage("Uploading to secure storage...");
+    setCompletedCount(0);
 
-    // Fix (cancellable fetch): AbortController tied to this upload session
-    abortControllerRef.current = new AbortController();
-    const { signal } = abortControllerRef.current;
+    abortRef.current = new AbortController();
+    const { signal } = abortRef.current;
+
+    let ticker: ReturnType<typeof setInterval> | null = null;
 
     try {
-      const base64Str = await readFileAsBase64(file);
+      // 1. Client → Firebase Storage (binary)
+      const fileRef = ref(
+        storage,
+        `users/${uid}/labReports/${generateId()}_${file.name}`,
+      );
+      await uploadBytes(fileRef, file);
+      const downloadUrl = await getDownloadURL(fileRef);
 
-      const totalChunks = Math.ceil(base64Str.length / CHUNK_SIZE);
-      const uploadId = uuidv4();
-      let downloadUrl = "";
-      let data: any = null;
+      if (signal.aborted)
+        throw new DOMException("Upload cancelled.", "AbortError");
 
-      // Firebase Storage — best-effort; non-fatal if it fails
-      try {
-        const uid = auth.currentUser?.uid;
-        if (uid) {
-          const fileRef = ref(
-            storage,
-            `users/${uid}/labReports/${uuidv4()}_${file.name}`,
-          );
-          await uploadBytes(fileRef, file);
-          downloadUrl = await getDownloadURL(fileRef);
-        }
-      } catch {
-        if (file.size < 700 * 1024) {
-          downloadUrl = `data:${file.type};base64,${base64Str}`;
-        }
+      // 2. Client → API server (pass download URL)
+      setStatusMessage("Analyzing medical document with AI...");
+      ticker = setInterval(() => {
+        setCompletedCount((prev) => Math.min(prev + 1, CORE_BIOMARKERS.length));
+      }, 1200);
+
+      const token = await auth.currentUser?.getIdToken();
+      const mimeType =
+        file.type ||
+        (file.name.toLowerCase().endsWith(".pdf")
+          ? "application/pdf"
+          : "image/png");
+
+      const res = await fetch("/api/analyze-report", {
+        method: "POST",
+        signal,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileUrl: downloadUrl,
+          mimeType,
+        }),
+      });
+
+      if (ticker) clearInterval(ticker);
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to analyze document.");
       }
 
-      const mimeType = detectMimeType(file);
-
-      for (let i = 0; i < totalChunks; i++) {
-        if (signal.aborted)
-          throw new DOMException("Upload cancelled.", "AbortError");
-
-        const isLastChunk = i === totalChunks - 1;
-
-        if (isLastChunk) {
-          dispatchUpload({
-            type: "SET_PHASE",
-            phase: "scanning",
-            message: "Reading medical document context...",
-          });
-
-          // Fix #3: timeout ID is saved so it can be cleared on unmount
-          scanTimeoutRef.current = setTimeout(() => {
-            if (!isMountedRef.current) return;
-
-            let aiMessageIndex = 0;
-            dispatchUpload({
-              type: "SET_PHASE",
-              phase: "extracting",
-              message: AI_MESSAGES[0],
-            });
-
-            // Fix #2: stored in ref, never on window
-            rotateIntervalRef.current = setInterval(() => {
-              if (!isMountedRef.current) return;
-              aiMessageIndex = (aiMessageIndex + 1) % AI_MESSAGES.length;
-              dispatchUpload({
-                type: "SET_STATUS",
-                message: AI_MESSAGES[aiMessageIndex],
-              });
-            }, 6000);
-          }, 2500);
-        } else {
-          dispatchUpload({
-            type: "SET_STATUS",
-            message: `Uploading securely (${Math.round(((i + 1) / totalChunks) * 100)}%)...`,
-          });
-        }
-
-        const chunkData = base64Str.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-        const token = await auth.currentUser?.getIdToken();
-
-        const res = await fetch("/api/upload-chunk", {
-          method: "POST",
-          signal, // makes this fetch cancellable
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            uploadId,
-            chunkIndex: i,
-            totalChunks,
-            chunkData,
-            mimeType,
-            type: "lab-report",
-          }),
-        });
-
-        if (!res.ok) {
-          const text = await res.text();
-          let parsed: any;
-          try {
-            parsed = JSON.parse(text);
-          } catch {
-            /* not JSON */
-          }
-          const details =
-            typeof parsed?.details === "object"
-              ? JSON.stringify(parsed.details)
-              : parsed?.details;
-          throw new Error(
-            parsed?.error || details || text || `HTTP Error ${res.status}`,
-          );
-        }
-
-        const resData = await res.json();
-        if (isLastChunk) data = resData;
-      }
-
-      clearTimers();
-      if (!isMountedRef.current) return;
-
+      // 3. Save report and biomarkers
       if (
         data?.success &&
         Array.isArray(data.biomarkers) &&
         data.biomarkers.length > 0
       ) {
-        const extractedBiomarkers = data.biomarkers
-          .map((b: any) => {
-            const statusResult = calculateStatus(
-              b.biomarkerId || b.name,
-              b.value,
-              b.refMin,
-              b.refMax,
-              b.status,
-              b.refRangeText,
-            );
-            return {
-              id: uuidv4(),
-              name: b.name,
-              originalName: b.originalName,
-              biomarkerId: b.biomarkerId,
-              category: b.category,
-              confidence: b.confidence,
-              matchedBy: b.matchedBy,
-              value: b.value,
-              unit: b.unit,
-              refMin: b.refMin,
-              refMax: b.refMax,
-              refRangeText: b.refRangeText,
-              status: statusResult.status || b.status,
-              info: statusResult.info || b.info,
-            };
-          })
-          .filter(Boolean);
+        const extractedBiomarkers = data.biomarkers.map((b: any) => {
+          const statusResult = calculateStatus(
+            b.biomarkerId || b.name,
+            b.value,
+            b.refMin,
+            b.refMax,
+            b.status,
+            b.refRangeText,
+          );
+          return {
+            id: generateId(),
+            name: b.name,
+            originalName: b.originalName,
+            biomarkerId: b.biomarkerId,
+            category: b.category,
+            confidence: b.confidence,
+            matchedBy: b.matchedBy,
+            value: b.value,
+            unit: b.unit,
+            refMin: b.refMin,
+            refMax: b.refMax,
+            refRangeText: b.refRangeText,
+            status: statusResult.status || b.status,
+            info: statusResult.info || b.info,
+          };
+        });
 
         const report: LabReport = {
-          id: uuidv4(),
+          id: generateId(),
           name: reportName.trim(),
           fileUrl: downloadUrl,
           date: reportDate,
@@ -470,72 +222,99 @@ export function AddReportFlow({
         );
       }
     } catch (err: any) {
-      if (!isMountedRef.current) return;
-      // Silently ignore intentional cancellations
       if (err.name === "AbortError") return;
       setErrorMsg(err.message || "Failed to upload and process document.");
     } finally {
-      clearTimers();
-      if (isMountedRef.current) setIsUploading(false);
+      if (ticker) clearInterval(ticker);
+      setIsUploading(false);
     }
   };
 
-  // Fix (optimization): memoized so it doesn't recalculate on every render
-  const isFormComplete = useMemo(
-    () => file !== null && reportName.trim().length > 0 && reportDate !== "",
-    [file, reportName, reportDate],
-  );
-
-  // ── Render ─────────────────────────────────────────────────────────────────
-
-  const { phase, statusMessage, simulatedBiomarkers } = uploadState;
+  const isFormComplete = Boolean(file && reportName.trim() && reportDate);
 
   return (
     <div className="fixed inset-0 z-60 bg-theme-text/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-theme-card max-w-md w-full rounded-4xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-        {/* ── Uploading Phase ────────────────────────────────────────────── */}
-        {isUploading ? (
+        {duplicateWarning ? (
+          <div className="p-8 text-center min-h-75 flex flex-col items-center justify-center relative">
+            <button
+              onClick={() => setDuplicateWarning(null)}
+              className="absolute top-4 right-4 p-2 text-theme-text-sec hover:text-theme-text transition-colors"
+            >
+              <X size={24} />
+            </button>
+            <div className="w-14 h-14 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mb-4">
+              <AlertCircle size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-theme-text mb-2">
+              Report Already Exists
+            </h3>
+            <p className="text-theme-text-sec text-sm mb-6 max-w-xs">
+              A report named{" "}
+              <span className="font-semibold text-theme-text">
+                {duplicateWarning.name}
+              </span>{" "}
+              for{" "}
+              <span className="font-semibold text-theme-text">
+                {duplicateWarning.date}
+              </span>{" "}
+              is already in your records.
+            </p>
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={() => setDuplicateWarning(null)}
+                className="flex-1 py-3 border border-theme-border text-theme-text font-bold rounded-xl hover:bg-theme-card-sec transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => processFile(true)}
+                className="flex-1 py-3 bg-theme-accent text-white font-bold rounded-xl hover:bg-theme-accent/90 shadow-md shadow-theme-accent/20 transition-all"
+              >
+                Save Anyway
+              </button>
+            </div>
+          </div>
+        ) : isUploading ? (
           <div className="p-8 flex flex-col items-center justify-center min-h-87.5 relative">
             <DnaLoader className="mb-8 scale-110" />
             <h3 className="text-[22px] font-bold text-theme-text mb-2 text-center">
-              {phase === "uploading" && "Uploading Securely"}
-              {phase === "scanning" && "Scanning Content"}
-              {phase === "extracting" && "Extracting Biomarkers"}
-              {phase === "finalizing" && "Finalizing Results"}
+              Processing Health Report
             </h3>
             <p className="text-theme-text-sec text-sm mb-6 text-center">
               {statusMessage}
             </p>
             <div className="w-full max-w-60 space-y-3 mt-2">
-              {simulatedBiomarkers.map((b, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between text-sm animate-in fade-in slide-in-from-bottom-2 duration-500"
-                  style={{ animationFillMode: "both" }}
-                >
-                  <span
-                    className={
-                      b.status === "done"
-                        ? "text-theme-text font-medium"
-                        : "text-theme-text-sec"
-                    }
+              {CORE_BIOMARKERS.map((name, idx) => {
+                const isDone = idx < completedCount;
+                return (
+                  <div
+                    key={name}
+                    className="flex items-center justify-between text-sm animate-in fade-in slide-in-from-bottom-2 duration-500"
                   >
-                    {b.name}
-                  </span>
-                  {b.status === "done" ? (
-                    <CheckCircle2
-                      size={16}
-                      className="text-emerald-500 animate-in zoom-in duration-300"
-                    />
-                  ) : (
-                    <div className="w-4 h-4 rounded-full border-2 border-theme-border/50 animate-pulse" />
-                  )}
-                </div>
-              ))}
+                    <span
+                      className={
+                        isDone
+                          ? "text-theme-text font-medium"
+                          : "text-theme-text-sec"
+                      }
+                    >
+                      {name}
+                    </span>
+                    {isDone ? (
+                      <CheckCircle2
+                        size={16}
+                        className="text-emerald-500 animate-in zoom-in duration-300"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-theme-border/50 animate-pulse" />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : errorMsg ? (
-          /* ── Error Phase ──────────────────────────────────────────────── */
           <div className="p-8 text-center min-h-75 flex flex-col items-center justify-center relative">
             <button
               onClick={onClose}
@@ -546,11 +325,7 @@ export function AddReportFlow({
             <h3 className="text-xl font-bold text-theme-text mb-2">
               Upload Failed
             </h3>
-            <p className="text-theme-text-sec text-sm mb-2">
-              {typeof errorMsg === "object"
-                ? JSON.stringify(errorMsg)
-                : errorMsg}
-            </p>
+            <p className="text-theme-text-sec text-sm mb-2">{errorMsg}</p>
             <p className="text-theme-text-sec text-xs mb-6">
               Allowed formats: PDF, PNG, JPEG, JPG.
               <br />
@@ -564,7 +339,6 @@ export function AddReportFlow({
             </button>
           </div>
         ) : (
-          /* ── Form Phase ───────────────────────────────────────────────── */
           <div className="p-6 sm:p-8">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-[22px] font-display font-medium text-theme-text">
@@ -579,22 +353,35 @@ export function AddReportFlow({
             </div>
 
             <div className="space-y-5">
-              {/* File Upload Zone */}
+              {/* File Dropzone */}
               <div>
-                {/* Fix #5: no spaces in accept; Fix #6: no runtime accept mutation */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/png,image/jpeg,image/jpg,application/pdf"
                   className="hidden"
-                  onChange={handleFileChange}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleSelectFile(f);
+                    e.target.value = "";
+                  }}
                 />
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  // Fix #7: drag events only wired on non-touch devices
-                  onDragOver={!isTouchDevice ? handleDragOver : undefined}
-                  onDragLeave={!isTouchDevice ? handleDragLeave : undefined}
-                  onDrop={!isTouchDevice ? handleDrop : undefined}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    const f = e.dataTransfer.files?.[0];
+                    if (f) handleSelectFile(f);
+                  }}
                   className={cn(
                     "w-full h-32 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors text-center px-4",
                     isDragging
@@ -623,28 +410,12 @@ export function AddReportFlow({
                       <span className="text-sm font-medium text-theme-text">
                         Upload file here
                       </span>
-                      {/* Fix #7: contextual hint per device type */}
                       <span className="text-xs text-theme-text-sec mt-0.5">
-                        {isTouchDevice
-                          ? "Tap to choose a PDF or Image"
-                          : "Drag and drop or choose a PDF / Image"}
+                        Drag & drop or tap to choose PDF / Image
                       </span>
-                      <div
-                        className="flex gap-2 mt-4"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Fix #6: no accept mutation here — single source of truth
-                            fileInputRef.current?.click();
-                          }}
-                          className="px-8 py-3 bg-theme-accent text-white text-base font-bold rounded-xl hover:bg-theme-accent/90 shadow-lg shadow-theme-accent/30 transition-all transform hover:scale-105"
-                        >
-                          Upload Report
-                        </button>
-                      </div>
+                      <span className="mt-3 px-6 py-2 bg-theme-accent text-white text-sm font-semibold rounded-xl hover:bg-theme-accent/90 shadow-md shadow-theme-accent/20 transition-all">
+                        Browse Files
+                      </span>
                     </>
                   )}
                 </div>
@@ -687,7 +458,7 @@ export function AddReportFlow({
                 </p>
               </div>
               <button
-                onClick={processFile}
+                onClick={() => processFile()}
                 disabled={!isFormComplete || isUploading}
                 className="w-full py-4 bg-linear-to-r from-theme-accent to-theme-accent/80 disabled:opacity-50 disabled:from-theme-border disabled:to-theme-border text-white font-bold rounded-xl transition-all shadow-lg shadow-theme-accent/20 active:scale-[0.98] flex justify-center items-center gap-2"
               >

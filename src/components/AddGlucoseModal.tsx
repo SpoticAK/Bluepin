@@ -92,24 +92,52 @@ export function AddGlucoseModal({
     const file = e.dataTransfer.files?.[0];
     if (file) {
       await processFile(file, "file");
+    } else {
+      console.warn(
+        "[AddGlucoseModal:handleDrop] Drop event triggered but no file was found in dataTransfer.",
+        { dataTransferTypes: e.dataTransfer.types, filesLength: e.dataTransfer.files?.length },
+      );
     }
   }, []);
 
   // ── File processing ────────────────────────────────────────────────────────
 
   const processFile = async (file: File, trigger: "file" | "camera") => {
-    if (!file) return;
+    if (!file) {
+      console.error("[AddGlucoseModal:processFile] Called with null or undefined file.", {
+        trigger,
+      });
+      return;
+    }
 
     if (file.size === 0) {
+      console.error("[AddGlucoseModal:processFile] File validation failed: File is empty (0 bytes).", {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        trigger,
+      });
       setErrorObj("The selected file appears to be empty.");
       return;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
+      console.error("[AddGlucoseModal:processFile] File validation failed: File size exceeds limit.", {
+        fileName: file.name,
+        fileSize: file.size,
+        maxSizeBytes: MAX_FILE_SIZE_BYTES,
+        trigger,
+      });
       setErrorObj("File size exceeds 10 MB. Please upload a smaller file.");
       return;
     }
     const ext = file.name.toLowerCase().split(".").pop() ?? "";
     if (ext && !ALLOWED_EXTENSIONS.includes(ext)) {
+      console.error("[AddGlucoseModal:processFile] File validation failed: Unsupported file extension.", {
+        fileName: file.name,
+        extension: ext,
+        allowedExtensions: ALLOWED_EXTENSIONS,
+        trigger,
+      });
       setErrorObj(
         "Invalid file format. Only PDF, PNG, and JPEG files are supported.",
       );
@@ -123,51 +151,144 @@ export function AddGlucoseModal({
     const { signal } = abortControllerRef.current;
 
     try {
-      const base64Str = await readFileAsBase64(file);
+      let base64Str: string;
+      try {
+        base64Str = await readFileAsBase64(file);
+      } catch (readErr: any) {
+        console.error("[AddGlucoseModal:processFile] Failed to read file as base64 string:", {
+          error: readErr,
+          message: readErr?.message,
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+          trigger,
+        });
+        throw readErr;
+      }
+
+      if (!base64Str || base64Str.length === 0) {
+        console.error("[AddGlucoseModal:processFile] Base64 conversion produced an empty payload.", {
+          fileName: file.name,
+          trigger,
+        });
+        throw new Error("Failed to read image data: file content is empty.");
+      }
+
       const mimeType = detectMimeType(file);
       const totalChunks = Math.ceil(base64Str.length / CHUNK_SIZE);
       const uploadId = uuidv4();
       let data: any = null;
 
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.error("[AddGlucoseModal:processFile] Authentication error: User is not authenticated.");
+      }
+      let token: string | undefined;
+      try {
+        token = await currentUser?.getIdToken();
+        if (!token) {
+          console.warn("[AddGlucoseModal:processFile] Auth token is undefined or empty for current user.", {
+            uid: currentUser?.uid,
+          });
+        }
+      } catch (tokenErr: any) {
+        console.error("[AddGlucoseModal:processFile] Failed to retrieve Firebase auth token:", {
+          error: tokenErr,
+          message: tokenErr?.message,
+          uid: currentUser?.uid,
+        });
+        throw new Error("Authentication failed. Please sign in again.");
+      }
+
       for (let i = 0; i < totalChunks; i++) {
-        if (signal.aborted)
-          throw new DOMException("Upload cancelled.", "AbortError");
-
-        const chunkData = base64Str.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-        const token = await auth.currentUser?.getIdToken();
-
-        const res = await fetch("/api/upload-chunk", {
-          method: "POST",
-          signal,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            uploadId,
+        if (signal.aborted) {
+          console.warn("[AddGlucoseModal:processFile] Upload aborted before sending chunk:", {
             chunkIndex: i,
             totalChunks,
-            chunkData,
-            mimeType,
-            type: "glucose",
-          }),
-        });
+            uploadId,
+          });
+          throw new DOMException("Upload cancelled.", "AbortError");
+        }
+
+        const chunkData = base64Str.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+
+        let res: Response;
+        try {
+          res = await fetch("/api/upload-chunk", {
+            method: "POST",
+            signal,
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              uploadId,
+              chunkIndex: i,
+              totalChunks,
+              chunkData,
+              mimeType,
+              type: "glucose",
+            }),
+          });
+        } catch (fetchErr: any) {
+          if (fetchErr.name === "AbortError" || signal.aborted) {
+            console.warn("[AddGlucoseModal:processFile] Fetch aborted during chunk transfer:", {
+              chunkIndex: i,
+              totalChunks,
+              uploadId,
+            });
+          } else {
+            console.error("[AddGlucoseModal:processFile] Network request failed for chunk upload:", {
+              error: fetchErr,
+              message: fetchErr?.message,
+              chunkIndex: i,
+              totalChunks,
+              uploadId,
+            });
+          }
+          throw fetchErr;
+        }
 
         if (!res.ok) {
-          const text = await res.text();
+          const text = await res.text().catch((textErr) => {
+            console.error("[AddGlucoseModal:processFile] Failed to read error response body text:", {
+              status: res.status,
+              statusText: res.statusText,
+              error: textErr,
+            });
+            return "";
+          });
+
           let parsed: any;
           try {
             parsed = JSON.parse(text);
-          } catch {
-            /* not JSON */
+          } catch (parseErr) {
+            console.warn("[AddGlucoseModal:processFile] Error response body is not valid JSON:", {
+              status: res.status,
+              statusText: res.statusText,
+              rawBody: text,
+              parseError: parseErr,
+            });
           }
+
+          console.error("[AddGlucoseModal:processFile] Chunk upload endpoint returned HTTP error status:", {
+            status: res.status,
+            statusText: res.statusText,
+            chunkIndex: i,
+            totalChunks,
+            uploadId,
+            error: parsed?.error,
+            details: parsed?.details,
+            rawBody: text,
+          });
+
           if (
             parsed?.details?.includes("503") ||
             parsed?.details?.includes("UNAVAILABLE") ||
             parsed?.details?.includes("high demand")
           ) {
             throw new Error(
-              "The AI model is currently experiencing high demand. Please wait a moment and try again.",
+              "Service is currently experiencing high demand. Please wait a moment and try again.",
             );
           }
           const errDetails =
@@ -179,25 +300,87 @@ export function AddGlucoseModal({
           );
         }
 
-        const resData = await res.json();
+        let resData: any;
+        try {
+          resData = await res.json();
+        } catch (jsonErr: any) {
+          console.error("[AddGlucoseModal:processFile] Failed to parse successful response as JSON:", {
+            status: res.status,
+            chunkIndex: i,
+            totalChunks,
+            uploadId,
+            error: jsonErr,
+          });
+          throw new Error("Invalid response format received from server.");
+        }
+
         if (i === totalChunks - 1) data = resData;
       }
 
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current) {
+        console.warn("[AddGlucoseModal:processFile] Component unmounted before extraction result could be applied.", {
+          uploadId,
+          data,
+        });
+        return;
+      }
 
-      if (data?.success && data.value) {
-        setVal(data.value.toString());
+      if (data?.success && data.value !== undefined && data.value !== null) {
+        const numVal = Number(data.value);
+        if (isNaN(numVal)) {
+          console.error("[AddGlucoseModal:processFile] Extracted glucose value is not a valid number:", {
+            rawValue: data.value,
+            data,
+            uploadId,
+          });
+          setErrorObj("Extracted reading is not a valid number.");
+          return;
+        }
+        setVal(Math.round(numVal).toString());
         setSource("OCR");
         setImageUrlData("");
       } else {
+        console.error("[AddGlucoseModal:processFile] Glucose extraction failed or returned unsuccessful status:", {
+          success: data?.success,
+          value: data?.value,
+          errorMsg: data?.errorMsg,
+          details: data?.details,
+          fullResponse: data,
+          uploadId,
+          fileName: file.name,
+        });
         setErrorObj(data?.errorMsg ?? "Could not extract glucose reading.");
       }
     } catch (err: any) {
-      if (!isMountedRef.current) return;
-      if (err.name === "AbortError") return;
+      if (!isMountedRef.current) {
+        console.warn("[AddGlucoseModal:processFile] Catch block: Component unmounted during failure handling.", {
+          error: err?.message,
+        });
+        return;
+      }
+      if (err.name === "AbortError") {
+        console.warn("[AddGlucoseModal:processFile] Extraction process aborted/cancelled.", {
+          trigger,
+          fileName: file.name,
+        });
+        return;
+      }
+      console.error("[AddGlucoseModal:processFile] End-to-end extraction pipeline failure:", {
+        error: err,
+        message: err?.message,
+        name: err?.name,
+        stack: err?.stack,
+        fileName: file?.name,
+        fileSize: file?.size,
+        trigger,
+      });
       setErrorObj(err.message || "Failed to process image.");
     } finally {
-      if (isMountedRef.current) setUploadingSource(null);
+      if (isMountedRef.current) {
+        setUploadingSource(null);
+      } else {
+        console.warn("[AddGlucoseModal:processFile] Finally block: Component unmounted during cleanup.");
+      }
     }
   };
 
@@ -207,7 +390,12 @@ export function AddGlucoseModal({
       trigger: "file" | "camera",
     ) => {
       const file = e.target.files?.[0];
-      if (!file) return;
+      if (!file) {
+        console.warn(
+          `[AddGlucoseModal:handleFileUpload] File input change event triggered with no file for trigger: ${trigger}.`,
+        );
+        return;
+      }
       // Reset so the same file can be re-selected
       e.target.value = "";
       await processFile(file, trigger);

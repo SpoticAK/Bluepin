@@ -10,3 +10,4 @@ coverage
 dist/
 
 firebase-adminsdk.json
+dist/
