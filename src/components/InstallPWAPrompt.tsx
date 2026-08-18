@@ -56,31 +56,63 @@ export const InstallPWAPrompt: React.FC = () => {
       return () => clearTimeout(timer);
     }
 
+    // Check if early event was already captured by index.html
+    const existingPrompt = (window as any).__pwaInstallPrompt;
+    if (existingPrompt) {
+      setDeferredPrompt(existingPrompt);
+      setShowPrompt(true);
+    }
+
     // Capture standard install prompt on Chrome / Edge / Android / Desktop
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const promptEvent = e as BeforeInstallPromptEvent;
+      (window as any).__pwaInstallPrompt = promptEvent;
+      setDeferredPrompt(promptEvent);
       setShowPrompt(true);
+    };
+
+    const handlePromptReady = () => {
+      if ((window as any).__pwaInstallPrompt) {
+        setDeferredPrompt((window as any).__pwaInstallPrompt);
+        setShowPrompt(true);
+      }
     };
 
     const handleAppInstalled = () => {
       setShowPrompt(false);
       setDeferredPrompt(null);
+      (window as any).__pwaInstallPrompt = null;
       setInstalled(true);
       setTimeout(() => setInstalled(false), 5000);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("pwa-prompt-ready", handlePromptReady);
     window.addEventListener("appinstalled", handleAppInstalled);
+
+    // On Android / mobile browsers, if beforeinstallprompt is delayed by Chrome heuristics,
+    // show prompt banner after 3 seconds so mobile users still see the install option
+    const isMobileAndroid = /android/.test(userAgent);
+    let fallbackTimer: NodeJS.Timeout | null = null;
+    if (isMobileAndroid && !existingPrompt) {
+      fallbackTimer = setTimeout(() => {
+        setShowPrompt(true);
+      }, 3500);
+    }
 
     return () => {
       window.removeEventListener(
         "beforeinstallprompt",
         handleBeforeInstallPrompt,
       );
+      window.removeEventListener("pwa-prompt-ready", handlePromptReady);
       window.removeEventListener("appinstalled", handleAppInstalled);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
     };
   }, []);
+
+  const [showAndroidFallback, setShowAndroidFallback] = useState(false);
 
   const handleInstallClick = async () => {
     if (isIOS) {
@@ -88,24 +120,37 @@ export const InstallPWAPrompt: React.FC = () => {
       return;
     }
 
-    if (!deferredPrompt) return;
+    const promptToUse = deferredPrompt || (window as any).__pwaInstallPrompt;
 
-    await deferredPrompt.prompt();
-    const choiceResult = await deferredPrompt.userChoice;
+    if (!promptToUse) {
+      // If browser hasn't fired beforeinstallprompt yet, show guide for Android Chrome
+      setShowAndroidFallback(true);
+      return;
+    }
 
-    if (choiceResult.outcome === "accepted") {
-      console.log("[PWA] User accepted install prompt");
-      setShowPrompt(false);
-    } else {
-      console.log("[PWA] User dismissed install prompt");
-      handleDismiss();
+    try {
+      await promptToUse.prompt();
+      const choiceResult = await promptToUse.userChoice;
+
+      if (choiceResult.outcome === "accepted") {
+        console.log("[PWA] User accepted install prompt");
+        setShowPrompt(false);
+      } else {
+        console.log("[PWA] User dismissed install prompt");
+        handleDismiss();
+      }
+    } catch (err) {
+      console.warn("[PWA] Install prompt error:", err);
+      setShowAndroidFallback(true);
     }
     setDeferredPrompt(null);
+    (window as any).__pwaInstallPrompt = null;
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
     setShowIOSModal(false);
+    setShowAndroidFallback(false);
     localStorage.setItem("bluepin_pwa_dismissed", Date.now().toString());
   };
 
@@ -248,6 +293,77 @@ export const InstallPWAPrompt: React.FC = () => {
                   <span>
                     Tap <strong>Add</strong> in the top right corner to install
                     Bluepin on your device.
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleDismiss}
+                className="w-full mt-5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2.5 rounded-xl transition-colors"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Android Manual Instructions Modal (Fallback) */}
+      <AnimatePresence>
+        {showAndroidFallback && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full text-slate-100 shadow-2xl relative"
+            >
+              <button
+                onClick={handleDismiss}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 p-1 rounded-full hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                  <Smartphone className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-100">
+                    Install on Android
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Chrome / Edge Browser
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-300">
+                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
+                    1
+                  </span>
+                  <span>
+                    Tap the <strong>three dots menu (⋮)</strong> in the top-right corner of Chrome.
+                  </span>
+                </div>
+
+                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
+                    2
+                  </span>
+                  <span>
+                    Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+                  </span>
+                </div>
+
+                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
+                    3
+                  </span>
+                  <span>
+                    Tap <strong>Install</strong> to add Bluepin to your app drawer.
                   </span>
                 </div>
               </div>
