@@ -33,6 +33,8 @@ export interface Biomarker {
   specimenType?: string;
   reportType?: string;
   value: number;
+  rawValue?: string;
+  isQualitative?: boolean;
   unit: string;
   refMin?: number;
   refMax?: number;
