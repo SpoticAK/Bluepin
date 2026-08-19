@@ -1,14 +1,16 @@
-const CACHE_NAME = 'bluepin-cache-v1';
+const CACHE_NAME = 'bluepin-cache-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/Bluepin.png',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
   '/maskable-icon-512x512.png',
   '/apple-touch-icon.png',
-  '/favicon-32x32.png',
-  '/Bluepin.png'
+  '/Bluepin PWA logo 128 x 128.png',
+  '/Bluepin PWA logo 256 x 256.png',
+  '/Bluepin PWA logo 512 x 512.png'
 ];
 
 // Install Event - Pre-cache core shell

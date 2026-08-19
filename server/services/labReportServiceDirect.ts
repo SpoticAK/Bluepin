@@ -219,10 +219,10 @@ export function processLabReportResult(result: any) {
     const isQualitative = isNaN(numericValue);
 
     // ── Ref min/max parsing ────────────────────────────────────────────────
-    const parseRef = (val: any): number | undefined => {
-      if (val == null || val === "") return undefined;
+    const parseRef = (val: any): number | null => {
+      if (val == null || val === "") return null;
       const num = typeof val === "number" ? val : parseFloat(String(val).trim());
-      return isNaN(num) ? undefined : parseFloat(num.toFixed(4));
+      return isNaN(num) ? null : parseFloat(num.toFixed(4));
     };
     const refMin = parseRef(b.refMin);
     const refMax = parseRef(b.refMax);
