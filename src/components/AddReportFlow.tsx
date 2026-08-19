@@ -12,7 +12,6 @@ import { auth, storage } from "../lib/firebase";
 import { useAppStore } from "../store";
 import { LabReport } from "../types";
 import { cn } from "../lib/utils";
-import { calculateStatus } from "../lib/biomarkerUtils";
 import { DnaLoader } from "./DnaLoader";
 import { generateId } from "@/server/utils/generateId";
 
@@ -34,7 +33,7 @@ export function AddReportFlow({
   onClose: () => void;
   onSuccess?: () => void;
 }) {
-  const { addLabReport, labReports } = useAppStore();
+  const { labReports } = useAppStore();
 
   const [file, setFile] = useState<File | null>(null);
   const [reportName, setReportName] = useState("");
@@ -124,10 +123,14 @@ export function AddReportFlow({
     let ticker: ReturnType<typeof setInterval> | null = null;
 
     try {
+      // Generate a stable ID for this report upfront — it travels with both
+      // the Storage path and the API request, enabling server-side idempotency.
+      const reportId = generateId();
+
       // 1. Client → Firebase Storage (binary)
       const fileRef = ref(
         storage,
-        `users/${uid}/labReports/${generateId()}_${file.name}`,
+        `users/${uid}/labReports/${reportId}_${file.name}`,
       );
       await uploadBytes(fileRef, file);
       const downloadUrl = await getDownloadURL(fileRef);
@@ -158,6 +161,9 @@ export function AddReportFlow({
         body: JSON.stringify({
           fileUrl: downloadUrl,
           mimeType,
+          reportId,
+          reportName: reportName.trim(),
+          reportDate,
         }),
       });
 
@@ -168,51 +174,9 @@ export function AddReportFlow({
         throw new Error(data?.error || "Failed to analyze document.");
       }
 
-      // 3. Save report and biomarkers
-      if (
-        data?.success &&
-        Array.isArray(data.biomarkers) &&
-        data.biomarkers.length > 0
-      ) {
-        const extractedBiomarkers = data.biomarkers.map((b: any) => {
-          const statusResult = calculateStatus(
-            b.biomarkerId || b.name,
-            b.value,
-            b.refMin,
-            b.refMax,
-            b.status,
-            b.refRangeText,
-          );
-          return {
-            id: generateId(),
-            name: b.name,
-            originalName: b.originalName,
-            biomarkerId: b.biomarkerId,
-            category: b.category,
-            confidence: b.confidence,
-            matchedBy: b.matchedBy,
-            value: b.value,
-            unit: b.unit,
-            refMin: b.refMin,
-            refMax: b.refMax,
-            refRangeText: b.refRangeText,
-            status: statusResult.status || b.status,
-            info: statusResult.info || b.info,
-          };
-        });
-
-        const report: LabReport = {
-          id: generateId(),
-          name: reportName.trim(),
-          fileUrl: downloadUrl,
-          date: reportDate,
-          reportType: data.reportType,
-          specimenType: data.specimenType,
-          biomarkers: extractedBiomarkers,
-          createdAt: Date.now(),
-        };
-
-        addLabReport(report);
+      // 3. Server wrote to Firestore — the onSnapshot listener in store.tsx
+      //    delivers the report automatically. Just close the modal.
+      if (data?.success && Array.isArray(data.biomarkers) && data.biomarkers.length > 0) {
         onSuccess ? onSuccess() : onClose();
       } else {
         setErrorMsg(

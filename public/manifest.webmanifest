@@ -11,8 +11,20 @@
   "categories": ["health", "medical", "lifestyle"],
   "icons": [
     {
+      "src": "/Bluepin PWA logo 128 x 128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/pwa-192x192.png",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Bluepin PWA logo 256 x 256.png",
+      "sizes": "256x256",
       "type": "image/png",
       "purpose": "any"
     },
@@ -40,14 +52,14 @@
       "short_name": "Glucose",
       "description": "Log and track blood glucose levels",
       "url": "/?tab=glucose",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/Bluepin PWA logo 128 x 128.png", "sizes": "128x128" }]
     },
     {
       "name": "Upload Medical Report",
       "short_name": "Upload",
       "description": "Upload a new lab report or medical document",
       "url": "/?action=upload",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/Bluepin PWA logo 128 x 128.png", "sizes": "128x128" }]
     }
   ]
 }
