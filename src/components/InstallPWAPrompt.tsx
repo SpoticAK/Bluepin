@@ -163,9 +163,9 @@ export const InstallPWAPrompt: React.FC = () => {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-emerald-950/90 border border-emerald-500/40 text-emerald-200 px-4 py-3 rounded-2xl shadow-xl backdrop-blur-md"
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-theme-card border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 px-4 py-3 rounded-2xl shadow-xl backdrop-blur-md"
           >
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span className="text-sm font-medium">
               Bluepin installed successfully!
             </span>
@@ -181,25 +181,25 @@ export const InstallPWAPrompt: React.FC = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.95 }}
             transition={{ duration: 0.3 }}
-            className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:w-96 z-50 bg-slate-900/95 border border-slate-700/60 shadow-2xl rounded-2xl p-4 backdrop-blur-xl text-slate-100"
+            className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:w-96 z-50 bg-theme-card/95 border border-theme-border shadow-2xl rounded-2xl p-4 backdrop-blur-xl text-theme-text"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-600 to-indigo-600 p-0.5 shadow-md flex items-center justify-center shrink-0">
+                <div className="size-12 rounded-xl shadow-xs flex items-center justify-center shrink-0">
                   <img
                     src="/pwa-192x192.png"
                     alt="Bluepin"
-                    className="w-11 h-11 rounded-[10px] object-cover"
+                    className="size-12 rounded-[10px] object-cover"
                   />
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <h4 className="font-semibold text-sm text-slate-100">
+                    <h4 className="font-semibold text-sm text-theme-text font-display">
                       Install Bluepin App
                     </h4>
-                    <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                    <Sparkles className="w-3.5 h-3.5 text-blue-500" />
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-theme-text-sec mt-0.5 leading-relaxed">
                     Fast access, offline medical records, and full-screen
                     companion experience.
                   </p>
@@ -207,7 +207,7 @@ export const InstallPWAPrompt: React.FC = () => {
               </div>
               <button
                 onClick={handleDismiss}
-                className="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                className="text-theme-text-sec hover:text-theme-text p-1.5 rounded-lg hover:bg-theme-card-sec transition-colors shrink-0"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -217,14 +217,14 @@ export const InstallPWAPrompt: React.FC = () => {
             <div className="mt-4 flex items-center gap-2">
               <button
                 onClick={handleInstallClick}
-                className="flex-1 flex items-center justify-center gap-2 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold py-2.5 px-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98]"
+                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-[0.98]"
               >
                 <Download className="w-4 h-4" />
                 Install Now
               </button>
               <button
                 onClick={handleDismiss}
-                className="text-xs font-medium text-slate-400 hover:text-slate-200 py-2.5 px-3 rounded-xl hover:bg-slate-800 transition-colors"
+                className="text-xs font-medium text-theme-text-sec hover:text-theme-text py-2.5 px-3 rounded-xl hover:bg-theme-card-sec transition-colors"
               >
                 Not Now
               </button>
@@ -236,70 +236,75 @@ export const InstallPWAPrompt: React.FC = () => {
       {/* iOS Instructions Modal */}
       <AnimatePresence>
         {showIOSModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full text-slate-100 shadow-2xl relative"
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-theme-card border border-theme-border rounded-3xl p-6 max-w-sm w-full text-theme-text shadow-2xl relative"
             >
               <button
                 onClick={handleDismiss}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 p-1 rounded-full hover:bg-slate-800"
+                className="absolute top-4 right-4 text-theme-text-sec hover:text-theme-text p-2 rounded-full hover:bg-theme-card-sec transition-colors"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
 
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center justify-center">
                   <Smartphone className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-slate-100">
+                  <h3 className="font-bold text-base text-theme-text font-display">
                     Install on iOS
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-theme-text-sec">
                     Safari on iPhone & iPad
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-3 text-xs text-slate-300">
-                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+              <div className="space-y-2.5 text-xs text-theme-text">
+                <div className="flex items-start gap-3 bg-theme-bg p-3 rounded-2xl border border-theme-border/60">
                   <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
                     1
                   </span>
-                  <span>
-                    Tap the <strong>Share</strong> button{" "}
-                    <Share className="w-3.5 h-3.5 inline text-blue-400 mx-0.5" />{" "}
+                  <span className="leading-relaxed">
+                    Tap the <strong className="font-semibold">Share</strong>{" "}
+                    button{" "}
+                    <Share className="w-3.5 h-3.5 inline text-blue-500 mx-0.5" />{" "}
                     in your Safari toolbar at the bottom.
                   </span>
                 </div>
 
-                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+                <div className="flex items-start gap-3 bg-theme-bg p-3 rounded-2xl border border-theme-border/60">
                   <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
                     2
                   </span>
-                  <span>
+                  <span className="leading-relaxed">
                     Scroll down the options list and tap{" "}
-                    <strong>Add to Home Screen</strong>.
+                    <strong className="font-semibold">
+                      Add to Home Screen
+                    </strong>
+                    .
                   </span>
                 </div>
 
-                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+                <div className="flex items-start gap-3 bg-theme-bg p-3 rounded-2xl border border-theme-border/60">
                   <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
                     3
                   </span>
-                  <span>
-                    Tap <strong>Add</strong> in the top right corner to install
-                    Bluepin on your device.
+                  <span className="leading-relaxed">
+                    Tap <strong className="font-semibold">Add</strong> in the
+                    top right corner to install Bluepin on your device.
                   </span>
                 </div>
               </div>
 
               <button
                 onClick={handleDismiss}
-                className="w-full mt-5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2.5 rounded-xl transition-colors"
+                className="w-full mt-5 bg-theme-card-sec hover:bg-theme-border text-theme-text text-xs font-semibold py-3 rounded-xl transition-colors"
               >
                 Got it
               </button>
@@ -311,66 +316,77 @@ export const InstallPWAPrompt: React.FC = () => {
       {/* Android Manual Instructions Modal (Fallback) */}
       <AnimatePresence>
         {showAndroidFallback && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-sm w-full text-slate-100 shadow-2xl relative"
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-theme-card border border-theme-border rounded-3xl p-6 max-w-sm w-full text-theme-text shadow-2xl relative"
             >
               <button
                 onClick={handleDismiss}
-                className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 p-1 rounded-full hover:bg-slate-800"
+                className="absolute top-4 right-4 text-theme-text-sec hover:text-theme-text p-2 rounded-full hover:bg-theme-card-sec transition-colors"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
 
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-500 border border-blue-500/20 flex items-center justify-center">
                   <Smartphone className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-slate-100">
+                  <h3 className="font-bold text-base text-theme-text font-display">
                     Install on Android
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-theme-text-sec">
                     Chrome / Edge Browser
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-3 text-xs text-slate-300">
-                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+              <div className="space-y-2.5 text-xs text-theme-text">
+                <div className="flex items-start gap-3 bg-theme-bg p-3 rounded-2xl border border-theme-border/60">
                   <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
                     1
                   </span>
-                  <span>
-                    Tap the <strong>three dots menu (⋮)</strong> in the top-right corner of Chrome.
+                  <span className="leading-relaxed">
+                    Tap the{" "}
+                    <strong className="font-semibold">
+                      three dots menu (⋮)
+                    </strong>{" "}
+                    in the top-right corner of Chrome.
                   </span>
                 </div>
 
-                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+                <div className="flex items-start gap-3 bg-theme-bg p-3 rounded-2xl border border-theme-border/60">
                   <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
                     2
                   </span>
-                  <span>
-                    Select <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+                  <span className="leading-relaxed">
+                    Select{" "}
+                    <strong className="font-semibold">Install app</strong> or{" "}
+                    <strong className="font-semibold">
+                      Add to Home screen
+                    </strong>
+                    .
                   </span>
                 </div>
 
-                <div className="flex items-start gap-3 bg-slate-800/60 p-3 rounded-xl border border-slate-700/50">
+                <div className="flex items-start gap-3 bg-theme-bg p-3 rounded-2xl border border-theme-border/60">
                   <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold shrink-0">
                     3
                   </span>
-                  <span>
-                    Tap <strong>Install</strong> to add Bluepin to your app drawer.
+                  <span className="leading-relaxed">
+                    Tap <strong className="font-semibold">Install</strong> to
+                    add Bluepin to your app drawer.
                   </span>
                 </div>
               </div>
 
               <button
                 onClick={handleDismiss}
-                className="w-full mt-5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold py-2.5 rounded-xl transition-colors"
+                className="w-full mt-5 bg-theme-card-sec hover:bg-theme-border text-theme-text text-xs font-semibold py-3 rounded-xl transition-colors"
               >
                 Got it
               </button>
