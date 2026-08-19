@@ -283,6 +283,9 @@ export function processLabReportResult(result: any) {
       // Preserve the raw string for display and qualitative results
       rawValue,
       isQualitative,
+      // Coerce undefined → null so Firestore never receives undefined
+      refMin: cleanBiomarker.refMin ?? null,
+      refMax: cleanBiomarker.refMax ?? null,
       biomarkerId: match.biomarkerId,
       category: finalCategory,
       confidence: match.confidence,
