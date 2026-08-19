@@ -8,9 +8,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   getAdditionalUserInfo,
-  setPersistence,
-  browserLocalPersistence,
-  inMemoryPersistence,
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
@@ -31,30 +28,34 @@ export default function AuthScreen() {
   const [showConsentError, setShowConsentError] = useState(false);
   const canSignUp = agreeTerms && agreePrivacy && agreeConsent;
 
-  // useEffect(() => {
-  //   const checkRedirect = async () => {
-  //     try {
-  //       const userCred = await getRedirectResult(auth);
-  //       if (userCred) {
-  //         const additionalInfo = getAdditionalUserInfo(userCred);
-  //         if (additionalInfo?.isNewUser) {
-  //           await setDoc(
-  //             doc(db, "users", userCred.user.uid),
-  //             {
-  //               consent: getConsentPayload(navigator.userAgent),
-  //             },
-  //             { merge: true },
-  //           );
-  //         }
-  //       }
-  //     } catch (err: any) {
-  //       if (err.code !== "auth/redirect-cancelled-by-user") {
-  //         setError(err.message || "An error occurred during authentication.");
-  //       }
-  //     }
-  //   };
-  //   checkRedirect();
-  // }, []);
+  // Handle the result of signInWithRedirect (used for iOS PWA standalone mode).
+  // This runs on mount: after Google redirects back to the app, Firebase resolves
+  // the pending credential here.
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const userCred = await getRedirectResult(auth);
+        if (userCred) {
+          const additionalInfo = getAdditionalUserInfo(userCred);
+          if (additionalInfo?.isNewUser) {
+            await setDoc(
+              doc(db, "users", userCred.user.uid),
+              {
+                consent: getConsentPayload(navigator.userAgent),
+              },
+              { merge: true },
+            );
+          }
+          // Auth state change will unmount this screen automatically.
+        }
+      } catch (err: any) {
+        if (err.code !== "auth/redirect-cancelled-by-user") {
+          setError(err.message || "An error occurred during authentication.");
+        }
+      }
+    };
+    checkRedirect();
+  }, []);
 
   const handleToggleMode = () => {
     setIsLogin((prev) => !prev);
@@ -120,22 +121,24 @@ export default function AuthScreen() {
     setGoogleLoading(true);
     const provider = new GoogleAuthProvider();
     try {
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      
-      if (isMobile) {
-        // Use in-memory persistence for the popup to avoid IndexedDB closing bug on mobile
-        await setPersistence(auth, inMemoryPersistence);
+      // iOS Safari in standalone (home-screen PWA) mode silently blocks window.open(),
+      // which signInWithPopup relies on. Detect iOS standalone specifically and use
+      // the redirect flow instead. Android and desktop keep the faster popup flow.
+      const isIosStandalone =
+        /iPhone|iPad|iPod/i.test(navigator.userAgent) &&
+        (window.navigator as any).standalone === true;
+
+      if (isIosStandalone) {
+        // signInWithRedirect does a full-page navigation to Google, then back.
+        // getRedirectResult() in the useEffect above will complete the sign-in.
+        await signInWithRedirect(auth, provider);
+        return; // Page navigates away; loading state is irrelevant after this.
       }
 
       const userCred = await signInWithPopup(auth, provider);
 
-      if (isMobile) {
-        // Switch back to local persistence and save the user
-        await setPersistence(auth, browserLocalPersistence);
-      }
-
       const additionalInfo = getAdditionalUserInfo(userCred);
-      
+
       if (additionalInfo?.isNewUser) {
         try {
           // Record DPDP compliant consent automatically upon Google sign-up
@@ -151,8 +154,8 @@ export default function AuthScreen() {
         }
       }
       // Do NOT call setGoogleLoading(false) here on success.
-      // This allows the button to stay in the 'Loading...' state for the 
-      // brief moment before the App component detects the auth state change 
+      // This allows the button to stay in the 'Loading...' state for the
+      // brief moment before the App component detects the auth state change
       // and unmounts this screen, preventing a UI flash.
     } catch (err: any) {
       if (err.code === "auth/popup-blocked") {
