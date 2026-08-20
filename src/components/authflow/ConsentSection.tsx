@@ -1,48 +1,64 @@
 import CheckSvg from "../CheckSvg";
 import { CONSENT_KEYS, ConsentState } from "./types";
+import { LegalDocType } from "../../lib/consentManager";
 
 interface ConsentSectionProps {
   consent: ConsentState;
   onChange: (key: keyof ConsentState, value: boolean) => void;
   onSelectAll: (checked: boolean) => void;
   error?: string;
+  onOpenLegalDoc?: (doc: LegalDocType) => void;
 }
-
-const CONSENT_COPY: Record<keyof ConsentState, React.ReactNode> = {
-  termsRead: (
-    <>
-      I have read and agree to the{" "}
-      <button
-        type="button"
-        className="text-theme-accent font-medium hover:underline"
-      >
-        Terms of Service
-      </button>
-      .
-    </>
-  ),
-  privacyRead: (
-    <>
-      I have read the{" "}
-      <button
-        type="button"
-        className="text-theme-accent font-medium hover:underline"
-      >
-        Privacy Policy
-      </button>
-      .
-    </>
-  ),
-  legalConsent:
-    "I consent to Bluepin collecting, storing and processing my personal and health information to provide the services described in the Privacy Policy and Terms of Service.",
-};
 
 export default function ConsentSection({
   consent,
   onChange,
   onSelectAll,
   error,
+  onOpenLegalDoc,
 }: ConsentSectionProps) {
+  const getConsentCopy = (key: keyof ConsentState): React.ReactNode => {
+    switch (key) {
+      case "termsRead":
+        return (
+          <>
+            I have read and agree to the{" "}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenLegalDoc?.("terms");
+              }}
+              className="text-theme-accent font-medium hover:underline"
+            >
+              Terms of Service
+            </button>
+            .
+          </>
+        );
+      case "privacyRead":
+        return (
+          <>
+            I have read the{" "}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenLegalDoc?.("privacy");
+              }}
+              className="text-theme-accent font-medium hover:underline"
+            >
+              Privacy Policy
+            </button>
+            .
+          </>
+        );
+      case "legalConsent":
+        return "I consent to Bluepin collecting, storing and processing my personal and health information to provide the services described in the Privacy Policy and Terms of Service.";
+    }
+  };
   const allSelected = CONSENT_KEYS.every((key) => consent[key]);
 
   return (
@@ -67,7 +83,7 @@ export default function ConsentSection({
             <CheckSvg />
           </div>
           <span className="text-xs text-theme-text-sec leading-snug select-none">
-            {CONSENT_COPY[key]}
+            {getConsentCopy(key)}
           </span>
         </label>
       ))}

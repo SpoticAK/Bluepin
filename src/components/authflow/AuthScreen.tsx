@@ -36,7 +36,7 @@ export default function AuthScreen() {
             just got simpler.
           </p>
         </div>
-        <AuthForm />
+        <AuthForm onOpenLegalDoc={(doc) => setOpenLegalDoc(doc)} />
       </div>
       <LegalDocsModal
         isOpen={!!openLegalDoc}

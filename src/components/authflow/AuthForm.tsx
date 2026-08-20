@@ -3,19 +3,21 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFirebaseAuth } from "../../hooks/useFirebaseAuth";
 import { loginSchema, signUpSchema, type AuthFormValues } from "./types";
-import ConsentSection from "./ConsentSection";
 import EmailPasswordFields from "./EmailPasswordFields";
 import GoogleAuthButton from "./GoogleAuthButton";
+import { LegalDocType } from "../../lib/consentManager";
 
 const defaultValues: AuthFormValues = {
   email: "",
   password: "",
-  consent: { termsRead: false, privacyRead: false, legalConsent: false },
 };
 
-export default function AuthForm() {
+interface AuthFormProps {
+  onOpenLegalDoc?: (doc: LegalDocType) => void;
+}
+
+export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
   const [isLogin, setIsLogin] = useState(true);
-  const [pendingGoogleConsent, setPendingGoogleConsent] = useState(false);
 
   const {
     loading,
@@ -24,15 +26,11 @@ export default function AuthForm() {
     signInWithEmail,
     signUpWithEmail,
     signInWithGoogle,
-    abandonUnconsentedGoogleSignup,
   } = useFirebaseAuth();
 
   const {
     control,
     handleSubmit,
-    watch,
-    setValue,
-    setError,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<AuthFormValues>({
@@ -41,104 +39,22 @@ export default function AuthForm() {
     mode: "onSubmit",
   });
 
-  const consent = watch("consent");
-
   const onSubmit = async (values: AuthFormValues) => {
-    const result = isLogin
-      ? await signInWithEmail(values.email, values.password)
-      : await signUpWithEmail(values.email, values.password);
-
-    if (result) {
-      // navigate / close modal / etc.
+    if (isLogin) {
+      await signInWithEmail(values.email, values.password);
+    } else {
+      await signUpWithEmail(values.email, values.password);
     }
   };
 
   const handleGoogleAuth = async () => {
-    const googleAuthResult = await signInWithGoogle();
-    if (!googleAuthResult) return; // error already set by the hook
-
-    if (googleAuthResult.isNewUser) {
-      // Account was just created by the popup — hold here until they consent,
-      // regardless of which screen (Login or Sign Up) they started from.
-      setPendingGoogleConsent(true);
-      return;
-    }
-
-    // Existing user, already consented at original signup — just proceed.
-    // navigate / close modal / etc.
-  };
-
-  const confirmGoogleConsent = async () => {
-    const valid = ["termsRead", "privacyRead", "legalConsent"].every(
-      (k) => consent[k as keyof typeof consent],
-    );
-    if (!valid) {
-      setError("consent.legalConsent", {
-        type: "manual",
-        message: "Please give the required consents above.",
-      });
-      return;
-    }
-    setPendingGoogleConsent(false);
-    // navigate / finalize — account is now considered active
-  };
-
-  const cancelGoogleConsent = async () => {
-    await abandonUnconsentedGoogleSignup();
-    setPendingGoogleConsent(false);
-    reset(defaultValues);
+    await signInWithGoogle();
   };
 
   const toggleMode = () => {
     setIsLogin((prev) => !prev);
     reset(defaultValues);
   };
-
-  if (pendingGoogleConsent) {
-    return (
-      <div className="space-y-4 text-left">
-        <p className="text-sm text-theme-text-sec mb-3">
-          Before we finish setting up your account, please review and confirm:
-        </p>
-        <ConsentSection
-          consent={consent}
-          onChange={(key, value) =>
-            setValue(`consent.${key}`, value, { shouldValidate: true })
-          }
-          onSelectAll={(checked) =>
-            setValue(
-              "consent",
-              {
-                termsRead: checked,
-                privacyRead: checked,
-                legalConsent: checked,
-              },
-              { shouldValidate: true },
-            )
-          }
-          error={errors.consent?.legalConsent?.message}
-        />
-        <div className="flex gap-3 pt-2">
-          <button
-            type="button"
-            onClick={cancelGoogleConsent}
-            className="flex-1 py-3 rounded-full border border-theme-border font-medium hover:bg-theme-hover
-  transition"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={confirmGoogleConsent}
-            className="flex-1 py-3 rounded-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium
-  transition"
-          >
-            Confirm & Continue
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -169,30 +85,6 @@ export default function AuthForm() {
           )}
         />
 
-        {!isLogin && (
-          <ConsentSection
-            consent={consent}
-            onChange={(key, value) =>
-              setValue(`consent.${key}`, value, { shouldValidate: true })
-            }
-            onSelectAll={(checked) =>
-              setValue(
-                "consent",
-                {
-                  termsRead: checked,
-                  privacyRead: checked,
-                  legalConsent: checked,
-                },
-                { shouldValidate: true },
-              )
-            }
-            error={
-              errors.consent?.legalConsent?.message ??
-              errors.consent?.root?.message
-            }
-          />
-        )}
-
         {error && (
           <p className="text-xs text-theme-critical font-medium">{error}</p>
         )}
@@ -213,6 +105,26 @@ export default function AuthForm() {
       </div>
 
       <GoogleAuthButton onClick={handleGoogleAuth} loading={googleLoading} />
+
+      <p className="text-[11px] text-theme-text-sec text-center leading-relaxed px-1 my-4">
+        By continuing, you agree to our{" "}
+        <button
+          type="button"
+          onClick={() => onOpenLegalDoc?.("terms")}
+          className="text-theme-accent hover:underline font-medium"
+        >
+          Terms of Service
+        </button>{" "}
+        and{" "}
+        <button
+          type="button"
+          onClick={() => onOpenLegalDoc?.("privacy")}
+          className="text-theme-accent hover:underline font-medium"
+        >
+          Privacy Policy
+        </button>
+        .
+      </p>
 
       <p className="text-center text-sm text-theme-text-sec">
         {isLogin ? "Don't have an account? " : "Already have an account? "}

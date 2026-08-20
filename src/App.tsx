@@ -33,14 +33,12 @@ import { auth, db } from "./lib/firebase";
 import {
   onAuthStateChanged,
   getRedirectResult,
-  getAdditionalUserInfo,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { ThemeProvider, useTheme } from "./theme";
 import { LegalDocsModal } from "./components/LegalDocsModal";
 import { LegalDocType } from "./lib/consentManager";
 import AdminFeedbackView from "./components/AdminFeedbackView";
-import { getConsentPayload } from "./lib/consentManager";
 import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
 import AuthScreen from "./components/authflow/AuthScreen";
 
@@ -448,31 +446,12 @@ function AppContent() {
   const [authTimedOut, setAuthTimedOut] = useState(false);
 
   useEffect(() => {
-    // ✅ Handle Android redirect FIRST, before anything else
-    // This must live here, not in AuthScreen, because AuthScreen
-    // may not be mounted when the redirect returns.
-    getRedirectResult(auth)
-      .then(async (userCred) => {
-        if (userCred) {
-          const additionalInfo = getAdditionalUserInfo(userCred);
-          if (additionalInfo?.isNewUser) {
-            try {
-              await setDoc(
-                doc(db, "users", userCred.user.uid),
-                { consent: getConsentPayload(navigator.userAgent) },
-                { merge: true },
-              );
-            } catch (e: any) {
-              console.error("Error saving consent:", e);
-            }
-          }
-        }
-      })
-      .catch((err) => {
-        if (err.code !== "auth/redirect-cancelled-by-user") {
-          console.error("Redirect result error:", err);
-        }
-      });
+    // Handle redirect sign-in results (e.g. mobile standalone PWA)
+    getRedirectResult(auth).catch((err) => {
+      if (err.code !== "auth/redirect-cancelled-by-user") {
+        console.error("Redirect result error:", err);
+      }
+    });
 
     const timer = setTimeout(() => {
       setAuthTimedOut(true);
