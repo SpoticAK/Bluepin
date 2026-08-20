@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 
 export default function WelcomeScreen({ onStart }: { onStart: () => void }) {
   return (
-    <div className="min-h-[100dvh] bg-white flex flex-col justify-center items-center p-4 relative">
+    <div className="min-h-screen bg-theme-card text-theme-text flex flex-col justify-center items-center p-4 relative">
       <div className="w-full max-w-sm z-10 flex flex-col h-full md:h-auto md:justify-center">
         
         {/* Logo/Brand */}
@@ -15,7 +15,7 @@ export default function WelcomeScreen({ onStart }: { onStart: () => void }) {
               alt="Bluepin Logo"
               className="w-12 h-12 object-contain"
             />
-            <h1 className="text-5xl font-display tracking-tight text-neutral-900">
+            <h1 className="text-5xl font-display tracking-tight text-theme-text">
               <span className="font-bold">Blue</span>
               <span className="font-medium opacity-80">pin.</span>
             </h1>
@@ -24,15 +24,15 @@ export default function WelcomeScreen({ onStart }: { onStart: () => void }) {
 
         {/* Hero */}
         <div className="text-center mb-8">
-          <p className="text-[20px] md:text-[21px] text-black leading-tight" style={{ fontFamily: 'Inter, sans-serif' }}>
-            Managing <span className="bg-gradient-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent font-medium">diabetes</span> just got simpler.
+          <p className="text-[20px] md:text-[21px] text-theme-text leading-tight" style={{ fontFamily: 'Inter, sans-serif' }}>
+            Managing <span className="bg-linear-to-r from-purple-500 to-indigo-500 bg-clip-text text-transparent font-medium">diabetes</span> just got simpler.
           </p>
         </div>
 
         {/* Feature Cards */}
         <div className="mb-6 flex-1 flex flex-col justify-center">
           {/* Card 1 */}
-          <div className="py-4 border-t border-b border-neutral-100 flex items-center gap-5">
+          <div className="py-4 border-t border-b border-theme-border flex items-center gap-5">
             <div className="shrink-0 flex items-center justify-center w-12 h-12">
               <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <defs>
@@ -48,21 +48,21 @@ export default function WelcomeScreen({ onStart }: { onStart: () => void }) {
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-neutral-900 text-sm mb-0.5" style={{ fontFamily: 'Garet, sans-serif' }}>AI Pattern Analysis</h3>
-              <p className="text-[13px] text-neutral-500 leading-tight">
+              <h3 className="font-semibold text-theme-text text-sm mb-0.5" style={{ fontFamily: 'Garet, sans-serif' }}>AI Pattern Analysis</h3>
+              <p className="text-[13px] text-theme-text-sec leading-tight">
                 Discover hidden trends in your glucose and biomarker levels.
               </p>
             </div>
           </div>
 
           {/* Card 2 */}
-          <div className="py-4 border-b border-neutral-100 flex items-center gap-5">
+          <div className="py-4 border-b border-theme-border flex items-center gap-5">
             <div className="shrink-0 flex items-center justify-center w-12 h-12 relative">
               <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="10" y="6" width="20" height="28" rx="2" stroke="#64748b" strokeWidth="1.5" />
-                <line x1="14" y1="14" x2="26" y2="14" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
+                <rect x="10" y="6" width="20" height="28" rx="2" stroke="currentColor" className="text-theme-text-sec/60" strokeWidth="1.5" />
+                <line x1="14" y1="14" x2="26" y2="14" stroke="currentColor" className="text-theme-text-sec/40" strokeWidth="1.5" strokeLinecap="round" />
                 <line x1="14" y1="20" x2="26" y2="20" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
-                <line x1="14" y1="26" x2="22" y2="26" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="14" y1="26" x2="22" y2="26" stroke="currentColor" className="text-theme-text-sec/40" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
               <svg className="absolute -left-1 top-2" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 19V5M5 12l7-7 7 7" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -72,29 +72,29 @@ export default function WelcomeScreen({ onStart }: { onStart: () => void }) {
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-neutral-900 text-sm mb-0.5" style={{ fontFamily: 'Garet, sans-serif' }}>Personalized Insights</h3>
-              <p className="text-[13px] text-neutral-500 leading-tight">
+              <h3 className="font-semibold text-theme-text text-sm mb-0.5" style={{ fontFamily: 'Garet, sans-serif' }}>Personalized Insights</h3>
+              <p className="text-[13px] text-theme-text-sec leading-tight">
                 Understand what changed, why it matters, and what deserves your attention.
               </p>
             </div>
           </div>
 
           {/* Card 3 */}
-          <div className="py-4 border-b border-neutral-100 flex items-center gap-5">
+          <div className="py-4 border-b border-theme-border flex items-center gap-5">
             <div className="shrink-0 flex items-center justify-center w-12 h-12 relative">
               <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 18 C 18 36 30 36 36 18" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="2 2" fill="none" strokeLinecap="round" />
-                <rect x="6" y="12" width="10" height="14" rx="1.5" fill="white" stroke="#64748b" strokeWidth="1.2" />
+                <path d="M12 18 C 18 36 30 36 36 18" stroke="currentColor" className="text-theme-border" strokeWidth="1" strokeDasharray="2 2" fill="none" strokeLinecap="round" />
+                <rect x="6" y="12" width="10" height="14" rx="1.5" className="fill-theme-card stroke-theme-text-sec/60" strokeWidth="1.2" />
                 <line x1="8" y1="16" x2="14" y2="16" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" />
-                <line x1="8" y1="20" x2="12" y2="20" stroke="#cbd5e1" strokeWidth="1" strokeLinecap="round" />
+                <line x1="8" y1="20" x2="12" y2="20" stroke="currentColor" className="text-theme-border" strokeWidth="1" strokeLinecap="round" />
                 
-                <rect x="19" y="22" width="10" height="14" rx="1.5" fill="white" stroke="#64748b" strokeWidth="1.2" />
+                <rect x="19" y="22" width="10" height="14" rx="1.5" className="fill-theme-card stroke-theme-text-sec/60" strokeWidth="1.2" />
                 <line x1="21" y1="26" x2="27" y2="26" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" />
-                <line x1="21" y1="30" x2="25" y2="30" stroke="#cbd5e1" strokeWidth="1" strokeLinecap="round" />
+                <line x1="21" y1="30" x2="25" y2="30" stroke="currentColor" className="text-theme-border" strokeWidth="1" strokeLinecap="round" />
                 
-                <rect x="32" y="12" width="10" height="14" rx="1.5" fill="white" stroke="#64748b" strokeWidth="1.2" />
+                <rect x="32" y="12" width="10" height="14" rx="1.5" className="fill-theme-card stroke-theme-text-sec/60" strokeWidth="1.2" />
                 <line x1="34" y1="16" x2="40" y2="16" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" />
-                <line x1="34" y1="20" x2="38" y2="20" stroke="#cbd5e1" strokeWidth="1" strokeLinecap="round" />
+                <line x1="34" y1="20" x2="38" y2="20" stroke="currentColor" className="text-theme-border" strokeWidth="1" strokeLinecap="round" />
               </svg>
               <span className="absolute -top-1 -left-2 text-[8px] font-bold text-blue-500 opacity-80 rotate-[-10deg]">LDL</span>
               <span className="absolute top-10 -left-1 text-[8px] font-bold text-purple-500 opacity-80 rotate-[15deg]">CRP</span>
@@ -102,8 +102,8 @@ export default function WelcomeScreen({ onStart }: { onStart: () => void }) {
               <span className="absolute top-10 -right-2 text-[8px] font-bold text-amber-500 opacity-80 rotate-[-15deg]">TSH</span>
             </div>
             <div>
-              <h3 className="font-semibold text-neutral-900 text-sm mb-0.5" style={{ fontFamily: 'Garet, sans-serif' }}>Unified Health Data</h3>
-              <p className="text-[13px] text-neutral-500 leading-tight">
+              <h3 className="font-semibold text-theme-text text-sm mb-0.5" style={{ fontFamily: 'Garet, sans-serif' }}>Unified Health Data</h3>
+              <p className="text-[13px] text-theme-text-sec leading-tight">
                 Keep every lab report and glucose reading together in one organized timeline.
               </p>
             </div>
