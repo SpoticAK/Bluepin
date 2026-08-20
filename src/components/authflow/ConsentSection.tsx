@@ -62,7 +62,7 @@ export default function ConsentSection({
   const allSelected = CONSENT_KEYS.every((key) => consent[key]);
 
   return (
-    <div className="space-y-3 mb-4 bg-theme-bg p-4 rounded-xl border border-theme-border">
+    <div className="space-y-3 mb-4 bg-theme-card p-4 sm:p-5 rounded-2xl border border-theme-border shadow-xs">
       <p className="text-xs font-bold text-theme-text mb-3">
         Required Consents
       </p>
@@ -72,14 +72,14 @@ export default function ConsentSection({
           key={key}
           className="flex items-start gap-3 cursor-pointer group"
         >
-          <div className="relative flex items-center justify-center mt-0.5">
+          <div className="relative flex items-center justify-center mt-0.5 shrink-0">
             <input
               type="checkbox"
               className="peer sr-only"
               checked={consent[key]}
               onChange={(e) => onChange(key, e.target.checked)}
             />
-            <div className="w-4 h-4 rounded border-2 border-theme-border peer-checked:border-theme-accent peer-checked:bg-theme-accent transition-all" />
+            <div className="w-4 h-4 rounded border-2 border-theme-border bg-theme-bg group-hover:border-theme-text-sec peer-checked:border-blue-600 peer-checked:bg-blue-600 dark:peer-checked:border-blue-500 dark:peer-checked:bg-blue-500 transition-all" />
             <CheckSvg />
           </div>
           <span className="text-xs text-theme-text-sec leading-snug select-none">
@@ -88,18 +88,18 @@ export default function ConsentSection({
         </label>
       ))}
 
-      <label className="flex items-start gap-3 cursor-pointer group">
-        <div className="relative flex items-center justify-center mt-0.5">
+      <label className="flex items-start gap-3 cursor-pointer group pt-1 border-t border-theme-border/60">
+        <div className="relative flex items-center justify-center mt-0.5 shrink-0">
           <input
             type="checkbox"
             className="peer sr-only"
             checked={allSelected}
             onChange={(e) => onSelectAll(e.target.checked)}
           />
-          <div className="w-4 h-4 rounded border-2 border-theme-border peer-checked:border-theme-accent peer-checked:bg-theme-accent transition-all" />
+          <div className="w-4 h-4 rounded border-2 border-theme-border bg-theme-bg group-hover:border-theme-text-sec peer-checked:border-blue-600 peer-checked:bg-blue-600 dark:peer-checked:border-blue-500 dark:peer-checked:bg-blue-500 transition-all" />
           <CheckSvg />
         </div>
-        <span className="text-xs text-theme-text-sec select-none">
+        <span className="text-xs text-theme-text-sec font-medium select-none">
           Select All
         </span>
       </label>

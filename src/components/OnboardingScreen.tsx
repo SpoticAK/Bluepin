@@ -107,12 +107,12 @@ export default function OnboardingScreen({
   };
 
   return (
-    <div className="min-h-dvh bg-white flex flex-col relative overflow-hidden font-sans">
+    <div className="min-h-dvh bg-theme-bg text-theme-text flex flex-col relative overflow-hidden font-sans">
       {/* Top Nav */}
       <div className="w-full max-w-lg mx-auto p-6 pt-10 flex items-center justify-between z-10">
         <button
           onClick={handleBack}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-neutral-100 transition-colors text-neutral-600"
+          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-theme-card-sec transition-colors text-theme-text-sec hover:text-theme-text"
           title={step === 1 ? "Sign out" : "Previous step"}
         >
           <ArrowLeft size={20} />
@@ -124,10 +124,10 @@ export default function OnboardingScreen({
               className={cn(
                 "h-1.5 rounded-full transition-all duration-300",
                 i === step
-                  ? "w-6 bg-blue-500"
+                  ? "w-6 bg-blue-600 dark:bg-blue-500"
                   : i < step
-                    ? "w-1.5 bg-blue-500/40"
-                    : "w-1.5 bg-neutral-200",
+                    ? "w-1.5 bg-blue-600/40 dark:bg-blue-400/40"
+                    : "w-1.5 bg-theme-border",
               )}
             />
           ))}
@@ -138,7 +138,7 @@ export default function OnboardingScreen({
       <div className="flex-1 w-full max-w-lg mx-auto px-8 flex flex-col justify-center pb-32 z-10">
         <div className="animate-in fade-in slide-in-from-bottom-8 duration-500 delay-100 fill-mode-both">
           {error && (
-            <div className="p-4 mb-6 text-sm text-red-600 bg-red-50 rounded-2xl border border-red-100">
+            <div className="p-4 mb-6 text-sm text-theme-critical bg-theme-critical/10 rounded-2xl border border-theme-critical/20">
               {error}
             </div>
           )}
@@ -146,10 +146,10 @@ export default function OnboardingScreen({
           {step === 1 && (
             <div className="space-y-6">
               <div className="space-y-2">
-                <h1 className="text-3xl font-display font-semibold text-neutral-900 tracking-tight">
+                <h1 className="text-3xl font-display font-semibold text-theme-text tracking-tight">
                   Terms & Consent
                 </h1>
-                <p className="text-neutral-500 text-[15px]">
+                <p className="text-theme-text-sec text-[15px]">
                   Please review and accept our data terms in compliance with
                   India's DPDP Act to proceed.
                 </p>
@@ -177,10 +177,10 @@ export default function OnboardingScreen({
           {step === 2 && (
             <div className="space-y-10">
               <div className="space-y-3">
-                <h1 className="text-3xl font-display font-semibold text-neutral-900 tracking-tight">
+                <h1 className="text-3xl font-display font-semibold text-theme-text tracking-tight">
                   Let's get to know you
                 </h1>
-                <p className="text-neutral-500 text-[15px]">
+                <p className="text-theme-text-sec text-[15px]">
                   What should we call you?
                 </p>
                 <input
@@ -188,7 +188,7 @@ export default function OnboardingScreen({
                   autoFocus
                   value={data.name}
                   onChange={(e) => setData({ ...data, name: e.target.value })}
-                  className="w-full text-2xl font-medium text-neutral-900 placeholder:text-neutral-300 border-b-2 border-neutral-200 focus:border-blue-500 pb-3 focus:outline-none transition-colors bg-transparent mt-2"
+                  className="w-full text-2xl font-medium text-theme-text placeholder:text-theme-text-sec/40 border-b-2 border-theme-border focus:border-blue-500 pb-3 focus:outline-none transition-colors bg-transparent mt-2"
                   placeholder="Your first name"
                   onKeyDown={(e) =>
                     e.key === "Enter" && data.name.trim() && handleNext()
@@ -198,10 +198,10 @@ export default function OnboardingScreen({
 
               <div className="space-y-4 pt-4">
                 <div>
-                  <h2 className="text-xl font-display font-semibold text-neutral-900 mb-1">
+                  <h2 className="text-xl font-display font-semibold text-theme-text mb-1">
                     Managing diabetes?
                   </h2>
-                  <p className="text-neutral-500 text-[14px]">
+                  <p className="text-theme-text-sec text-[14px]">
                     Select the option that best describes you.
                   </p>
                 </div>
@@ -215,8 +215,8 @@ export default function OnboardingScreen({
                       className={cn(
                         "p-4 rounded-2xl flex items-center justify-between transition-all border-2 text-left",
                         data.diabetesStatus === status
-                          ? "border-blue-500 bg-blue-50/50 text-blue-700"
-                          : "border-neutral-100 hover:border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50",
+                          ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                          : "border-theme-border hover:border-theme-text-sec/40 bg-theme-card text-theme-text hover:bg-theme-card-sec",
                       )}
                     >
                       <span className="font-medium text-[16px]">{status}</span>
@@ -233,16 +233,16 @@ export default function OnboardingScreen({
           {step === 3 && (
             <div className="space-y-8">
               <div>
-                <h1 className="text-3xl font-display font-semibold text-neutral-900 mb-3 tracking-tight">
+                <h1 className="text-3xl font-display font-semibold text-theme-text mb-3 tracking-tight">
                   Your basic stats
                 </h1>
-                <p className="text-neutral-500 text-[15px]">
+                <p className="text-theme-text-sec text-[15px]">
                   This helps us personalize your health insights.
                 </p>
               </div>
               <div className="space-y-6">
                 <div>
-                  <label className="block text-[13px] font-medium text-neutral-500 mb-2">
+                  <label className="block text-[13px] font-medium text-theme-text-sec mb-2">
                     Age
                   </label>
                   <input
@@ -250,13 +250,13 @@ export default function OnboardingScreen({
                     autoFocus
                     value={data.age}
                     onChange={(e) => setData({ ...data, age: e.target.value })}
-                    className="w-full text-xl font-medium text-neutral-900 placeholder:text-neutral-300 border-b-2 border-neutral-200 focus:border-blue-500 pb-2 focus:outline-none transition-colors bg-transparent"
+                    className="w-full text-xl font-medium text-theme-text placeholder:text-theme-text-sec/40 border-b-2 border-theme-border focus:border-blue-500 pb-2 focus:outline-none transition-colors bg-transparent"
                     placeholder="e.g. 30"
                   />
                 </div>
                 <div className="flex gap-6">
                   <div className="flex-1">
-                    <label className="block text-[13px] font-medium text-neutral-500 mb-2">
+                    <label className="block text-[13px] font-medium text-theme-text-sec mb-2">
                       Height (cm)
                     </label>
                     <input
@@ -265,12 +265,12 @@ export default function OnboardingScreen({
                       onChange={(e) =>
                         setData({ ...data, height: e.target.value })
                       }
-                      className="w-full text-xl font-medium text-neutral-900 placeholder:text-neutral-300 border-b-2 border-neutral-200 focus:border-blue-500 pb-2 focus:outline-none transition-colors bg-transparent"
+                      className="w-full text-xl font-medium text-theme-text placeholder:text-theme-text-sec/40 border-b-2 border-theme-border focus:border-blue-500 pb-2 focus:outline-none transition-colors bg-transparent"
                       placeholder="175"
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[13px] font-medium text-neutral-500 mb-2">
+                    <label className="block text-[13px] font-medium text-theme-text-sec mb-2">
                       Weight (kg)
                     </label>
                     <input
@@ -279,7 +279,7 @@ export default function OnboardingScreen({
                       onChange={(e) =>
                         setData({ ...data, weight: e.target.value })
                       }
-                      className="w-full text-xl font-medium text-neutral-900 placeholder:text-neutral-300 border-b-2 border-neutral-200 focus:border-blue-500 pb-2 focus:outline-none transition-colors bg-transparent"
+                      className="w-full text-xl font-medium text-theme-text placeholder:text-theme-text-sec/40 border-b-2 border-theme-border focus:border-blue-500 pb-2 focus:outline-none transition-colors bg-transparent"
                       placeholder="70"
                     />
                   </div>
@@ -291,7 +291,7 @@ export default function OnboardingScreen({
       </div>
 
       {/* Bottom Floating Action */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-linear-to-t from-white via-white to-transparent pb-10 z-20 pointer-events-none">
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-linear-to-t from-theme-bg via-theme-bg/90 to-transparent pb-10 z-20 pointer-events-none">
         <div className="w-full max-w-lg mx-auto flex justify-end pointer-events-auto">
           <button
             onClick={handleNext}
@@ -301,7 +301,7 @@ export default function OnboardingScreen({
               (step === 2 && !data.name.trim()) ||
               (step === 3 && (!data.age || !data.height || !data.weight))
             }
-            className="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-full transition-all shadow-[0_8px_20px_-6px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+            className="w-full sm:w-auto px-8 py-4 bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium rounded-full transition-all shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
           >
             {loading ? (
               <span className="flex items-center gap-2">
