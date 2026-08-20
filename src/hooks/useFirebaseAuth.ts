@@ -111,12 +111,12 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
 }
 
 function mapFirebaseError(err: unknown): string {
-  // const code = (err as { code?: string })?.code ?? "";
-  const code = (err as any)?.code || "unknown_error";
-  const message = (err as any)?.message || "Something went wrong.";
+  const code = (err as { code?: string })?.code ?? "";
+  // const code = (err as any)?.code || "unknown_error";
+  // const message = (err as any)?.message || "Something went wrong.";
 
   // 📱 Shows the exact error code on the mobile screen
-  return `[${code}] ${message}: wholeerror: ${err}`;
+  // return `[${code}] ${message}: wholeerror: ${err}`;
   switch (code) {
     case "auth/email-already-in-use":
       return "An account with this email already exists.";

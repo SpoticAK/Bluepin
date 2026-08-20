@@ -194,7 +194,7 @@ export default function AuthScreen() {
         </div>
         <div className="text-center mb-8">
           <p
-            className="text-[20px] md:text-[21px] text-black leading-tight"
+            className="text-[20px] md:text-[21px] text-theme-text leading-tight"
             style={{ fontFamily: "Inter, sans-serif" }}
           >
             Managing{" "}
@@ -213,7 +213,7 @@ export default function AuthScreen() {
 
         <form onSubmit={handleEmailAuth} className="space-y-4 mb-6 text-left">
           <div>
-            <label className="block text-xs font-bold text-black mb-1">
+            <label className="block text-xs font-bold text-theme-text mb-1">
               Email
             </label>
             <input
@@ -221,11 +221,11 @@ export default function AuthScreen() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-border text-black"
+              className="w-full px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-border text-theme-text placeholder:text-theme-text-sec/50"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-black mb-1">
+            <label className="block text-xs font-bold text-theme-text mb-1">
               Password
             </label>
             <input
@@ -234,7 +234,7 @@ export default function AuthScreen() {
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-border text-black"
+              className="w-full px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-border text-theme-text placeholder:text-theme-text-sec/50"
             />
           </div>
           {!isLogin && (

@@ -26,7 +26,7 @@ export default function AuthScreen() {
         </div>
         <div className="text-center mb-8">
           <p
-            className="text-[20px] md:text-[21px] text-black leading-tight"
+            className="text-[20px] md:text-[21px] text-theme-text leading-tight"
             style={{ fontFamily: "Inter, sans-serif" }}
           >
             Managing{" "}
