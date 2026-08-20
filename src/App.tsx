@@ -25,7 +25,7 @@ import GlucoseTab from "./components/GlucoseTab";
 import BiomarkersTab from "./components/BiomarkersTab";
 import { FeedbackWidget } from "./components/FeedbackWidget";
 import { AppProvider, useAppStore } from "./store";
-import AuthScreen from "./components/AuthScreen";
+// import AuthScreen from "./components/AuthScreen";
 import WelcomeScreen from "./components/WelcomeScreen";
 import { ProfileModal } from "./components/ProfileModal";
 import OnboardingScreen from "./components/OnboardingScreen";
@@ -42,6 +42,7 @@ import { LegalDocType } from "./lib/consentManager";
 import AdminFeedbackView from "./components/AdminFeedbackView";
 import { getConsentPayload } from "./lib/consentManager";
 import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
+import AuthScreen from "./components/authflow/AuthScreen";
 
 type TabType = "dashboard" | "glucose" | "biomarkers" | "admin";
 
