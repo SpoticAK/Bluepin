@@ -441,9 +441,22 @@ function MobileNavItem({
 function AppContent() {
   const [sessionUser, setSessionUser] = useState<any>(undefined);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try {
+      return localStorage.getItem("bluepin_welcome_seen") !== "true";
+    } catch {
+      return true;
+    }
+  });
   const [authError, setAuthError] = useState<string | null>(null);
   const [authTimedOut, setAuthTimedOut] = useState(false);
+
+  const handleStartWelcome = () => {
+    try {
+      localStorage.setItem("bluepin_welcome_seen", "true");
+    } catch {}
+    setShowWelcome(false);
+  };
 
   useEffect(() => {
     // Handle redirect sign-in results (e.g. mobile standalone PWA)
@@ -464,6 +477,9 @@ function AppContent() {
         setAuthTimedOut(false);
         setAuthError(null);
         if (u) {
+          try {
+            localStorage.setItem("bluepin_welcome_seen", "true");
+          } catch {}
           try {
             const docRef = doc(db, "users", u.uid);
             const docSnap = await getDoc(docRef);
@@ -539,7 +555,7 @@ function AppContent() {
 
   if (sessionUser === null) {
     if (showWelcome) {
-      return <WelcomeScreen onStart={() => setShowWelcome(false)} />;
+      return <WelcomeScreen onStart={handleStartWelcome} />;
     }
     return <AuthScreen />;
   }
