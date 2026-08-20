@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit",
+    "test:tokens": "tsx scripts/test_lab_report_tokens.ts",
     "start": "node dist/server.cjs"
   },
   "dependencies": {
@@ -17,6 +18,7 @@
     "@babel/traverse": "^8.0.4",
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@google/genai": "^2.4.0",
+    "@hookform/resolvers": "^5.9.1",
     "@tailwindcss/vite": "^4.1.14",
     "@types/express": "^4.17.25",
     "@types/multer": "^2.1.0",
@@ -29,9 +31,10 @@
     "esbuild": "^0.25.12",
     "express": "^4.21.2",
     "express-rate-limit": "^8.6.0",
-    "firebase": "^12.14.0",
-    "firebase-admin": "^14.2.0",
+    "firebase": "^12.18.0",
+    "firebase-admin": "^14.3.0",
     "helmet": "^8.3.0",
+    "jsonrepair": "^3.15.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "multer": "^2.1.1",
@@ -39,6 +42,7 @@
     "pdf-parse": "^1.1.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "react-hook-form": "^7.85.0",
     "recharts": "^3.8.1",
     "sharp": "^0.35.3",
     "tailwind-merge": "^3.6.0",
@@ -56,6 +60,7 @@
     "@types/cors": "^2.8.19",
     "@types/nodemailer": "^8.0.1",
     "@types/pdf-parse": "^1.1.5",
+    "@types/react": "^19.2.18",
     "@types/sharp": "^0.31.1",
     "esbuild-register": "^3.6.0"
   }

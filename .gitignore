@@ -7,5 +7,7 @@ dist-ssr
 *.local
 coverage
 *.log
-!dist
-!dist/
+dist/
+
+firebase-adminsdk.json
+dist/
