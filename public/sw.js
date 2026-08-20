@@ -51,8 +51,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API Requests: Network-First with graceful offline response
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth')) {
+  // API Requests: Network-First with graceful offline response.
+  // Also passthrough Firebase's internal auth handler (/__/auth/) used by signInWithRedirect.
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/__/auth')) {
     event.respondWith(
       fetch(request)
         .catch(() => {

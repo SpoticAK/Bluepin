@@ -25,7 +25,7 @@ import GlucoseTab from "./components/GlucoseTab";
 import BiomarkersTab from "./components/BiomarkersTab";
 import { FeedbackWidget } from "./components/FeedbackWidget";
 import { AppProvider, useAppStore } from "./store";
-import AuthScreen from "./components/AuthScreen";
+// import AuthScreen from "./components/AuthScreen";
 import WelcomeScreen from "./components/WelcomeScreen";
 import { ProfileModal } from "./components/ProfileModal";
 import OnboardingScreen from "./components/OnboardingScreen";
@@ -33,15 +33,14 @@ import { auth, db } from "./lib/firebase";
 import {
   onAuthStateChanged,
   getRedirectResult,
-  getAdditionalUserInfo,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { ThemeProvider, useTheme } from "./theme";
 import { LegalDocsModal } from "./components/LegalDocsModal";
 import { LegalDocType } from "./lib/consentManager";
 import AdminFeedbackView from "./components/AdminFeedbackView";
-import { getConsentPayload } from "./lib/consentManager";
 import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
+import AuthScreen from "./components/authflow/AuthScreen";
 
 type TabType = "dashboard" | "glucose" | "biomarkers" | "admin";
 
@@ -442,36 +441,30 @@ function MobileNavItem({
 function AppContent() {
   const [sessionUser, setSessionUser] = useState<any>(undefined);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try {
+      return localStorage.getItem("bluepin_welcome_seen") !== "true";
+    } catch {
+      return true;
+    }
+  });
   const [authError, setAuthError] = useState<string | null>(null);
   const [authTimedOut, setAuthTimedOut] = useState(false);
 
+  const handleStartWelcome = () => {
+    try {
+      localStorage.setItem("bluepin_welcome_seen", "true");
+    } catch {}
+    setShowWelcome(false);
+  };
+
   useEffect(() => {
-    // ✅ Handle Android redirect FIRST, before anything else
-    // This must live here, not in AuthScreen, because AuthScreen
-    // may not be mounted when the redirect returns.
-    getRedirectResult(auth)
-      .then(async (userCred) => {
-        if (userCred) {
-          const additionalInfo = getAdditionalUserInfo(userCred);
-          if (additionalInfo?.isNewUser) {
-            try {
-              await setDoc(
-                doc(db, "users", userCred.user.uid),
-                { consent: getConsentPayload(navigator.userAgent) },
-                { merge: true },
-              );
-            } catch (e: any) {
-              console.error("Error saving consent:", e);
-            }
-          }
-        }
-      })
-      .catch((err) => {
-        if (err.code !== "auth/redirect-cancelled-by-user") {
-          console.error("Redirect result error:", err);
-        }
-      });
+    // Handle redirect sign-in results (e.g. mobile standalone PWA)
+    getRedirectResult(auth).catch((err) => {
+      if (err.code !== "auth/redirect-cancelled-by-user") {
+        console.error("Redirect result error:", err);
+      }
+    });
 
     const timer = setTimeout(() => {
       setAuthTimedOut(true);
@@ -484,6 +477,9 @@ function AppContent() {
         setAuthTimedOut(false);
         setAuthError(null);
         if (u) {
+          try {
+            localStorage.setItem("bluepin_welcome_seen", "true");
+          } catch {}
           try {
             const docRef = doc(db, "users", u.uid);
             const docSnap = await getDoc(docRef);
@@ -559,7 +555,7 @@ function AppContent() {
 
   if (sessionUser === null) {
     if (showWelcome) {
-      return <WelcomeScreen onStart={() => setShowWelcome(false)} />;
+      return <WelcomeScreen onStart={handleStartWelcome} />;
     }
     return <AuthScreen />;
   }
