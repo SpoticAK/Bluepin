@@ -27,7 +27,8 @@ if (!getApps().length) {
 }
 
 export const getAdminAuth = () => getAuth();
-export const getAdminFirestore = () => getFirestore();
+const firestoreDatabaseId = process.env.VITE_FIREBASE_DATABASE_ID || (firebaseConfig as any).firestoreDatabaseId || '(default)';
+export const getAdminFirestore = () => getFirestore(firestoreDatabaseId);
 
 // Authentication Middleware
 export const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
