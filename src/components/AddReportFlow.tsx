@@ -169,9 +169,19 @@ export function AddReportFlow({
 
       if (ticker) clearInterval(ticker);
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        const text = await res.text();
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        if (res.status === 503) {
+          throw new Error("AI analysis service is temporarily busy. Please try again in a few moments.");
+        }
+        throw new Error(`Server returned status ${res.status}. Please try again.`);
+      }
+
       if (!res.ok) {
-        throw new Error(data?.error || "Failed to analyze document.");
+        throw new Error(data?.error || `Failed to analyze document (status ${res.status}).`);
       }
 
       // 3. Server wrote to Firestore — the onSnapshot listener in store.tsx
