@@ -14,12 +14,29 @@ export const helmetConfig: HelmetOptions = {
     useDefaults: false,
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://*.firebase.com", "https://*.firebaseapp.com", "https://*.gstatic.com", "https://apis.google.com"],
+      scriptSrc: [
+        "'self'", 
+        "'unsafe-inline'", 
+        "'unsafe-eval'", 
+        "https://*.firebase.com", 
+        "https://*.firebaseapp.com", 
+        "https://*.gstatic.com", 
+        "https://apis.google.com",
+        "https://www.googletagmanager.com",
+        "https://www.google-analytics.com",
+        "https://*.clarity.ms"
+      ],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'", "https:", "wss:", "ws:"],
-      frameSrc: ["'self'", "https://*.firebaseapp.com", "https://apis.google.com", "https://accounts.google.com"],
+      frameSrc: [
+        "'self'", 
+        "https://*.firebaseapp.com", 
+        "https://apis.google.com", 
+        "https://accounts.google.com",
+        "https://www.googletagmanager.com"
+      ],
       objectSrc: ["'none'"]
     }
   }
