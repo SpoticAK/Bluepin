@@ -14,8 +14,8 @@ import { db } from "../lib/firebase";
 import { LegalDocsModal } from "./LegalDocsModal";
 import { getConsentPayload, LegalDocType } from "../lib/consentManager";
 
-export default function AuthScreen() {
-  const [isLogin, setIsLogin] = useState(true);
+export default function AuthScreen({ initialIsLogin = false }: { initialIsLogin?: boolean }) {
+  const [isLogin, setIsLogin] = useState(initialIsLogin);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

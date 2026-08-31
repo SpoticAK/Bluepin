@@ -441,20 +441,13 @@ function MobileNavItem({
 function AppContent() {
   const [sessionUser, setSessionUser] = useState<any>(undefined);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(() => {
-    try {
-      return localStorage.getItem("bluepin_welcome_seen") !== "true";
-    } catch {
-      return true;
-    }
-  });
+  const [initialIsLogin, setInitialIsLogin] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authTimedOut, setAuthTimedOut] = useState(false);
 
-  const handleStartWelcome = () => {
-    try {
-      localStorage.setItem("bluepin_welcome_seen", "true");
-    } catch {}
+  const handleStartWelcome = (isLogin = false) => {
+    setInitialIsLogin(isLogin);
     setShowWelcome(false);
   };
 
@@ -477,9 +470,6 @@ function AppContent() {
         setAuthTimedOut(false);
         setAuthError(null);
         if (u) {
-          try {
-            localStorage.setItem("bluepin_welcome_seen", "true");
-          } catch {}
           try {
             const docRef = doc(db, "users", u.uid);
             const docSnap = await getDoc(docRef);
@@ -557,7 +547,7 @@ function AppContent() {
     if (showWelcome) {
       return <WelcomeScreen onStart={handleStartWelcome} />;
     }
-    return <AuthScreen />;
+    return <AuthScreen initialIsLogin={initialIsLogin} />;
   }
 
   if (needsOnboarding) {

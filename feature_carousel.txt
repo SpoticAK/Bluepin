@@ -1,0 +1,88 @@
+const FeatureCarousel = ({ 
+  title, 
+  subtitle, 
+  images, 
+  iconColor, 
+  glowColor, 
+  buttonColor, 
+  activeIndicatorColor,
+  reverse = false 
+}: { 
+  title: string, 
+  subtitle: string, 
+  images: string[], 
+  iconColor: string, 
+  glowColor: string, 
+  buttonColor: string, 
+  activeIndicatorColor: string,
+  reverse?: boolean 
+}) => {
+  const [currentSlide, setCurrentSlide] = React.useState(0);
+  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % images.length);
+
+  return (
+    <div className={`flex flex-col ${reverse ? 'md:flex-row-reverse' : 'md:flex-row'} items-center gap-12 md:gap-20 max-w-5xl mx-auto mb-24 md:mb-32`}>
+      <div className="flex-1 text-left min-h-[160px] flex flex-col justify-center">
+        <div className="inline-flex items-center gap-3 mb-4 relative">
+          {/* Hand-drawn red oval */}
+          
+          <div className="flex items-center gap-3 relative z-10">
+            <Hash className={`w-6 h-6 ${iconColor}`} />
+            <h3 className="text-2xl md:text-3xl font-garet tracking-tight text-theme-text font-bold">
+              {title}
+            </h3>
+          </div>
+        </div>
+        <p className="text-xl md:text-2xl font-display text-theme-text leading-relaxed font-medium">
+          {subtitle}
+        </p>
+      </div>
+      
+      <div className="flex-1 flex flex-col justify-center relative items-center">
+        <div className="relative flex items-center justify-center mb-6">
+          <div className="relative w-60 md:w-72 bg-white dark:bg-slate-950 rounded-[2.5rem] border-[8px] border-slate-900 dark:border-slate-800 shadow-2xl overflow-hidden z-10 shadow-black/5">
+            <AnimatePresence mode="wait">
+              <motion.img 
+                key={currentSlide}
+                src={images[currentSlide]} 
+                alt={`${title} Screenshot`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="w-full h-auto object-cover" 
+              />
+            </AnimatePresence>
+          </div>
+          <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 ${glowColor} blur-3xl rounded-full z-0 pointer-events-none`}></div>
+          
+          {/* Next Button */}
+          <button 
+            onClick={nextSlide}
+            className={`absolute -right-6 md:-right-12 z-20 w-12 h-12 md:w-16 md:h-16 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform border border-slate-200 dark:border-slate-700 ${buttonColor}`}
+            aria-label="Next slide"
+          >
+            <ChevronRight className="w-6 h-6 md:w-8 md:h-8" />
+          </button>
+        </div>
+        
+        {/* Pagination Indicators */}
+        <div className="flex items-center gap-2 z-10">
+          {images.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentSlide(idx)}
+              className={cn(
+                "h-1.5 rounded-full transition-all duration-300",
+                currentSlide === idx 
+                  ? `w-8 ${activeIndicatorColor}` 
+                  : "w-3 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600"
+              )}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};

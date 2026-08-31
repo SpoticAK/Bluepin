@@ -3,7 +3,7 @@ import { LegalDocsModal } from "../LegalDocsModal";
 import { LegalDocType } from "@/src/lib/consentManager";
 import AuthForm from "./AuthForm";
 
-export default function AuthScreen() {
+export default function AuthScreen({ initialIsLogin = false }: { initialIsLogin?: boolean }) {
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
   return (
     <div className="min-h-screen bg-theme-card flex flex-col items-center justify-center p-4 sm:p-8">
@@ -36,7 +36,7 @@ export default function AuthScreen() {
             just got simpler.
           </p>
         </div>
-        <AuthForm onOpenLegalDoc={(doc) => setOpenLegalDoc(doc)} />
+        <AuthForm onOpenLegalDoc={(doc) => setOpenLegalDoc(doc)} initialIsLogin={initialIsLogin} />
       </div>
       <LegalDocsModal
         isOpen={!!openLegalDoc}
