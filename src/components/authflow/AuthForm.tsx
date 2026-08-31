@@ -13,11 +13,12 @@ const defaultValues: AuthFormValues = {
 };
 
 interface AuthFormProps {
+  initialIsLogin?: boolean;
   onOpenLegalDoc?: (doc: LegalDocType) => void;
 }
 
-export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
-  const [isLogin, setIsLogin] = useState(true);
+export default function AuthForm({ onOpenLegalDoc, initialIsLogin = false }: AuthFormProps) {
+  const [isLogin, setIsLogin] = useState(initialIsLogin);
 
   const {
     loading,
