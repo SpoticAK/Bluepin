@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Send, Sparkles } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, trackEvent } from '../lib/utils';
 import { auth, db } from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 
@@ -83,6 +83,7 @@ export function FeedbackWidget({ trigger }: { trigger?: React.ReactElement }) {
       });
 
       setStatus('success');
+      trackEvent('feedback_submitted', { feedback_type: subject });
       incrementLimit();
       
       setTimeout(() => {

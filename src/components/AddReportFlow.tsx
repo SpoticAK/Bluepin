@@ -11,7 +11,7 @@ import {
 import { auth, storage } from "../lib/firebase";
 import { useAppStore } from "../store";
 import { LabReport } from "../types";
-import { cn } from "../lib/utils";
+import { cn, trackEvent } from "../lib/utils";
 import { DnaLoader } from "./DnaLoader";
 import { generateId } from "@/server/utils/generateId";
 
@@ -187,6 +187,7 @@ export function AddReportFlow({
       // 3. Server wrote to Firestore — the onSnapshot listener in store.tsx
       //    delivers the report automatically. Just close the modal.
       if (data?.success && Array.isArray(data.biomarkers) && data.biomarkers.length > 0) {
+        trackEvent('report_uploaded', { fileType: file.type });
         onSuccess ? onSuccess() : onClose();
       } else {
         setErrorMsg(

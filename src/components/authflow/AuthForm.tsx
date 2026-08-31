@@ -6,6 +6,7 @@ import { loginSchema, signUpSchema, type AuthFormValues } from "./types";
 import EmailPasswordFields from "./EmailPasswordFields";
 import GoogleAuthButton from "./GoogleAuthButton";
 import { LegalDocType } from "../../lib/consentManager";
+import { trackEvent } from "../../lib/utils";
 
 const defaultValues: AuthFormValues = {
   email: "",
@@ -40,15 +41,22 @@ export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
   });
 
   const onSubmit = async (values: AuthFormValues) => {
+    let res;
     if (isLogin) {
-      await signInWithEmail(values.email, values.password);
+      res = await signInWithEmail(values.email, values.password);
     } else {
-      await signUpWithEmail(values.email, values.password);
+      res = await signUpWithEmail(values.email, values.password);
+    }
+    if (res) {
+      trackEvent('user_signed_up', { method: 'Email', type: isLogin ? 'login' : 'signup' });
     }
   };
 
   const handleGoogleAuth = async () => {
-    await signInWithGoogle();
+    const res = await signInWithGoogle();
+    if (res) {
+      trackEvent('user_signed_up', { method: 'Google', type: res.isNewUser ? 'signup' : 'login' });
+    }
   };
 
   const toggleMode = () => {

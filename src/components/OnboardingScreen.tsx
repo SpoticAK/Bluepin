@@ -8,7 +8,7 @@ import {
   addDoc,
   collection,
 } from "firebase/firestore";
-import { cn } from "../lib/utils";
+import { cn, trackEvent } from "../lib/utils";
 import ConsentSection from "./authflow/ConsentSection";
 import { ConsentState } from "./authflow/types";
 import { LegalDocsModal } from "./LegalDocsModal";
@@ -99,6 +99,7 @@ export default function OnboardingScreen({
         );
       }
 
+      trackEvent('onboarding_completed');
       onComplete();
     } catch (err: any) {
       setError(err.message);
