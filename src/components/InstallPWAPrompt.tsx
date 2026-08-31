@@ -8,6 +8,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { trackEvent } from "../lib/utils";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -80,6 +81,7 @@ export const InstallPWAPrompt: React.FC = () => {
     };
 
     const handleAppInstalled = () => {
+      trackEvent('pwa_installed', { platform: isIOS ? 'ios' : 'android_or_desktop' });
       setShowPrompt(false);
       setDeferredPrompt(null);
       (window as any).__pwaInstallPrompt = null;

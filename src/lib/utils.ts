@@ -1,6 +1,26 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+declare global {
+  interface Window {
+    dataLayer: any[];
+  }
+}
+
+export function trackEvent(eventName: string, params: Record<string, any> = {}) {
+  try {
+    if (typeof window !== "undefined") {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: eventName,
+        ...params,
+      });
+    }
+  } catch (err) {
+    console.error("Failed to track event:", err);
+  }
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

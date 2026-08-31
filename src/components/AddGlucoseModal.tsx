@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { GlucoseReading, MealTiming } from "../types";
 import { v4 as uuidv4 } from "uuid";
-import { cn, safeFormat } from "../lib/utils";
+import { cn, safeFormat, trackEvent } from "../lib/utils";
 import {
   ALLOWED_EXTENSIONS,
   CHUNK_SIZE,
@@ -437,6 +437,7 @@ export function AddGlucoseModal({
     setIsSubmitting(true);
     try {
       await onAdd(reading);
+      trackEvent('glucose_logged', { method: source === 'Manual' ? 'manual' : 'camera_ai' });
     } catch (err: any) {
       setErrorObj(err.message || "Failed to add reading");
     } finally {
