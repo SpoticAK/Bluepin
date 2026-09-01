@@ -554,9 +554,10 @@ function AppContent() {
   }
 
   if (sessionUser === null) {
-    if (showWelcome) {
-      return <WelcomeScreen onStart={handleStartWelcome} />;
-    }
+    // WelcomeScreen is now handled by the separate marketing site (bluepin.in)
+    // if (showWelcome) {
+    //   return <WelcomeScreen onStart={handleStartWelcome} />;
+    // }
     return <AuthScreen />;
   }
 
