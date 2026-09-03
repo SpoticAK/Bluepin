@@ -20,6 +20,7 @@ export const helmetConfig: HelmetOptions = {
         "'unsafe-eval'", 
         "https://*.firebase.com", 
         "https://*.firebaseapp.com", 
+        "https://*.bluepin.in",
         "https://*.gstatic.com", 
         "https://apis.google.com",
         "https://www.googletagmanager.com",
@@ -33,6 +34,7 @@ export const helmetConfig: HelmetOptions = {
       frameSrc: [
         "'self'", 
         "https://*.firebaseapp.com", 
+        "https://*.bluepin.in",
         "https://apis.google.com", 
         "https://accounts.google.com",
         "https://www.googletagmanager.com"
