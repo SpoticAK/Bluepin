@@ -321,6 +321,8 @@ export default function BiomarkersTab() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex bg-theme-card-sec p-1 rounded-full relative">
             <button
+              id="canvas-dashboard-tab"
+              data-tour="canvas-dashboard-tab"
               onClick={() => setActiveTab("dashboard")}
               className={cn(
                 "px-4 py-2 text-sm font-medium rounded-full transition-colors relative z-10",
@@ -339,6 +341,8 @@ export default function BiomarkersTab() {
               Dashboard
             </button>
             <button
+              id="canvas-timeline-tab"
+              data-tour="canvas-timeline-tab"
               onClick={() => setActiveTab("timeline")}
               className={cn(
                 "px-4 py-2 text-sm font-medium rounded-full transition-colors relative z-10",
@@ -359,6 +363,8 @@ export default function BiomarkersTab() {
           </div>
 
           <button
+            id="canvas-highlights-button"
+            data-tour="canvas-highlights-button"
             onClick={generateInsights}
             disabled={isAnalyzing}
             className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-full text-white bg-linear-to-r from-[#9B49FC] to-[#792DF5] transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg shrink-0"
@@ -475,7 +481,11 @@ export default function BiomarkersTab() {
 
       {/* Primary Dashboard Content */}
       {activeTab === "dashboard" && labReports.length > 0 && (
-        <div className="space-y-8 animate-in fade-in duration-300">
+        <div 
+          id="health-canvas-area"
+          data-tour="health-canvas-area"
+          className="space-y-8 animate-in fade-in duration-300"
+        >
           {/* Section 1: Health Score */}
           {score !== null &&
             (() => {
@@ -726,7 +736,11 @@ export default function BiomarkersTab() {
       )}
       {/* Timeline Content */}
       {activeTab === "timeline" && (
-        <div className="space-y-6 animate-in fade-in duration-300 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-linear-to-b before:from-transparent before:via-theme-border before:to-transparent">
+        <div 
+          id="canvas-timeline-area"
+          data-tour="canvas-timeline-area"
+          className="space-y-6 animate-in fade-in duration-300 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-linear-to-b before:from-transparent before:via-theme-border before:to-transparent"
+        >
           {sortedReports.length === 0 ? (
             <div className="text-center py-12 relative z-10">
               <p className="text-theme-text-sec">No medical reports found.</p>
@@ -909,7 +923,11 @@ export default function BiomarkersTab() {
 
       {/* Empty State Dashboard */}
       {activeTab === "dashboard" && labReports.length === 0 && !isUploading && (
-        <div className="flex flex-col items-center justify-center py-32 text-theme-text-sec bg-theme-card rounded-4xl border border-theme-border border-dashed">
+        <div 
+          id="health-canvas-area"
+          data-tour="health-canvas-area"
+          className="flex flex-col items-center justify-center py-32 text-theme-text-sec bg-theme-card rounded-4xl border border-theme-border border-dashed"
+        >
           <FileText size={48} className="opacity-20 mb-4" />
           <p className="font-medium text-theme-text-sec text-lg">
             Your health canvas is empty.

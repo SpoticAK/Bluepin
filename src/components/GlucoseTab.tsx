@@ -884,7 +884,11 @@ export default function GlucoseTab() {
       {/* Premium Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Today's Glucose */}
-        <div className="bg-theme-card rounded-4xl p-6 sm:p-8 border border-theme-border shadow-lg relative overflow-hidden group">
+        <div 
+          id="todays-glucose-card"
+          data-tour="todays-glucose-card"
+          className="bg-theme-card rounded-4xl p-6 sm:p-8 border border-theme-border shadow-lg relative overflow-hidden group"
+        >
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Droplet size={100} fill="currentColor" />
           </div>

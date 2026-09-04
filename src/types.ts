@@ -98,6 +98,7 @@ export interface UserProfile {
   photoUrl?: string;
   profileColor?: string;
   familyId?: string | null;
+  hasSeenDashboardTour?: boolean;
 }
 
 
