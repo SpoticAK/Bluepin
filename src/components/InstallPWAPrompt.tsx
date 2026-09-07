@@ -23,6 +23,16 @@ export const InstallPWAPrompt: React.FC = () => {
   const [showIOSModal, setShowIOSModal] = useState(false);
   const [installed, setInstalled] = useState(false);
 
+  const [isTourActive, setIsTourActive] = useState(false);
+
+  useEffect(() => {
+    const handleTourState = (e: any) => {
+      setIsTourActive(e.detail);
+    };
+    window.addEventListener("tour-state", handleTourState);
+    return () => window.removeEventListener("tour-state", handleTourState);
+  }, []);
+
   useEffect(() => {
     // Check if app is already running in standalone mode (installed PWA)
     const isStandalone =
@@ -177,7 +187,7 @@ export const InstallPWAPrompt: React.FC = () => {
 
       {/* Main Install Prompt Banner */}
       <AnimatePresence>
-        {showPrompt && !installed && (
+        {showPrompt && !installed && !isTourActive && (
           <motion.div
             initial={{ opacity: 0, y: 40, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

@@ -469,6 +469,8 @@ export function AddGlucoseModal({
       )}
 
       <div
+        id="add-glucose-modal-content"
+        data-tour="add-glucose-modal-content"
         className={cn(
           "bg-theme-card rounded-4xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 transition-all z-10",
           isDragging ? "scale-[0.98] opacity-50" : "",
@@ -480,6 +482,7 @@ export function AddGlucoseModal({
               Add Reading
             </h3>
             <button
+              id="close-glucose-modal-btn"
               onClick={onClose}
               className="p-2 -mr-2 text-theme-text-sec hover:text-theme-text transition-colors"
             >

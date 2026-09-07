@@ -391,6 +391,8 @@ export default function BiomarkersTab() {
 
       {/* Global Actions */}
       <button
+        id="canvas-upload-report-button"
+        data-tour="canvas-upload-report-button"
         onClick={() => setShowAddReportModal(true)}
         className="fixed bottom-24 md:bottom-10 right-4 md:right-8 bg-theme-text text-theme-bg w-14 h-14 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-transform z-40 flex items-center justify-center"
       >
