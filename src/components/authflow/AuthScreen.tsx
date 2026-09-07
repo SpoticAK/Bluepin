@@ -1,7 +1,10 @@
-import { useState } from "react";
-import { LegalDocsModal } from "../LegalDocsModal";
+import React, { useState } from "react";
 import { LegalDocType } from "@/src/lib/consentManager";
 import AuthForm from "./AuthForm";
+
+const LegalDocsModal = React.lazy(() =>
+  import("../LegalDocsModal").then((m) => ({ default: m.LegalDocsModal }))
+);
 
 export default function AuthScreen() {
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
@@ -14,9 +17,13 @@ export default function AuthScreen() {
             style={{ animation: "float 5s ease-in-out infinite" }}
           >
             <img
-              src="/Bluepin.png"
+              src="/bluepin-48.webp"
+              srcSet="/bluepin-48.webp 1x, /bluepin-96.webp 2x, /bluepin-144.webp 3x"
               alt="Bluepin Logo"
+              width={48}
+              height={48}
               className="w-12 h-12 object-contain"
+              fetchPriority="high"
             />
             <h1 className="text-5xl font-display tracking-tight text-theme-text">
               <span className="font-bold">Blue</span>
@@ -38,11 +45,15 @@ export default function AuthScreen() {
         </div>
         <AuthForm onOpenLegalDoc={(doc) => setOpenLegalDoc(doc)} />
       </div>
-      <LegalDocsModal
-        isOpen={!!openLegalDoc}
-        onClose={() => setOpenLegalDoc(null)}
-        defaultTab={openLegalDoc || "terms"}
-      />
+      {openLegalDoc && (
+        <React.Suspense fallback={null}>
+          <LegalDocsModal
+            isOpen={true}
+            onClose={() => setOpenLegalDoc(null)}
+            defaultTab={openLegalDoc}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 }

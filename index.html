@@ -41,11 +41,27 @@
 
     <!-- Icons -->
     <link rel="icon" type="image/png" href="/Bluepin.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <!-- Preconnect & Preload for performance -->
+    <!-- Google Fonts (Non-render-blocking core families) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="image" href="/Bluepin.webp" type="image/webp" fetchpriority="high" />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      />
+    </noscript>
+    <link rel="preload" as="image" href="/bluepin-48.webp" type="image/webp" fetchpriority="high" />
 
     <!-- Early Theme Detection (prevents flash of white/unthemed content) -->
     <script>
@@ -117,7 +133,8 @@
     <div id="root">
       <div id="app-preloader" aria-label="Loading Bluepin">
         <img
-          src="/Bluepin.webp"
+          src="/bluepin-48.webp"
+          srcset="/bluepin-48.webp 1x, /bluepin-96.webp 2x, /bluepin-144.webp 3x"
           alt="Bluepin Logo"
           class="preloader-logo"
           width="48"
