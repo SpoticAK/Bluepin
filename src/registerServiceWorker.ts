@@ -32,9 +32,17 @@ export function registerServiceWorker() {
       });
   };
 
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    register();
+  const scheduleRegister = () => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(register);
+    } else {
+      setTimeout(register, 2000);
+    }
+  };
+
+  if (document.readyState === 'complete') {
+    scheduleRegister();
   } else {
-    window.addEventListener('load', register);
+    window.addEventListener('load', scheduleRegister);
   }
 }
