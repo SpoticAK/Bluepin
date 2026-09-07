@@ -119,7 +119,7 @@ export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
         <button
           type="button"
           onClick={() => onOpenLegalDoc?.("terms")}
-          className="text-theme-accent hover:underline font-medium"
+          className="inline p-0 bg-transparent border-0 text-theme-accent hover:underline font-medium cursor-pointer align-baseline"
         >
           Terms of Service
         </button>{" "}
@@ -127,7 +127,7 @@ export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
         <button
           type="button"
           onClick={() => onOpenLegalDoc?.("privacy")}
-          className="text-theme-accent hover:underline font-medium"
+          className="inline p-0 bg-transparent border-0 text-theme-accent hover:underline font-medium cursor-pointer align-baseline"
         >
           Privacy Policy
         </button>

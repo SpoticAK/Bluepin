@@ -41,14 +41,110 @@
 
     <!-- Icons -->
     <link rel="icon" type="image/png" href="/Bluepin.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <!-- Google Fonts (Non-render-blocking core families) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+      />
+    </noscript>
+    <link rel="preload" as="image" href="/bluepin-48.webp" type="image/webp" fetchpriority="high" />
+
+    <!-- Early Theme Detection (prevents flash of white/unthemed content) -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('bluepin-theme');
+          var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Instant Preloader Styles (Matches exact existing loading screen style) -->
+    <style>
+      :root {
+        --bg-color: #F7F6F1;
+        --text-secondary: #777670;
+      }
+      html.dark, html.dark :root {
+        --bg-color: #121311;
+        --text-secondary: #9B9A93;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not(.light) {
+          --bg-color: #121311;
+          --text-secondary: #9B9A93;
+        }
+      }
+      body {
+        margin: 0;
+        background-color: var(--bg-color);
+      }
+      #app-preloader {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        background-color: var(--bg-color);
+        position: relative;
+      }
+      .preloader-logo {
+        width: 3rem;
+        height: 3rem;
+        object-fit: contain;
+        animation: preloader-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      .preloader-text {
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        margin: 0;
+      }
+      @keyframes preloader-pulse {
+        50% {
+          opacity: 0.5;
+        }
+      }
+    </style>
   </head>
   <body>
     <!-- Google Tag Manager (noscript) -->
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-N3TDQJHS"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
-    <div id="root"></div>
+    <div id="root">
+      <div id="app-preloader" aria-label="Loading Bluepin">
+        <img
+          src="/bluepin-48.webp"
+          srcset="/bluepin-48.webp 1x, /bluepin-96.webp 2x, /bluepin-144.webp 3x"
+          alt="Bluepin Logo"
+          class="preloader-logo"
+          width="48"
+          height="48"
+          fetchpriority="high"
+          decoding="sync"
+        />
+        <p class="preloader-text">Loading Bluepin...</p>
+      </div>
+    </div>
     <script>
       // Capture beforeinstallprompt as early as possible so it is never missed
       window.__pwaInstallPrompt = null;

@@ -862,6 +862,8 @@ export default function GlucoseTab() {
         </h2>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
+            id="add-glucose-reading-button"
+            data-tour="add-glucose-reading-button"
             onClick={() => setShowAddModal(true)}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-linear-to-r from-theme-accent to-theme-accent/80 hover:opacity-90 text-white px-5 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
@@ -869,6 +871,8 @@ export default function GlucoseTab() {
             Add Reading
           </button>
           <button
+            id="sugar-health-button"
+            data-tour="sugar-health-button"
             onClick={() => setShowSugarHealth(true)}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-linear-to-r from-purple-500 to-violet-600 hover:opacity-90 text-white px-5 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
