@@ -315,41 +315,7 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
     },
   });
 
-  const restartTour = () => {
-    const closeBtn = document.getElementById("close-glucose-modal-btn");
-    if (closeBtn) closeBtn.click();
-    if (uid) {
-      try {
-        localStorage.removeItem(`bluepin_dashboard_tour_${uid}`);
-      } catch {}
-      updateProfile({ hasSeenDashboardTour: false });
-    }
-    const dashBtn = document.getElementById("canvas-dashboard-tab");
-    if (dashBtn) dashBtn.click();
-    if (setActiveTab) setActiveTab("dashboard");
-    setRun(false);
-    setTimeout(() => {
-      setRun(true);
-    }, 150);
-  };
-
-  return (
-    <>
-      {Tour}
-      {/* Temporary button to restart the tour */}
-      <div className="fixed bottom-24 md:bottom-8 left-6 md:left-72 z-50">
-        <button
-          type="button"
-          onClick={restartTour}
-          title="Temporary Dev Button: Restart Tour"
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-semibold rounded-full shadow-lg border border-white/20 transition-all cursor-pointer"
-        >
-          <span>✨</span>
-          <span>Restart Tour</span>
-        </button>
-      </div>
-    </>
-  );
+  return <>{Tour}</>;
 }
 
 export default DashboardTour;
