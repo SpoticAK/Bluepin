@@ -11,3 +11,7 @@ dist/
 
 firebase-adminsdk.json
 dist/
+
+.agents/
+.claude/
+skills-lock.json

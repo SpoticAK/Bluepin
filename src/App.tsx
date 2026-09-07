@@ -34,14 +34,23 @@ import AuthScreen from "./components/authflow/AuthScreen";
 const Dashboard = React.lazy(() => import("./components/Dashboard"));
 const GlucoseTab = React.lazy(() => import("./components/GlucoseTab"));
 const BiomarkersTab = React.lazy(() => import("./components/BiomarkersTab"));
-const AdminFeedbackView = React.lazy(() => import("./components/AdminFeedbackView"));
+const AdminFeedbackView = React.lazy(
+  () => import("./components/AdminFeedbackView"),
+);
 const ProfileModal = React.lazy(() =>
-  import("./components/ProfileModal").then((m) => ({ default: m.ProfileModal }))
+  import("./components/ProfileModal").then((m) => ({
+    default: m.ProfileModal,
+  })),
 );
-const OnboardingScreen = React.lazy(() => import("./components/OnboardingScreen"));
+const OnboardingScreen = React.lazy(
+  () => import("./components/OnboardingScreen"),
+);
 const LegalDocsModal = React.lazy(() =>
-  import("./components/LegalDocsModal").then((m) => ({ default: m.LegalDocsModal }))
+  import("./components/LegalDocsModal").then((m) => ({
+    default: m.LegalDocsModal,
+  })),
 );
+import DashboardTour from "./components/DashboardTour";
 
 type TabType = "dashboard" | "glucose" | "biomarkers" | "admin";
 
@@ -70,6 +79,7 @@ function MainLayout() {
         isSidebarCollapsed ? "md:pl-20" : "md:pl-64",
       )}
     >
+      <DashboardTour activeTab={activeTab} setActiveTab={setActiveTab} />
       {/* Desktop Sidebar */}
       <aside
         className={cn(
@@ -345,7 +355,9 @@ function MainLayout() {
           {activeTab === "biomarkers" && <BiomarkersTab />}
 
           {activeTab === "admin" && isAdmin && <AdminFeedbackView />}
-          {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+          {showProfile && (
+            <ProfileModal onClose={() => setShowProfile(false)} />
+          )}
         </React.Suspense>
         <footer className="mt-12 pt-8 pb-4 border-t border-theme-border/50 text-center text-xs text-theme-text-sec flex flex-wrap justify-center gap-4">
           <button

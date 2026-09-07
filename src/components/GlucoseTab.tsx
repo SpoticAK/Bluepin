@@ -862,6 +862,8 @@ export default function GlucoseTab() {
         </h2>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
+            id="add-glucose-reading-button"
+            data-tour="add-glucose-reading-button"
             onClick={() => setShowAddModal(true)}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-linear-to-r from-theme-accent to-theme-accent/80 hover:opacity-90 text-white px-5 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
@@ -869,6 +871,8 @@ export default function GlucoseTab() {
             Add Reading
           </button>
           <button
+            id="sugar-health-button"
+            data-tour="sugar-health-button"
             onClick={() => setShowSugarHealth(true)}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-linear-to-r from-purple-500 to-violet-600 hover:opacity-90 text-white px-5 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
@@ -884,7 +888,11 @@ export default function GlucoseTab() {
       {/* Premium Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Today's Glucose */}
-        <div className="bg-theme-card rounded-4xl p-6 sm:p-8 border border-theme-border shadow-lg relative overflow-hidden group">
+        <div 
+          id="todays-glucose-card"
+          data-tour="todays-glucose-card"
+          className="bg-theme-card rounded-4xl p-6 sm:p-8 border border-theme-border shadow-lg relative overflow-hidden group"
+        >
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Droplet size={100} fill="currentColor" />
           </div>

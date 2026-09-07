@@ -384,6 +384,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           <>
             {/* 2. HEALTH SNAPSHOT */}
  <section 
+ id="health-score-section"
+ data-tour="health-score-section"
  onClick={() => onNavigate('biomarkers')}
  className="bg-theme-card px-4 py-2 sm:px-6 sm:py-4 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all relative group"
  >
@@ -616,6 +618,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
             {careRemindersNode}
             {/* 2. HEALTH SNAPSHOT */}
  <section 
+ id="health-score-section"
+ data-tour="health-score-section"
  onClick={() => onNavigate('biomarkers')}
  className="bg-theme-card px-4 py-2 sm:px-6 sm:py-4 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all relative group"
  >
@@ -689,6 +693,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
             {careRemindersNode}
             {/* 2. HEALTH SNAPSHOT */}
  <section 
+ id="health-score-section"
+ data-tour="health-score-section"
  onClick={() => onNavigate('biomarkers')}
  className="bg-theme-card px-4 py-2 sm:px-6 sm:py-4 rounded-[28px] border border-theme-border/50 shadow-sm cursor-pointer hover:shadow-md transition-all relative group"
  >
@@ -842,6 +848,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
         {/* QUICK ADD FLOATING BUTTON */}
         <div className="flex-1 flex justify-end">
           <button 
+            id="quick-add-button"
+            data-tour="quick-add-button"
             onClick={() => setShowQuickAdd(true)}
             className="pointer-events-auto w-14 h-14 bg-theme-text text-theme-bg rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
           >
