@@ -67,8 +67,8 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
     }
   };
 
-  const steps: Step[] = useMemo(
-    () => [
+  const steps: Step[] = useMemo(() => {
+    const rawSteps: Step[] = [
       // 1. Health Score (Dashboard)
       {
         target: "#health-score-section",
@@ -103,16 +103,15 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
           }
         },
       },
-      // 3. Add Glucose Reading Modal (Glucose Tab)
+      // 3. Add Glucose Reading Modal - Upload (Glucose Tab)
       {
         target: "#add-glucose-modal-content",
-        title: "Add Glucose Reading",
-        content:
-          "click and upload a pic of your blood sugar reading or enter it manually",
-        placement: "bottom",
+        title: "Upload Reading",
+        content: "Click and upload a pic of your blood sugar reading.",
+        placement: "top",
         skipBeacon: true,
         spotlightPadding: 6,
-        spotlightRadius: 32,
+        spotlightRadius: 16,
         before: async (): Promise<void> => {
           if (setActiveTab) {
             setActiveTab("glucose");
@@ -129,7 +128,32 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
           await new Promise<void>((resolve) => setTimeout(resolve, 600));
         },
       },
-      // 4. Sugar Health Button (Glucose Tab)
+      // 4. Add Glucose Reading Modal - Manual (Glucose Tab)
+      {
+        target: "#add-glucose-manual-entry",
+        title: "Manual Entry",
+        content: "Or enter it manually here.",
+        placement: "bottom",
+        skipBeacon: true,
+        spotlightPadding: 6,
+        spotlightRadius: 16,
+        before: async (): Promise<void> => {
+          if (setActiveTab) {
+            setActiveTab("glucose");
+          }
+          const modalContent = document.getElementById(
+            "add-glucose-modal-content",
+          );
+          if (!modalContent) {
+            const addBtn = document.getElementById(
+              "add-glucose-reading-button",
+            );
+            if (addBtn) addBtn.click();
+          }
+          await new Promise<void>((resolve) => setTimeout(resolve, 600));
+        },
+      },
+      // 5. Sugar Health Button (Glucose Tab)
       {
         target: "#sugar-health-button",
         title: "Sugar Health",
@@ -148,7 +172,7 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
           await new Promise<void>((resolve) => setTimeout(resolve, 600));
         },
       },
-      // 5. Upload Health Report Floating Button (Canvas Tab)
+      // 6. Upload Health Report Floating Button (Canvas Tab)
       {
         target: "#canvas-upload-report-button",
         title: "Upload Reports",
@@ -167,7 +191,7 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
           await new Promise<void>((resolve) => setTimeout(resolve, 600));
         },
       },
-      // 6. AI Highlights Button (Canvas Tab)
+      // 7. AI Highlights Button (Canvas Tab)
       {
         target: "#canvas-highlights-button",
         title: "Highlights",
@@ -184,9 +208,15 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
           await new Promise<void>((resolve) => setTimeout(resolve, 600));
         },
       },
-    ],
-    [setActiveTab],
-  );
+    ];
+
+    return rawSteps.map((s, i) => ({
+      ...s,
+      locale: {
+        skip: `Step ${i + 1}/${rawSteps.length}`,
+      },
+    }));
+  }, [setActiveTab]);
 
   const { Tour } = useJoyride({
     continuous: true,
@@ -210,7 +240,6 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
     },
     locale: {
       back: "Previous",
-      skip: "Maybe later",
       last: "Let's Go! 🚀",
       next: "Got it!",
     },
@@ -218,7 +247,8 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
       tooltip: {
         borderRadius: 24,
         padding: "24px 24px",
-        boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+        boxShadow:
+          "0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
         border: "1px solid var(--color-theme-border)",
       },
       tooltipTitle: {
@@ -260,26 +290,30 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
       buttonSkip: {
         color: "var(--color-theme-text-sec)",
         fontSize: "13px",
-        fontWeight: 500,
+        fontWeight: 700,
         background: "transparent",
         border: "none",
-        cursor: "pointer",
+        cursor: "default",
+        pointerEvents: "none", // Makes it act like static text instead of a clickable skip button
         fontFamily: "var(--font-sans, inherit)",
+        letterSpacing: "0.05em",
       },
       buttonClose: {
         color: "var(--color-theme-text-sec)",
+        // ==========================================
+        // CLOSE BUTTON (X) POSITION
+        // Change the top and right values below to move the X
+        // ==========================================
+        top: "20px",
+        right: "20px",
       },
     },
     onEvent: (data) => {
-      if (
-        data.status === STATUS.FINISHED ||
-        data.status === STATUS.SKIPPED
-      ) {
+      if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
         markTourDone();
       }
     },
   });
-
 
   const restartTour = () => {
     const closeBtn = document.getElementById("close-glucose-modal-btn");
