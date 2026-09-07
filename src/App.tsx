@@ -30,10 +30,7 @@ import WelcomeScreen from "./components/WelcomeScreen";
 import { ProfileModal } from "./components/ProfileModal";
 import OnboardingScreen from "./components/OnboardingScreen";
 import { auth, db } from "./lib/firebase";
-import {
-  onAuthStateChanged,
-  getRedirectResult,
-} from "firebase/auth";
+import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { ThemeProvider, useTheme } from "./theme";
 import { LegalDocsModal } from "./components/LegalDocsModal";
@@ -119,6 +116,8 @@ function MainLayout() {
             colorClass="text-blue-500"
           />
           <NavItem
+            id="nav-glucose-desktop"
+            dataTour="nav-glucose"
             icon={<Droplet />}
             label="Glucose"
             isActive={activeTab === "glucose"}
@@ -127,6 +126,8 @@ function MainLayout() {
             colorClass="text-red-500"
           />
           <NavItem
+            id="nav-canvas-desktop"
+            dataTour="nav-canvas"
             icon={<FileText />}
             label="Health Canvas"
             isActive={activeTab === "biomarkers"}
@@ -193,7 +194,11 @@ function MainLayout() {
                   Talk to the founder
                   <div className="absolute -top-1.25 right-3.5 w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
                 </div>
-                <button className="w-10 h-10 bg-theme-card border border-theme-border rounded-full flex items-center justify-center text-theme-text hover:bg-theme-card-sec transition-colors shadow-sm">
+                <button
+                  id="talk-founder-desktop"
+                  data-tour="talk-founder-btn"
+                  className="w-10 h-10 bg-theme-card border border-theme-border rounded-full flex items-center justify-center text-theme-text hover:bg-theme-card-sec transition-colors shadow-sm"
+                >
                   <div
                     className={cn(
                       "text-xl group-hover:scale-110 transition-transform duration-300 relative",
@@ -209,6 +214,8 @@ function MainLayout() {
             }
           />
           <button
+            id="profile-btn-desktop"
+            data-tour="profile-btn"
             onClick={() => setShowProfile(true)}
             className="w-10 h-10 bg-theme-card border border-theme-border rounded-full flex items-center justify-center text-theme-text hover:bg-theme-card-sec transition-colors shadow-sm group"
           >
@@ -251,7 +258,11 @@ function MainLayout() {
                     Talk to the founder
                     <div className="absolute -top-1.25 right-3.5 w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
                   </div>
-                  <button className="text-theme-text-sec p-2">
+                  <button
+                    id="talk-founder-mobile"
+                    data-tour="talk-founder-btn"
+                    className="text-theme-text-sec p-2"
+                  >
                     <div
                       className={cn(
                         "text-xl hover:scale-110 transition-transform duration-300 relative",
@@ -281,6 +292,8 @@ function MainLayout() {
               )}
             </button>
             <button
+              id="profile-btn-mobile"
+              data-tour="profile-btn"
               onClick={() => setShowProfile(true)}
               className="text-theme-text-sec p-2 group"
             >
@@ -336,6 +349,8 @@ function MainLayout() {
           colorClass="text-blue-500"
         />
         <MobileNavItem
+          id="nav-glucose-mobile"
+          dataTour="nav-glucose"
           icon={<Droplet size={20} />}
           label="Glucose"
           isActive={activeTab === "glucose"}
@@ -343,6 +358,8 @@ function MainLayout() {
           colorClass="text-red-500"
         />
         <MobileNavItem
+          id="nav-canvas-mobile"
+          dataTour="nav-canvas"
           icon={<FileText size={20} />}
           label="Canvas"
           isActive={activeTab === "biomarkers"}
@@ -371,6 +388,8 @@ function NavItem({
   onClick,
   isCollapsed,
   colorClass,
+  id,
+  dataTour,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -378,9 +397,13 @@ function NavItem({
   onClick: () => void;
   isCollapsed?: boolean;
   colorClass?: string;
+  id?: string;
+  dataTour?: string;
 }) {
   return (
     <button
+      id={id}
+      data-tour={dataTour}
       onClick={onClick}
       title={isCollapsed ? label : undefined}
       className={cn(
@@ -410,15 +433,21 @@ function MobileNavItem({
   isActive,
   onClick,
   colorClass,
+  id,
+  dataTour,
 }: {
   icon: React.ReactNode;
   label: string;
   isActive: boolean;
   onClick: () => void;
   colorClass?: string;
+  id?: string;
+  dataTour?: string;
 }) {
   return (
     <button
+      id={id}
+      data-tour={dataTour}
       onClick={onClick}
       className={cn(
         "flex flex-col items-center justify-center space-y-1 w-16 py-1 transition-colors",
@@ -542,9 +571,10 @@ function AppContent() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-theme-bg text-theme-text gap-4 relative">
         <img
-          src="/Bluepin.png"
+          src="/Bluepin.webp"
           alt="Bluepin Logo"
           className="w-12 h-12 object-contain animate-pulse"
+          fetchPriority="high"
         />
         <p className="text-sm text-theme-text-sec font-medium">
           Loading Bluepin...
