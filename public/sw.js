@@ -4,6 +4,7 @@ const STATIC_ASSETS = [
   '/index.html',
   '/manifest.webmanifest',
   '/Bluepin.png',
+  '/Bluepin.webp',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
   '/maskable-icon-512x512.png',
