@@ -9,7 +9,7 @@ const LegalDocsModal = React.lazy(() =>
 export default function AuthScreen() {
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
   return (
-    <div className="min-h-screen bg-theme-card flex flex-col items-center justify-center p-4 sm:p-8">
+    <main className="min-h-screen bg-theme-card flex flex-col items-center justify-center p-4 sm:p-8">
       <div className="w-full max-w-sm text-center">
         <div className="flex justify-center mb-2">
           <div
@@ -54,6 +54,6 @@ export default function AuthScreen() {
           />
         </React.Suspense>
       )}
-    </div>
+    </main>
   );
 }
