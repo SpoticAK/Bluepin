@@ -528,24 +528,27 @@ function MobileNavItem({
 }
 
 function AppContent() {
-  const [sessionUser, setSessionUser] = useState<any>(undefined);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(() => {
+  /**
+   * Auth fast-path: Firebase stores session tokens in localStorage under keys
+   * matching `firebase:authUser:<apiKey>:*`. If no such key exists, the user
+   * is definitely NOT logged in — we can show AuthScreen immediately without
+   * waiting 2.5s+ for Firebase's auth/iframe.js handshake to complete.
+   * This is the primary fix for high LCP on first/unauthenticated visits.
+   */
+  const [sessionUser, setSessionUser] = useState<any>(() => {
     try {
-      return localStorage.getItem("bluepin_welcome_seen") !== "true";
+      const hasFirebaseSession = Object.keys(localStorage).some((k) =>
+        k.startsWith('firebase:authUser:')
+      );
+      // null = definitely not logged in, undefined = unknown (need Firebase to confirm)
+      return hasFirebaseSession ? undefined : null;
     } catch {
-      return true;
+      return undefined;
     }
   });
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authTimedOut, setAuthTimedOut] = useState(false);
-
-  const handleStartWelcome = () => {
-    try {
-      localStorage.setItem("bluepin_welcome_seen", "true");
-    } catch {}
-    setShowWelcome(false);
-  };
 
   useEffect(() => {
     // Handle redirect sign-in results (e.g. mobile standalone PWA)
@@ -555,9 +558,10 @@ function AppContent() {
       }
     });
 
-    const timer = setTimeout(() => {
+    // Only set the timeout if we're waiting (fast-path already resolved to null skips this)
+    const timer = sessionUser === undefined ? setTimeout(() => {
       setAuthTimedOut(true);
-    }, 8000);
+    }, 8000) : null;
 
     const unsub = onAuthStateChanged(
       auth,
@@ -588,7 +592,7 @@ function AppContent() {
     );
 
     return () => {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       unsub();
     };
   }, []);
