@@ -20,17 +20,15 @@ import {
   Shield,
 } from "lucide-react";
 import { cn } from "./lib/utils";
-import { FeedbackWidget } from "./components/FeedbackWidget";
-import { AppProvider, useAppStore } from "./store";
+import { AppProvider } from "./store";
 import { auth, db } from "./lib/firebase";
 import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { ThemeProvider, useTheme } from "./theme";
 import { LegalDocType } from "./lib/consentManager";
-import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
-import AuthScreen from "./components/authflow/AuthScreen";
 
-// Lazy-loaded heavy components (reduces initial JS bundle from ~2MB to <200KB)
+// Lazy-loaded components — keeps framer-motion, react-hook-form, zod out of the initial chunk
+const AuthScreen = React.lazy(() => import("./components/authflow/AuthScreen"));
 const Dashboard = React.lazy(() => import("./components/Dashboard"));
 const GlucoseTab = React.lazy(() => import("./components/GlucoseTab"));
 const BiomarkersTab = React.lazy(() => import("./components/BiomarkersTab"));
@@ -50,7 +48,17 @@ const LegalDocsModal = React.lazy(() =>
     default: m.LegalDocsModal,
   })),
 );
-import DashboardTour from "./components/DashboardTour";
+const DashboardTour = React.lazy(() => import("./components/DashboardTour"));
+const FeedbackWidget = React.lazy(() =>
+  import("./components/FeedbackWidget").then((m) => ({
+    default: m.FeedbackWidget,
+  })),
+);
+const InstallPWAPrompt = React.lazy(() =>
+  import("./components/InstallPWAPrompt").then((m) => ({
+    default: m.InstallPWAPrompt,
+  })),
+);
 
 type TabType = "dashboard" | "glucose" | "biomarkers" | "admin";
 
@@ -79,7 +87,9 @@ function MainLayout() {
         isSidebarCollapsed ? "md:pl-20" : "md:pl-64",
       )}
     >
-      <DashboardTour activeTab={activeTab} setActiveTab={setActiveTab} />
+      <React.Suspense fallback={null}>
+        <DashboardTour activeTab={activeTab} setActiveTab={setActiveTab} />
+      </React.Suspense>
       {/* Desktop Sidebar */}
       <aside
         className={cn(
@@ -202,37 +212,39 @@ function MainLayout() {
       {/* Main Content */}
       <main className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-8 overflow-y-auto relative">
         <div className="hidden md:flex absolute top-6 right-8 gap-3 z-30">
-          <FeedbackWidget
-            trigger={
-              <div className="relative group flex items-center">
-                <div
-                  className={cn(
-                    "absolute top-full right-0 mt-3 whitespace-nowrap bg-theme-bg border border-theme-border text-theme-text px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 pointer-events-none z-50",
-                    "opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0",
-                  )}
-                >
-                  Talk to the founder
-                  <div className="absolute -top-1.25 right-3.5 w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
-                </div>
-                <button
-                  id="talk-founder-desktop"
-                  data-tour="talk-founder-btn"
-                  className="w-10 h-10 bg-theme-card border border-theme-border rounded-full flex items-center justify-center text-theme-text hover:bg-theme-card-sec transition-colors shadow-sm"
-                >
+          <React.Suspense fallback={null}>
+            <FeedbackWidget
+              trigger={
+                <div className="relative group flex items-center">
                   <div
                     className={cn(
-                      "text-xl group-hover:scale-110 transition-transform duration-300 relative",
-                      isWaving
-                        ? "animate-[wave_2.5s_ease-in-out_infinite] origin-bottom-right"
-                        : "",
+                      "absolute top-full right-0 mt-3 whitespace-nowrap bg-theme-bg border border-theme-border text-theme-text px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 pointer-events-none z-50",
+                      "opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0",
                     )}
                   >
-                    👋
+                    Talk to the founder
+                    <div className="absolute -top-1.25 right-3.5 w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
                   </div>
-                </button>
-              </div>
-            }
-          />
+                  <button
+                    id="talk-founder-desktop"
+                    data-tour="talk-founder-btn"
+                    className="w-10 h-10 bg-theme-card border border-theme-border rounded-full flex items-center justify-center text-theme-text hover:bg-theme-card-sec transition-colors shadow-sm"
+                  >
+                    <div
+                      className={cn(
+                        "text-xl group-hover:scale-110 transition-transform duration-300 relative",
+                        isWaving
+                          ? "animate-[wave_2.5s_ease-in-out_infinite] origin-bottom-right"
+                          : "",
+                      )}
+                    >
+                      👋
+                    </div>
+                  </button>
+                </div>
+              }
+            />
+          </React.Suspense>
           <button
             id="profile-btn-desktop"
             data-tour="profile-btn"
@@ -269,37 +281,39 @@ function MainLayout() {
             </h1>
           </div>
           <div className="flex items-center gap-2 relative">
-            <FeedbackWidget
-              trigger={
-                <div className="relative group flex items-center">
-                  <div
-                    className={cn(
-                      "absolute top-full right-0 mt-2 whitespace-nowrap bg-theme-bg border border-theme-border text-theme-text px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 pointer-events-none z-50",
-                      "opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0",
-                    )}
-                  >
-                    Talk to the founder
-                    <div className="absolute -top-1.25 right-3.5 w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
-                  </div>
-                  <button
-                    id="talk-founder-mobile"
-                    data-tour="talk-founder-btn"
-                    className="text-theme-text-sec p-2"
-                  >
+            <React.Suspense fallback={null}>
+              <FeedbackWidget
+                trigger={
+                  <div className="relative group flex items-center">
                     <div
                       className={cn(
-                        "text-xl hover:scale-110 transition-transform duration-300 relative",
-                        isWaving
-                          ? "animate-[wave_2.5s_ease-in-out_infinite] origin-bottom-right"
-                          : "",
+                        "absolute top-full right-0 mt-2 whitespace-nowrap bg-theme-bg border border-theme-border text-theme-text px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 pointer-events-none z-50",
+                        "opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0",
                       )}
                     >
-                      👋
+                      Talk to the founder
+                      <div className="absolute -top-1.25 right-3.5 w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
                     </div>
-                  </button>
-                </div>
-              }
-            />
+                    <button
+                      id="talk-founder-mobile"
+                      data-tour="talk-founder-btn"
+                      className="text-theme-text-sec p-2"
+                    >
+                      <div
+                        className={cn(
+                          "text-xl hover:scale-110 transition-transform duration-300 relative",
+                          isWaving
+                            ? "animate-[wave_2.5s_ease-in-out_infinite] origin-bottom-right"
+                            : "",
+                        )}
+                      >
+                        👋
+                      </div>
+                    </button>
+                  </div>
+                }
+              />
+            </React.Suspense>
             <button
               onClick={toggleTheme}
               className="text-theme-text-sec p-2 group"
@@ -420,7 +434,9 @@ function MainLayout() {
           />
         )}
       </nav>
-      <InstallPWAPrompt />
+      <React.Suspense fallback={null}>
+        <InstallPWAPrompt />
+      </React.Suspense>
     </div>
   );
 }
@@ -635,7 +651,11 @@ function AppContent() {
     // if (showWelcome) {
     //   return <WelcomeScreen onStart={handleStartWelcome} />;
     // }
-    return <AuthScreen />;
+    return (
+      <React.Suspense fallback={null}>
+        <AuthScreen />
+      </React.Suspense>
+    );
   }
 
   if (needsOnboarding) {
