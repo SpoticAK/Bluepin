@@ -1,7 +1,24 @@
-import React from 'react';
-import { X } from 'lucide-react';
-import { LegalDocType } from '../lib/consentManager';
-import { cn } from '../lib/utils';
+import React, { useRef, useEffect } from "react";
+import Markdown from "react-markdown";
+import {
+  X,
+  ChevronDown,
+  FileText,
+  Lock,
+  Cookie,
+  Sparkles,
+  ShieldAlert,
+  HeartHandshake,
+} from "lucide-react";
+import { LegalDocType } from "../lib/consentManager";
+import { cn } from "../lib/utils";
+import remarkGfm from "remark-gfm";
+import privacyPolicyRaw from "../legal/Bluepin_Privacy_Policy.md?raw";
+import termsOfServiceRaw from "../legal/Bluepin_Terms_of_Service.md?raw";
+import cookiePolicyRaw from "../legal/Bluepin_Cookie_Tracking_Policy_Latest.md?raw";
+import aiDisclaimerRaw from "../legal/Bluepin_AI_Output_Disclaimer.md?raw";
+import medicalDisclaimerRaw from "../legal/Bluepin_Medical_Health_Disclaimer.md?raw";
+import healthConsentRaw from "../legal/Bluepin_Health_Data_Consent_Notice_Latest.md?raw";
 
 interface LegalDocsModalProps {
   isOpen: boolean;
@@ -9,186 +26,358 @@ interface LegalDocsModalProps {
   defaultTab?: LegalDocType;
 }
 
-export function LegalDocsModal({ isOpen, onClose, defaultTab = 'terms' }: LegalDocsModalProps) {
-  const [activeTab, setActiveTab] = React.useState<LegalDocType>(defaultTab);
+const LEGAL_DOCS: {
+  id: LegalDocType;
+  label: string;
+  icon: React.ElementType;
+  desc: string;
+}[] = [
+  {
+    id: "terms",
+    label: "Terms of Service",
+    icon: FileText,
+    desc: "Rules, accounts & service terms",
+  },
+  {
+    id: "privacy",
+    label: "Privacy Policy",
+    icon: Lock,
+    desc: "How we collect & protect data",
+  },
+  {
+    id: "cookies",
+    label: "Cookie & Tracking",
+    icon: Cookie,
+    desc: "Essential & analytics cookies",
+  },
+  {
+    id: "ai-disclaimer",
+    label: "AI Output Disclaimer",
+    icon: Sparkles,
+    desc: "Gemini AI intelligence limits",
+  },
+  {
+    id: "medical",
+    label: "Medical Disclaimer",
+    icon: ShieldAlert,
+    desc: "Clinical safety & care advisory",
+  },
+  {
+    id: "health-consent",
+    label: "Health Data Consent",
+    icon: HeartHandshake,
+    desc: "Sensitive health records consent",
+  },
+];
 
-  React.useEffect(() => {
+const DOC_CONTENT: Record<LegalDocType, string> = {
+  terms: termsOfServiceRaw,
+  privacy: privacyPolicyRaw,
+  cookies: cookiePolicyRaw,
+  "ai-disclaimer": aiDisclaimerRaw,
+  medical: medicalDisclaimerRaw,
+  "health-consent": healthConsentRaw,
+};
+
+const DOC_NAME_TO_TAB: Record<string, LegalDocType> = {
+  "bluepin terms of service": "terms",
+  "terms of service": "terms",
+  "bluepin privacy policy": "privacy",
+  "privacy policy": "privacy",
+  "bluepin cookie tracking policy": "cookies",
+  "cookie tracking policy": "cookies",
+  "cookie policy": "cookies",
+  "bluepin ai output disclaimer": "ai-disclaimer",
+  "ai output disclaimer": "ai-disclaimer",
+  "bluepin medical health disclaimer": "medical",
+  "medical health disclaimer": "medical",
+  "medical disclaimer": "medical",
+  "bluepin health data consent notice": "health-consent",
+  "health data consent notice": "health-consent",
+  "health data consent": "health-consent",
+};
+
+function extractText(node: React.ReactNode): string {
+  if (!node) return "";
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (typeof node === "object" && "props" in (node as any)) {
+    return extractText((node as any).props.children);
+  }
+  return "";
+}
+
+function resolveDocTab(input: string): LegalDocType | null {
+  if (!input || typeof input !== "string") return null;
+  const clean = input
+    .toLowerCase()
+    .replace(/[#&/_-]+/g, " ")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // If input is too long, it's a full sentence/paragraph, not just a document title
+  if (clean.length > 50) return null;
+
+  for (const [key, tab] of Object.entries(DOC_NAME_TO_TAB)) {
+    if (clean === key || clean.includes(key)) {
+      return tab;
+    }
+  }
+  return null;
+}
+
+export function LegalDocsModal({
+  isOpen,
+  onClose,
+  defaultTab = "terms",
+}: LegalDocsModalProps) {
+  const [activeTab, setActiveTab] = React.useState<LegalDocType>(defaultTab);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
     if (isOpen && defaultTab) {
       setActiveTab(defaultTab);
     }
   }, [isOpen, defaultTab]);
 
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [activeTab]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-theme-text/20 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-theme-card w-full max-w-3xl max-h-[90vh] rounded-2xl sm:rounded-3xl shadow-xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="flex justify-between items-center p-4 sm:p-6 border-b border-theme-border">
-          <h2 className="text-xl font-bold text-theme-text">Legal Documents</h2>
-          <button 
-            onClick={onClose}
-            className="p-2 bg-theme-bg hover:bg-theme-border text-theme-text-sec hover:text-theme-text rounded-full transition-colors"
+    <div
+      className="fixed inset-0 z-100 bg-theme-text/20 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 md:p-6"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className="bg-theme-card w-full max-w-4xl h-[88vh] max-h-205 rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-theme-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Top Header */}
+        <div className="flex justify-between items-center px-5 py-4 sm:px-6 border-b border-theme-border shrink-0 bg-theme-card">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-theme-accent/10 text-theme-accent flex items-center justify-center font-bold text-base">
+              §
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-theme-text leading-tight">
+                Legal & Policies
+              </h2>
+              <p className="text-[11px] text-theme-text-sec">
+                Bluepin Terms, Privacy & Health Disclaimers
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            className="p-2 bg-theme-bg hover:bg-theme-border/40 text-theme-text-sec hover:text-theme-text rounded-full transition-colors cursor-pointer border border-theme-border/50"
+            aria-label="Close legal documents"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
-        
-        <div className="flex bg-theme-bg p-2 sm:px-6 overflow-x-auto border-b border-theme-border gap-2 shrink-0 hide-scrollbar">
-          {(['terms', 'privacy'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={cn(
-                "px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors",
-                activeTab === tab 
-                  ? "bg-theme-card text-theme-text shadow-sm" 
-                  : "text-theme-text-sec hover:text-theme-text hover:bg-theme-card/50"
-              )}
+
+        {/* Mobile Document Dropdown (< md) */}
+        <div className="md:hidden px-4 py-2.5 bg-theme-bg border-b border-theme-border flex items-center justify-between shrink-0 gap-3">
+          <span className="text-[11px] font-bold text-theme-text-sec uppercase tracking-wider shrink-0">
+            Document:
+          </span>
+          <div className="relative flex-1 max-w-xs">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value as LegalDocType)}
+              className="w-full appearance-none bg-theme-card text-theme-text text-xs font-semibold py-2 pl-3 pr-8 rounded-xl border border-theme-border shadow-2xs focus:outline-none focus:ring-1 focus:ring-theme-accent cursor-pointer truncate"
             >
-              {tab === 'terms' && 'Terms of Service'}
-              {tab === 'privacy' && 'Privacy Policy'}
-            </button>
-          ))}
+              {LEGAL_DOCS.map((doc) => (
+                <option
+                  key={doc.id}
+                  value={doc.id}
+                  className="bg-theme-card text-theme-text"
+                >
+                  {doc.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={14}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-theme-text-sec"
+            />
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="prose prose-sm md:prose-base max-w-none text-theme-text text-sm">
-            {activeTab === 'terms' && (
-              <div className="space-y-6">
-                <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold mb-2">Terms of Service</h3>
-                  <p className="text-theme-text-sec text-sm">Effective Date: {new Date().toLocaleDateString()}</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">1. About Bluepin</h4>
-                  <p>Bluepin is a health and wellness application designed to help users track health metrics, upload medical reports, and receive AI-generated insights. These Terms of Service ("Terms") govern your use of the Bluepin application.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">2. Eligibility and Account Ownership</h4>
-                  <p>By creating an account, you confirm that you are legally capable of entering into a binding contract and are solely responsible for all activities that occur under your account. You agree to provide accurate and complete information during registration and keep it updated.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">3. Acceptable Use</h4>
-                  <p>You agree to use Bluepin strictly for lawful purposes. You shall not upload any false data, misrepresent your identity, attempt to gain unauthorized access to our systems, or use the platform in any way that violates applicable local, state, national, or international law, including the Digital Personal Data Protection Act, 2023.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">4. Consent to Processing</h4>
-                  <p>By actively checking the required consent checkboxes during account creation, you explicitly consent to Bluepin collecting, storing, and processing your personal and health information solely for the purpose of providing the application's services, as described in our Privacy Policy. You maintain the right to withdraw this consent at any time by deleting your account via the settings menu or by contacting our support team.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-xl text-amber-900 dark:text-amber-200">
-                    <h4 className="text-lg font-bold mb-3 flex items-center gap-2">
-                      <span className="text-amber-500">⚠️</span> 5. AI & Medical Disclaimer
-                    </h4>
-                    <ul className="list-disc pl-5 space-y-2">
-                      <li><strong>Not a Medical Device:</strong> Bluepin is an informational tool and is not classified as a medical device.</li>
-                      <li><strong>No Medical Advice:</strong> Bluepin does not provide professional medical advice, diagnosis, or treatment recommendations.</li>
-                      <li><strong>AI Limitations:</strong> AI-generated insights are informational only and may occasionally make mistakes or hallucinate information.</li>
-                      <li><strong>Consult Professionals:</strong> You should always consult qualified healthcare professionals before making medical decisions or altering any treatments.</li>
-                      <li><strong>Emergencies:</strong> Bluepin should never be relied upon in medical emergencies. If you experience a medical emergency, immediately contact your local emergency services.</li>
-                    </ul>
+        {/* Split View Body */}
+        <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
+          {/* Desktop Sidebar (>= md) */}
+          <aside className="hidden md:flex flex-col w-64 lg:w-72 shrink-0 bg-theme-bg/40 border-r border-theme-border p-3 gap-1 overflow-y-auto">
+            <div className="px-3 py-1.5 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-theme-text-sec">
+                Documents & Disclaimers
+              </span>
+            </div>
+            {LEGAL_DOCS.map((doc) => {
+              const Icon = doc.icon;
+              const isActive = activeTab === doc.id;
+              return (
+                <button
+                  type="button"
+                  key={doc.id}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveTab(doc.id);
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer group",
+                    isActive
+                      ? "bg-theme-card text-theme-text font-semibold shadow-xs border border-theme-border/60"
+                      : "text-theme-text-sec hover:text-theme-text hover:bg-theme-card/50 border border-transparent",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                      isActive
+                        ? "bg-theme-accent/10 text-theme-accent"
+                        : "bg-theme-card text-theme-text-sec group-hover:text-theme-text border border-theme-border/50",
+                    )}
+                  >
+                    <Icon size={15} />
                   </div>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold truncate leading-tight">
+                      {doc.label}
+                    </p>
+                    <p className="text-[10px] text-theme-text-sec truncate mt-0.5 font-normal">
+                      {doc.desc}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </aside>
 
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">6. Intellectual Property</h4>
-                  <p>All content, features, and functionality of Bluepin, including but not limited to text, graphics, logos, and software, are the exclusive property of Bluepin and its licensors and are protected by copyright, trademark, and other intellectual property laws.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">7. Limitation of Liability</h4>
-                  <p>To the maximum extent permitted by law, Bluepin and its affiliates shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, or any loss of data, use, goodwill, or other intangible losses, resulting from (a) your access to or use of or inability to access or use the application; (b) any conduct or content of any third party on the application; or (c) unauthorized access, use, or alteration of your transmissions or content.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">8. Account Suspension / Termination</h4>
-                  <p>We reserve the right to suspend or terminate your account and access to the services at our sole discretion, without prior notice or liability, for any reason whatsoever, including without limitation if you breach these Terms.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">9. Governing Law</h4>
-                  <p>These Terms shall be governed by and construed in accordance with the laws of India, without regard to its conflict of law provisions. You agree to submit to the exclusive jurisdiction of the courts located in India to resolve any legal matter arising from these Terms.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">10. Contact Information</h4>
-                  <p>If you have any questions about these Terms, please contact us at <a href="mailto:legal@bluepin.app" className="text-theme-accent hover:underline">legal@bluepin.app</a>.</p>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'privacy' && (
-              <div className="space-y-6">
-                <div className="text-center mb-8">
-                  <h3 className="text-2xl font-bold mb-2">Privacy Policy</h3>
-                  <p className="text-theme-text-sec text-sm">Effective Date: {new Date().toLocaleDateString()}</p>
-                </div>
-                
-                <p>Welcome to Bluepin. We are committed to protecting your personal information and your right to privacy in compliance with India's Digital Personal Data Protection (DPDP) Act, 2023.</p>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">1. What Information We Collect</h4>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>Personal Information:</strong> Name, age, gender, email address, and account credentials.</li>
-                    <li><strong>Health Information:</strong> Weight, height, uploaded medical lab reports, glucose readings, and other health metrics you choose to provide.</li>
-                    <li><strong>Technical Data:</strong> IP address, browser type, device identifiers, and application usage analytics.</li>
-                  </ul>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">2. Why We Collect It & How We Use It</h4>
-                  <p>We collect this data solely to provide, personalize, and improve the Bluepin application. Specifically, your data is used to:</p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>Create and manage your user account.</li>
-                    <li>Store and organize your medical reports and health metrics.</li>
-                    <li>Generate AI-driven insights to help you understand your health trends better.</li>
-                    <li>Ensure the security and proper functioning of the application.</li>
-                  </ul>
-                  <p>We do not use your data for targeted advertising or sell it to data brokers.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">3. Where It Is Stored & How We Protect It</h4>
-                  <p>Your data is securely stored in cloud databases managed by Google Cloud (Firebase). We implement robust technical and organizational security measures, including encryption in transit and at rest, to protect your personal and health information from unauthorized access, disclosure, alteration, or destruction.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">4. Whether We Share It With Anyone</h4>
-                  <p>We do not sell your personal or health data. We may share information only in the following limited circumstances:</p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>Service Providers:</strong> With trusted third-party services (like our AI processing partners and hosting providers) bound by strict confidentiality agreements, solely to operate the application.</li>
-                    <li><strong>Legal Obligations:</strong> When legally required to do so by a valid request from law enforcement or government authorities.</li>
-                  </ul>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">5. Data Retention</h4>
-                  <p>We retain your personal and health information only for as long as your account remains active or as needed to provide you with the services. If you delete your account, your data will be permanently removed from our active databases, subject to legal requirements.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">6. Your User Rights</h4>
-                  <p>Under the DPDP Act, you have the right to:</p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>Access:</strong> Request a copy of the personal and health data we hold about you.</li>
-                    <li><strong>Correction:</strong> Update or correct any inaccurate information in your profile.</li>
-                    <li><strong>Withdrawal of Consent:</strong> Withdraw your consent at any time (which may limit your ability to use the app).</li>
-                    <li><strong>Deletion:</strong> Request the deletion of your account and associated data directly through the application settings.</li>
-                  </ul>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold">7. Contact Information</h4>
-                  <p>If you have any questions, concerns, or wish to exercise your data rights, please contact our Data Protection Officer at <a href="mailto:privacy@bluepin.app" className="text-theme-accent hover:underline">privacy@bluepin.app</a>.</p>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Document Content Viewport */}
+          <main
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto p-5 sm:p-8 lg:p-10 bg-theme-card min-w-0"
+          >
+            <div className="prose prose-sm md:prose-base max-w-none text-theme-text dark:prose-invert prose-headings:text-theme-text prose-p:text-theme-text/90 prose-strong:text-theme-text prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-hr:border-theme-border">
+              <Markdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  strong: ({ children, ...props }) => {
+                    const text = extractText(children);
+                    const targetTab = resolveDocTab(text);
+                    if (targetTab && targetTab !== activeTab) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveTab(targetTab);
+                          }}
+                          className="inline-flex items-center gap-1 font-bold dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline decoration-blue-400/50 hover:decoration-blue-600 cursor-pointer transition-all mx-0.5 text-inherit"
+                          title={`Switch to ${LEGAL_DOCS.find((d) => d.id === targetTab)?.label}`}
+                        >
+                          <span>{children}</span>
+                          <span className="text-[10px] font-normal text-blue-500/80 no-underline select-none">
+                            ↗
+                          </span>
+                        </button>
+                      );
+                    }
+                    return (
+                      <strong className="text-theme-text font-bold" {...props}>
+                        {children}
+                      </strong>
+                    );
+                  },
+                  a: ({ href, children, ...props }) => {
+                    const text = extractText(children);
+                    const targetTab =
+                      resolveDocTab(href || "") || resolveDocTab(text);
+                    if (targetTab && targetTab !== activeTab) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveTab(targetTab);
+                          }}
+                          className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                          title={`Switch to ${LEGAL_DOCS.find((d) => d.id === targetTab)?.label}`}
+                        >
+                          <span>{children}</span>
+                          <span className="text-[10px] opacity-70">↗</span>
+                        </button>
+                      );
+                    }
+                    return (
+                      <a
+                        href={href}
+                        target={href?.startsWith("http") ? "_blank" : undefined}
+                        rel={
+                          href?.startsWith("http")
+                            ? "noopener noreferrer"
+                            : undefined
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                        {...props}
+                      >
+                        {children}
+                      </a>
+                    );
+                  },
+                  table: ({ children }) => (
+                    <div className="overflow-x-auto my-6 rounded-xl border border-theme-border shadow-xs not-prose">
+                      <table className="min-w-full divide-y divide-theme-border text-left text-xs sm:text-sm m-0 bg-theme-card">
+                        {children}
+                      </table>
+                    </div>
+                  ),
+                  thead: ({ children }) => (
+                    <thead className="bg-theme-card-sec text-theme-text font-semibold border-b border-theme-border">
+                      {children}
+                    </thead>
+                  ),
+                  tbody: ({ children }) => (
+                    <tbody className="divide-y divide-theme-border/60 bg-theme-card text-theme-text">
+                      {children}
+                    </tbody>
+                  ),
+                  th: ({ children }) => (
+                    <th className="px-4 py-3 font-semibold text-theme-text whitespace-nowrap text-left text-xs uppercase tracking-wider">
+                      {children}
+                    </th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="px-4 py-3 text-theme-text/85 align-top text-xs sm:text-sm">
+                      {children}
+                    </td>
+                  ),
+                }}
+              >
+                {DOC_CONTENT[activeTab]}
+              </Markdown>
+            </div>
+          </main>
         </div>
       </div>
     </div>
