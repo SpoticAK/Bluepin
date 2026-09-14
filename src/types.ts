@@ -1,6 +1,8 @@
 export interface UserConsent {
   termsVersion: string;
   privacyVersion: string;
+  healthConsentVersion?: string;
+  marketingConsent?: boolean;
   acceptedAt: number;
   userAgent: string;
   acceptedFromCountry?: string;
@@ -14,7 +16,7 @@ export interface GlucoseReading {
   unit: string;
   timing: MealTiming;
   hoursAfterEating?: number;
-  source?: 'Manual' | 'OCR';
+  source?: "Manual" | "OCR";
   imageUrl?: string;
   date: string;
   time: string;
@@ -27,7 +29,7 @@ export interface Biomarker {
   name: string; // Cannonical name, or raw name if no match
   originalName?: string; // The raw name extracted by OCR
   biomarkerId?: string | null; // Canonical ID from registry
-  confidence?: 'High' | 'Medium' | 'Low' | 'None';
+  confidence?: "High" | "Medium" | "Low" | "None";
   matchedBy?: string;
   category: BiomarkerCategory;
   specimenType?: string;
@@ -39,7 +41,7 @@ export interface Biomarker {
   refMin?: number;
   refMax?: number;
   refRangeText?: string;
-  status: 'Healthy' | 'Borderline' | 'Needs Attention';
+  status: "Healthy" | "Borderline" | "Needs Attention";
   info?: string;
 }
 
@@ -81,8 +83,8 @@ export interface GoalLog {
       completed: boolean;
       value?: number;
       updatedAt?: any;
-    }
-  }
+    };
+  };
 }
 
 export interface UserProfile {
@@ -92,7 +94,7 @@ export interface UserProfile {
   gender?: string;
   heightCm: number;
   weight?: number;
-  diabetesStatus?: 'No' | 'Pre diabetes' | 'Yes';
+  diabetesStatus?: "No" | "Pre diabetes" | "Yes";
   bmi?: number;
   country?: string;
   photoUrl?: string;
@@ -101,14 +103,13 @@ export interface UserProfile {
   hasSeenDashboardTour?: boolean;
 }
 
-
 export interface Invitation {
   id: string;
   familyId: string;
   familyName: string;
   inviterId: string;
   inviterName: string;
-  status: 'pending' | 'accepted' | 'expired';
+  status: "pending" | "accepted" | "expired";
   createdAt: number;
   expiresAt: number;
 }
