@@ -4,6 +4,7 @@ export interface ConsentState {
   termsRead: boolean;
   privacyRead: boolean;
   legalConsent: boolean;
+  marketingConsent?: boolean;
 }
 
 export interface AuthFormValues {

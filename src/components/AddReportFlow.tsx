@@ -14,6 +14,8 @@ import { LabReport } from "../types";
 import { cn, trackEvent } from "../lib/utils";
 import { DnaLoader } from "./DnaLoader";
 import { generateId } from "@/server/utils/generateId";
+import { LegalDocsModal } from "./LegalDocsModal";
+import { LegalDocType } from "../lib/consentManager";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTS = ["pdf", "png", "jpg", "jpeg"];
@@ -40,6 +42,7 @@ export function AddReportFlow({
   const [reportDate, setReportDate] = useState(
     new Date().toISOString().split("T")[0],
   );
+  const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Uploading file...");
@@ -427,9 +430,31 @@ export function AddReportFlow({
             <div className="mt-8 space-y-4">
               <div className="bg-theme-bg p-3 rounded-lg border border-theme-border/50">
                 <p className="text-[11px] text-theme-text-sec leading-relaxed text-center">
-                  By uploading this report, you confirm that you have the right
-                  to upload it and consent to its processing in accordance with
-                  our Privacy Policy.
+                  By uploading this report, you confirm that you have the right to upload it and consent to its processing per our{" "}
+                  <button
+                    type="button"
+                    onClick={() => setOpenLegalDoc("health-consent")}
+                    className="text-theme-accent hover:underline font-medium cursor-pointer"
+                  >
+                    Health Data Consent
+                  </button>
+                  {", "}
+                  <button
+                    type="button"
+                    onClick={() => setOpenLegalDoc("privacy")}
+                    className="text-theme-accent hover:underline font-medium cursor-pointer"
+                  >
+                    Privacy Policy
+                  </button>
+                  {" & "}
+                  <button
+                    type="button"
+                    onClick={() => setOpenLegalDoc("ai-disclaimer")}
+                    className="text-theme-accent hover:underline font-medium cursor-pointer"
+                  >
+                    AI Disclaimer
+                  </button>
+                  .
                 </p>
               </div>
               <button
@@ -447,6 +472,14 @@ export function AddReportFlow({
           </div>
         )}
       </div>
+
+      {openLegalDoc && (
+        <LegalDocsModal
+          isOpen={true}
+          onClose={() => setOpenLegalDoc(null)}
+          defaultTab={openLegalDoc}
+        />
+      )}
     </div>
   );
 }

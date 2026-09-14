@@ -122,14 +122,22 @@ export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
           className="inline p-0 bg-transparent border-0 text-theme-accent hover:underline font-medium cursor-pointer align-baseline"
         >
           Terms of Service
-        </button>{" "}
-        and{" "}
+        </button>
+        {", "}
         <button
           type="button"
           onClick={() => onOpenLegalDoc?.("privacy")}
           className="inline p-0 bg-transparent border-0 text-theme-accent hover:underline font-medium cursor-pointer align-baseline"
         >
           Privacy Policy
+        </button>
+        {", and "}
+        <button
+          type="button"
+          onClick={() => onOpenLegalDoc?.("cookies")}
+          className="inline p-0 bg-transparent border-0 text-theme-accent hover:underline font-medium cursor-pointer align-baseline"
+        >
+          Cookie Policy
         </button>
         .
       </p>

@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useAppStore } from "../store";
 import { AddGlucoseModal } from "./AddGlucoseModal";
+import { LegalDocsModal } from "./LegalDocsModal";
+import { LegalDocType } from "../lib/consentManager";
 import {
   ComposedChart,
   Area,
@@ -58,6 +60,7 @@ export default function GlucoseTab() {
   const [showHba1cInfo, setShowHba1cInfo] = useState(false);
   const [showCriteriaModal, setShowCriteriaModal] = useState(false);
   const [hasCalculated, setHasCalculated] = useState(false);
+  const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
 
   const [showSugarHealth, setShowSugarHealth] = useState(false);
   const sugarInsights = useMemo(() => {
@@ -1474,6 +1477,21 @@ export default function GlucoseTab() {
         )}
       </div>
 
+      {/* Clinical Safety & Medical Disclaimer Footnote */}
+      <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-theme-text-sec text-center sm:text-left">
+        <span className="flex items-center gap-1.5">
+          <Info size={15} className="shrink-0 text-amber-500" />
+          Glucose logs and trends are for informational tracking only. Never adjust medication or insulin dosages without consulting your doctor.
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpenLegalDoc("medical")}
+          className="text-theme-accent font-semibold hover:underline shrink-0 cursor-pointer"
+        >
+          Medical Disclaimer &rarr;
+        </button>
+      </div>
+
       {showAddModal && (
         <AddGlucoseModal
           onClose={() => setShowAddModal(false)}
@@ -1944,6 +1962,14 @@ export default function GlucoseTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {openLegalDoc && (
+        <LegalDocsModal
+          isOpen={true}
+          onClose={() => setOpenLegalDoc(null)}
+          defaultTab={openLegalDoc}
+        />
       )}
     </div>
   );

@@ -23,6 +23,8 @@ import {
 import { cn, safeFormat, downloadFile } from "../lib/utils";
 import { DashboardHealthDial } from "./DashboardHealthDial";
 import { AddReportFlow } from "./AddReportFlow";
+import { LegalDocsModal } from "./LegalDocsModal";
+import { LegalDocType } from "../lib/consentManager";
 
 import { format, parseISO, isAfter, subMonths } from "date-fns";
 import {
@@ -99,6 +101,7 @@ export default function BiomarkersTab() {
     "dashboard",
   );
   const [showAddReportModal, setShowAddReportModal] = useState(false);
+  const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -672,6 +675,20 @@ export default function BiomarkersTab() {
                             </ul>
                           </div>
                         )}
+
+                        <div className="pt-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-theme-text-sec border-t border-theme-border/50">
+                          <span className="flex items-center gap-1.5">
+                            <Info size={13} className="shrink-0 text-purple-500" />
+                            Bluepin Intelligence is informational and not medical advice.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setOpenLegalDoc("ai-disclaimer")}
+                            className="text-purple-600 dark:text-purple-400 font-semibold hover:underline shrink-0 cursor-pointer"
+                          >
+                            AI Output Disclaimer &rarr;
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -688,10 +705,17 @@ export default function BiomarkersTab() {
                 </h3>
                 <div className="relative flex items-center cursor-help">
                   <Info className="w-4 h-4 text-theme-text-sec transition-colors" />
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-70 bg-theme-card text-theme-text text-xs p-3 rounded-lg border border-theme-border shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-72 bg-theme-card text-theme-text text-xs p-3.5 rounded-xl border border-theme-border shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                     AI extraction may occasionally misclassify values or
                     statuses. We are continuously improving accuracy with newer
                     models.
+                    <button
+                      type="button"
+                      onClick={() => setOpenLegalDoc("ai-disclaimer")}
+                      className="block mt-2 text-purple-600 dark:text-purple-400 font-semibold hover:underline cursor-pointer"
+                    >
+                      AI Output Disclaimer &rarr;
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1279,6 +1303,13 @@ export default function BiomarkersTab() {
             </div>
           </div>
         </div>
+      )}
+      {openLegalDoc && (
+        <LegalDocsModal
+          isOpen={true}
+          onClose={() => setOpenLegalDoc(null)}
+          defaultTab={openLegalDoc}
+        />
       )}
     </div>
   );
