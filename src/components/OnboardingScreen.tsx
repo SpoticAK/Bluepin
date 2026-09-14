@@ -28,6 +28,7 @@ export default function OnboardingScreen({
     termsRead: false,
     privacyRead: false,
     legalConsent: false,
+    marketingConsent: false,
   });
 
   const [data, setData] = useState({
@@ -79,7 +80,7 @@ export default function OnboardingScreen({
           photoUrl: "",
           profileColor: data.profileColor,
           diabetesStatus: data.diabetesStatus,
-          consent: getConsentPayload(navigator.userAgent),
+          consent: getConsentPayload(navigator.userAgent, consent.marketingConsent),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         },

@@ -362,15 +362,39 @@ function MainLayout() {
         <footer className="mt-12 pt-8 pb-4 border-t border-theme-border/50 text-center text-xs text-theme-text-sec flex flex-wrap justify-center gap-4">
           <button
             onClick={() => setOpenLegalDoc("terms")}
-            className="hover:text-theme-text transition-colors"
+            className="hover:text-theme-text transition-colors cursor-pointer"
           >
             Terms of Service
           </button>
           <button
             onClick={() => setOpenLegalDoc("privacy")}
-            className="hover:text-theme-text transition-colors"
+            className="hover:text-theme-text transition-colors cursor-pointer"
           >
             Privacy Policy
+          </button>
+          <button
+            onClick={() => setOpenLegalDoc("cookies")}
+            className="hover:text-theme-text transition-colors cursor-pointer"
+          >
+            Cookie Policy
+          </button>
+          <button
+            onClick={() => setOpenLegalDoc("ai-disclaimer")}
+            className="hover:text-theme-text transition-colors cursor-pointer"
+          >
+            AI Disclaimer
+          </button>
+          <button
+            onClick={() => setOpenLegalDoc("medical")}
+            className="hover:text-theme-text transition-colors cursor-pointer"
+          >
+            Medical Disclaimer
+          </button>
+          <button
+            onClick={() => setOpenLegalDoc("health-consent")}
+            className="hover:text-theme-text transition-colors cursor-pointer"
+          >
+            Health Data Consent
           </button>
         </footer>
       </main>

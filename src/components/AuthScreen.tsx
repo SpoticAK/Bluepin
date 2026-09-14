@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Sparkles } from "lucide-react";
 import { auth } from "../lib/firebase";
 import {
   signInWithPopup,
@@ -24,6 +25,7 @@ export default function AuthScreen() {
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeConsent, setAgreeConsent] = useState(false);
+  const [agreeMarketing, setAgreeMarketing] = useState(false);
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
   const [showConsentError, setShowConsentError] = useState(false);
   const canSignUp = agreeTerms && agreePrivacy && agreeConsent;
@@ -64,6 +66,7 @@ export default function AuthScreen() {
     setAgreeTerms(false);
     setAgreePrivacy(false);
     setAgreeConsent(false);
+    setAgreeMarketing(false);
     setPassword("");
   };
 
@@ -88,7 +91,7 @@ export default function AuthScreen() {
         await setDoc(
           doc(db, "users", userCred.user.uid),
           {
-            consent: getConsentPayload(navigator.userAgent),
+            consent: getConsentPayload(navigator.userAgent, agreeMarketing),
           },
           { merge: true },
         );
@@ -320,7 +323,7 @@ export default function AuthScreen() {
               </label>
 
               <label className="flex items-start gap-3 cursor-pointer group">
-                <div className="relative flex items-center justify-center mt-0.5">
+                <div className="relative flex items-center justify-center mt-0.5 shrink-0">
                   <input
                     type="checkbox"
                     checked={agreeConsent}
@@ -341,11 +344,80 @@ export default function AuthScreen() {
                   </svg>
                 </div>
                 <span className="text-xs text-theme-text-sec leading-snug select-none">
-                  I consent to Bluepin collecting, storing and processing my
-                  personal and health information to provide the services
-                  described in the Privacy Policy and Terms of Service.
+                  I consent to Bluepin collecting, storing and processing my personal and health information as described in the{" "}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setOpenLegalDoc("health-consent");
+                    }}
+                    className="text-theme-accent font-medium hover:underline cursor-pointer"
+                  >
+                    Health Data Consent Notice
+                  </button>
+                  .
                 </span>
               </label>
+
+              {/* AI Processing Disclosure */}
+              <div className="p-3 bg-purple-500/5 dark:bg-purple-500/10 rounded-xl border border-purple-500/20 text-xs text-theme-text-sec">
+                <div className="flex items-start gap-2">
+                  <Sparkles size={14} className="text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                  <div className="leading-relaxed">
+                    <span className="font-semibold text-theme-text">AI Processing Disclosure: </span>
+                    Bluepin Intelligence uses automated AI processing powered by Google Gemini.{" "}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setOpenLegalDoc("ai-disclaimer");
+                      }}
+                      className="text-purple-600 dark:text-purple-400 font-semibold hover:underline cursor-pointer"
+                    >
+                      AI Output Disclaimer &rarr;
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Optional Marketing Consent */}
+              <div className="pt-2 border-t border-theme-border/60">
+                <p className="text-xs font-bold text-theme-text mb-2">
+                  Optional Communications
+                </p>
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <div className="relative flex items-center justify-center mt-0.5 shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={agreeMarketing}
+                      onChange={(e) => setAgreeMarketing(e.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <div className="w-4 h-4 rounded border-2 border-theme-border peer-checked:border-theme-accent peer-checked:bg-theme-accent transition-all"></div>
+                    <svg
+                      className="w-3 h-3 text-white absolute opacity-0 peer-checked:opacity-100"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </div>
+                  <div className="flex flex-col text-xs leading-snug select-none">
+                    <span className="text-theme-text font-medium">
+                      I agree to receive promotional and educational communications from Bluepin by email or WhatsApp.
+                    </span>
+                    <span className="text-theme-text-sec text-[11px] mt-0.5">
+                      Includes product updates, educational tips, and offers. You can opt out at any time.
+                    </span>
+                  </div>
+                </label>
+              </div>
             </div>
           )}
           {showConsentError && !isLogin && !canSignUp && (
@@ -400,17 +472,25 @@ export default function AuthScreen() {
           <button
             type="button"
             onClick={() => setOpenLegalDoc("terms")}
-            className="text-theme-accent hover:underline font-medium"
+            className="text-theme-accent hover:underline font-medium cursor-pointer"
           >
             Terms of Service
-          </button>{" "}
-          and{" "}
+          </button>
+          {", "}
           <button
             type="button"
             onClick={() => setOpenLegalDoc("privacy")}
-            className="text-theme-accent hover:underline font-medium"
+            className="text-theme-accent hover:underline font-medium cursor-pointer"
           >
             Privacy Policy
+          </button>
+          {", and "}
+          <button
+            type="button"
+            onClick={() => setOpenLegalDoc("cookies")}
+            className="text-theme-accent hover:underline font-medium cursor-pointer"
+          >
+            Cookie Policy
           </button>
           , and consent to personal and health data processing.
         </p>

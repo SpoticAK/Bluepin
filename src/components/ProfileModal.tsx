@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet } from 'lucide-react';
+import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet, Scale } from 'lucide-react';
 import { useAppStore } from '../store';
 import { auth } from '../lib/firebase';
 import { deleteUser } from 'firebase/auth';
@@ -233,22 +233,18 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
             
-            <div onClick={() => setOpenLegalDoc('privacy')} className="flex justify-between items-center px-3 py-2 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]">
+            <div
+              onClick={() => setOpenLegalDoc('terms')}
+              className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]"
+            >
               <div className="flex items-center gap-2.5 text-neutral-900">
-                <div className="w-7 h-7 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center">
-                  <FileText size={14} />
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Scale size={14} />
                 </div>
-                <span className="text-[13px] font-medium">Privacy Policy</span>
-              </div>
-              <ChevronRight size={14} className="text-neutral-400" />
-            </div>
-
-            <div onClick={() => setOpenLegalDoc('terms')} className="flex justify-between items-center px-3 py-2 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]">
-              <div className="flex items-center gap-2.5 text-neutral-900">
-                <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <FileText size={14} />
+                <div className="flex flex-col text-left">
+                  <span className="text-[13px] font-medium leading-tight">Legal & Disclaimers</span>
+                  <span className="text-[10px] text-neutral-500">Terms, Privacy, AI & Medical</span>
                 </div>
-                <span className="text-[13px] font-medium">Terms of Service</span>
               </div>
               <ChevronRight size={14} className="text-neutral-400" />
             </div>
