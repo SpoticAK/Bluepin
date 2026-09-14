@@ -1,6 +1,8 @@
 export interface UserConsent {
   termsVersion: string;
   privacyVersion: string;
+  healthConsentVersion?: string;
+  marketingConsent?: boolean;
   acceptedAt: number;
   userAgent: string;
   acceptedFromCountry?: string;
