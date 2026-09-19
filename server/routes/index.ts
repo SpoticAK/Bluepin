@@ -3,6 +3,7 @@ import { globalIpLimiter } from "../middleware/security";
 import uploadRouter from "./upload";
 import insightsRouter from "./insights";
 import feedbackRouter from "./feedback";
+import remindersRouter from "./reminders";
 
 const apiRouter = Router();
 
@@ -13,6 +14,7 @@ apiRouter.use(globalIpLimiter);
 apiRouter.use(uploadRouter);
 apiRouter.use(insightsRouter);
 apiRouter.use(feedbackRouter);
+apiRouter.use(remindersRouter);
 
 // Catch all unhandled API routes and return 404 JSON
 apiRouter.all("/*", (req, res) => {

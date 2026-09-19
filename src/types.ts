@@ -103,6 +103,17 @@ export interface UserProfile {
   hasSeenDashboardTour?: boolean;
 }
 
+export interface GlucoseReminderSettings {
+  enabled: boolean;
+  times: string[]; // "HH:MM" (24h)
+  days: number[]; // 1 (Mon) .. 7 (Sun); [] = every day
+  message?: string;
+  tz: string;
+  nextRunAt?: number | null;
+  lastNotifiedAt?: number | null;
+  updatedAt?: number | null;
+}
+
 export interface Invitation {
   id: string;
   familyId: string;
@@ -121,5 +132,6 @@ export interface AppState {
   goals: Goal[];
   goalLogs: GoalLog;
   profile: UserProfile;
+  glucoseReminder: GlucoseReminderSettings;
   deletedDummyGlucoseIds?: string[];
 }

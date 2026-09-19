@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bluepin-cache-v2';
+const CACHE_NAME = 'bluepin-cache-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -121,4 +121,65 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+// ---- Push notifications (glucose reminders, alarms) ----
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    const data = event.data ? event.data.json() : {};
+    payload = typeof data === 'object' && data !== null ? data : {};
+  } catch (e) {
+    // payload may have no body (just a signal to show a default notification)
+  }
+
+  const p = payload;
+  const baseUrl = self.location.origin;
+
+  const title = p.title || 'Bluepin reminder';
+  const options = {
+    body: p.body || 'Time to log your glucose reading.',
+    icon: p.icon || '/pwa-192x192.png',
+    badge: p.badge || '/Bluepin PWA logo 128 x 128.png',
+    vibrate: Array.isArray(p.vibrate) ? p.vibrate : [200, 100, 200, 100, 200, 100, 200],
+    sound: p.sound || '/sounds/reminder.wav',
+    requireInteraction: p.requireInteraction !== false,
+    tag: p.tag || 'glucose-reminder',
+    renotify: true,
+    data: {
+      url: typeof p.url === 'string' ? p.url : '/?tab=glucose',
+      timestamp: Date.now()
+    }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const target = (event.notification.data && event.notification.data.url) || '/?tab=glucose';
+  // Normalise to same-origin absolute URL.
+  const url = new URL(target, self.location.origin).toString();
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) {
+          client.focus();
+          if ('navigate' in client) {
+            client.navigate(url).catch(() => {});
+          }
+          return;
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
+self.addEventListener('notificationclose', (event) => {
+  event.notification.close();
 });

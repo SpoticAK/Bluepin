@@ -39,8 +39,10 @@ import {
   X,
   ChevronRight,
   TrendingUp,
+  Bell,
 } from "lucide-react";
 import { MealTiming } from "../types";
+import ReminderSettings from "./ReminderSettings";
 
 import { cn, safeFormat } from "../lib/utils";
 
@@ -52,6 +54,7 @@ export default function GlucoseTab() {
     labReports,
   } = useAppStore();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showReminderSettings, setShowReminderSettings] = useState(false);
   const [timeFilter, setTimeFilter] = useState<number>(30); // days
   const [selectedType, setSelectedType] = useState<MealTiming | "HbA1c">(
     "Fasting",
@@ -885,6 +888,15 @@ export default function GlucoseTab() {
             />
             Sugar Health
           </button>
+          <button
+            id="glucose-reminder-button"
+            data-tour="glucose-reminder-button"
+            onClick={() => setShowReminderSettings(true)}
+            title="Set glucose reminder alarms"
+            className="shrink-0 flex items-center justify-center gap-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border border-amber-500/30 w-12 h-12 rounded-2xl text-sm font-bold transition-all shadow-sm hover:shadow-md"
+          >
+            <Bell size={19} />
+          </button>
         </div>
       </div>
 
@@ -1504,6 +1516,10 @@ export default function GlucoseTab() {
             }
           }}
         />
+      )}
+
+      {showReminderSettings && (
+        <ReminderSettings onClose={() => setShowReminderSettings(false)} />
       )}
 
       {showCriteriaModal && (

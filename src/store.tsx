@@ -1,8 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
-import { AppState, GlucoseReading, LabReport, WeightEntry, Goal, GoalLog, UserProfile } from "./types";
+import { AppState, GlucoseReading, LabReport, WeightEntry, Goal, GoalLog, UserProfile, GlucoseReminderSettings } from "./types";
 import { DEFAULT_GOALS, DUMMY_GLUCOSE_READINGS } from "./data";
 import { auth, db, handleFirestoreError, OperationType } from "./lib/firebase";
 import { doc, collection, onSnapshot, setDoc, deleteDoc, serverTimestamp, updateDoc, getDoc, getDocs, deleteField, runTransaction, writeBatch, query, orderBy, limit } from "firebase/firestore";
+
+function defaultReminderSettings(): GlucoseReminderSettings {
+  return {
+    enabled: false,
+    times: [],
+    days: [],
+    tz: (typeof Intl !== "undefined" && typeof Intl.DateTimeFormat !== "undefined"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : undefined) || "UTC",
+  };
+}
 
 const defaultState: AppState = {
   glucoseReadings: DUMMY_GLUCOSE_READINGS,
@@ -11,6 +22,7 @@ const defaultState: AppState = {
   goals: DEFAULT_GOALS,
   goalLogs: {},
   profile: { heightCm: 170 }, // Default height
+  glucoseReminder: defaultReminderSettings(),
   deletedDummyGlucoseIds: [],
 };
 
@@ -22,6 +34,7 @@ interface AppContextType extends AppState {
   removeLabReport: (id: string) => void;
   addWeightEntry: (entry: WeightEntry) => void;
   updateProfile: (profile: Partial<UserProfile>) => void;
+  updateGlucoseReminder: (settings: Partial<GlucoseReminderSettings>) => void;
   toggleGoalActive: (goalId: string, isActive: boolean) => void;
   addCustomGoal: (goal: Goal) => void;
   removeGoal: (id: string) => void;
@@ -124,9 +137,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setState(s => ({ ...s, goalLogs: logs }));
     }, (err) => handleFirestoreError(err, OperationType.LIST, `users/${uid}/dailyLogs`));
 
+    const unsubReminder = onSnapshot(doc(db, `glucoseReminders/${uid}`), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as any;
+        const normalizeTs = (v: any): number | null => {
+          if (!v) return null;
+          if (typeof v.toMillis === "function") return v.toMillis();
+          if (typeof v === "object" && v.seconds) return v.seconds * 1000;
+          if (typeof v === "number") return v;
+          if (v instanceof Date) return v.getTime();
+          return null;
+        };
+        setState(s => ({
+          ...s,
+          glucoseReminder: {
+            ...s.glucoseReminder,
+            ...data,
+            nextRunAt: normalizeTs(data.nextRunAt),
+            lastNotifiedAt: normalizeTs(data.lastNotifiedAt),
+            updatedAt: normalizeTs(data.updatedAt),
+          },
+        }));
+      } else {
+        setState(s => ({ ...s, glucoseReminder: defaultReminderSettings() }));
+      }
+    }, (err) => handleFirestoreError(err, OperationType.GET, `glucoseReminders/${uid}`));
+
     setLoading(false);
     return () => {
-      unsubProfile(); unsubGlucose(); unsubReports(); unsubWeight(); unsubGoals(); unsubLogs();
+      unsubProfile(); unsubGlucose(); unsubReports(); unsubWeight(); unsubGoals(); unsubLogs(); unsubReminder();
     };
   }, []);
 
@@ -328,6 +367,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     })).catch(e => handleFirestoreError(e, OperationType.UPDATE, ref.path));
   };
 
+  const updateGlucoseReminder = async (settings: Partial<GlucoseReminderSettings>) => {
+    if (!uid) return;
+    const ref = doc(db, `glucoseReminders`, uid);
+    const payload: Record<string, unknown> = { ...settings };
+    // Firestore stores JS Date as a Timestamp; a numeric timestamp would never
+    // match the scheduler's timestamp-range query.
+    if (typeof payload.nextRunAt === "number") {
+      payload.nextRunAt = new Date(payload.nextRunAt);
+    }
+    await setDoc(ref, removeUndefined({
+      ...payload,
+      userId: uid,
+      updatedAt: serverTimestamp()
+    }), { merge: true }).catch(e => handleFirestoreError(e, OperationType.UPDATE, ref.path));
+  };
+
   const toggleGoalActive = async (goalId: string, isActive: boolean) => {
     if (!uid) return;
     const existingGoal = state.goals.find(g => g.id === goalId);
@@ -403,6 +458,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       addLabReport, updateLabReport, removeLabReport,
       addWeightEntry,
       updateProfile,
+      updateGlucoseReminder,
       toggleGoalActive, addCustomGoal, removeGoal, logGoal,
       
     }}>
