@@ -7,6 +7,7 @@ import { createServer as createViteServer } from "vite";
 
 import { helmetConfig, apiErrorHandler } from "./server/middleware/security";
 import apiRouter from "./server/routes";
+import { startReminderScheduler } from "./server/services/reminderScheduler";
 
 // Re-export requireAuth for backward compatibility
 export { requireAuth } from "./server/firebase";
@@ -60,6 +61,9 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
+
+  // Background reminder engine (glucose tracking reminders -> push notifications)
+  startReminderScheduler();
 }
 
 startServer();

@@ -12,6 +12,8 @@ dist/
 firebase-adminsdk.json
 dist/
 
+.vapid-keys.json
+
 .agents/
 .claude/
 skills-lock.json

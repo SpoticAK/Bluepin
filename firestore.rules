@@ -18,6 +18,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
     
+    // Glucose reminder settings (top-level, one doc per user: {uid})
+    match /glucoseReminders/{userId} {
+      allow get, create, update, delete: if isOwner(userId);
+      allow list: if false;
+    }
+    
+    // Push subscriptions are managed server-side only
+    match /pushSubscriptions/{subId} {
+      allow read, write: if false;
+    }
+    
     match /feedbacks/{feedbackId} {
       allow read: if request.auth != null && request.auth.token.email == "sparsh@bluepin.in";
       allow create: if true;
