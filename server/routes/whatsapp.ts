@@ -44,7 +44,7 @@ router.post(
     if (req.rawBody && process.env.WHATSAPP_APP_SECRET) {
       const isValid = verifyMetaSignature(req.rawBody, sigHeader);
       if (!isValid) {
-        console.warn("[WhatsApp] Invalid X-Hub-Signature-256 rejected.");
+        console.warn("[WhatsApp Webhook] Invalid X-Hub-Signature-256 rejected.", { sigHeader });
         return res.status(401).send("Invalid signature");
       }
     }
@@ -54,7 +54,10 @@ router.post(
 
     // 3. Process events in the background
     const body = req.body;
+    console.log("[WhatsApp Webhook] Received payload object:", body?.object);
+
     if (!body || body.object !== "whatsapp_business_account") {
+      console.warn("[WhatsApp Webhook] Ignored non-whatsapp_business_account object:", body?.object);
       return;
     }
 

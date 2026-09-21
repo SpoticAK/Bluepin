@@ -32,7 +32,7 @@ export async function sendWhatsAppMessage(
   }
 
   try {
-    const url = `https://graph.facebook.com/v25.0/${phoneId}/messages`;
+    const url = `https://graph.facebook.com/v26.0/${phoneId}/messages`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -73,7 +73,7 @@ export async function downloadWhatsAppMedia(
   }
 
   // 1. Retrieve the temporary media download URL
-  const metaRes = await fetch(`https://graph.facebook.com/v25.0/${mediaId}`, {
+  const metaRes = await fetch(`https://graph.facebook.com/v26.0/${mediaId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -217,10 +217,10 @@ export async function linkWhatsAppAccount(
   return {
     success: true,
     message:
-      "🎉 *Account successfully linked!*\\n\\nWelcome to Bluepin WhatsApp Sync. You can now:\\n" +
-      "• 🩸 *Log glucose:* Reply with readings like `115 Fasting`, `140 PP`, or `95`\\n" +
-      "• 📸 *Glucometer photo:* Send a photo of your meter screen to log automatically\\n" +
-      "• 📄 *Medical reports:* Send PDF or image lab reports to analyze biomarkers\\n\\n" +
+      "🎉 *Account successfully linked!*\n\nWelcome to Bluepin WhatsApp Sync. You can now:\n" +
+      "• 🩸 *Log glucose:* Reply with readings like `115 Fasting`, `140 PP`, or `95`\n" +
+      "• 📸 *Glucometer photo:* Send a photo of your meter screen to log automatically\n" +
+      "• 📄 *Medical reports:* Send PDF or image lab reports to analyze biomarkers\n\n" +
       "Send *HELP* anytime for quick commands.",
   };
 }
@@ -251,7 +251,7 @@ export async function unlinkWhatsAppAccount(uid: string): Promise<boolean> {
  * Main handler for any incoming WhatsApp message.
  */
 export async function processIncomingWhatsAppMessage(message: any) {
-  const senderPhone = message.from; // e.g. "919876543210"
+  const senderPhone = (message.from || "").replace(/[^0-9]/g, "");
   const messageType = message.type;
   const db = getAdminFirestore();
 
@@ -259,10 +259,12 @@ export async function processIncomingWhatsAppMessage(message: any) {
     `[WhatsApp] Received message type '${messageType}' from ${senderPhone}`,
   );
 
-  // 1. Check for LINK command (text message: "LINK 123456" or "CONNECT 123456")
+  // 1. Check for LINK command (e.g. "LINK 123456", "CONNECT 123456", or just "123456")
   if (messageType === "text") {
     const rawText = (message.text?.body || "").trim();
-    const linkMatch = rawText.match(/^(?:link|connect)\s*[:=]?\s*(\d{6})$/i);
+    const linkMatch = rawText.match(
+      /^(?:(?:link|connect)\s*[:=]?\s*)?(\d{6})$/i,
+    );
     if (linkMatch) {
       const code = linkMatch[1];
       const result = await linkWhatsAppAccount(senderPhone, code);
@@ -273,11 +275,11 @@ export async function processIncomingWhatsAppMessage(message: any) {
     if (rawText.toLowerCase() === "help") {
       await sendWhatsAppMessage(
         senderPhone,
-        "📋 *Bluepin WhatsApp Guide*\\n\\n" +
-          "• *Log Glucose:* Send `110 Fasting`, `145 PP`, or `98`\\n" +
-          "• *Photo of Meter:* Send a clear photo of your glucometer\\n" +
-          "• *Lab Reports:* Send a PDF document or lab photo\\n" +
-          "• *Link Account:* Send `LINK <6-digit code>`\\n\\n" +
+        "📋 *Bluepin WhatsApp Guide*\n\n" +
+          "• *Log Glucose:* Send `110 Fasting`, `145 PP`, or `98`\n" +
+          "• *Photo of Meter:* Send a clear photo of your glucometer\n" +
+          "• *Lab Reports:* Send a PDF document or lab photo\n" +
+          "• *Link Account:* Send `LINK <6-digit code>`\n\n" +
           "Access your web dashboard at https://bluepin.in",
       );
       return;
@@ -289,10 +291,10 @@ export async function processIncomingWhatsAppMessage(message: any) {
   if (!userDoc.exists) {
     await sendWhatsAppMessage(
       senderPhone,
-      "👋 Welcome to *Bluepin*! Your WhatsApp is not connected to an account yet.\\n\\n" +
-        "1. Open your Bluepin dashboard on web\\n" +
-        "2. Click your profile icon > *WhatsApp Sync*\\n" +
-        "3. Copy the 6-digit code and reply here with: `LINK <code>`",
+      "👋 Welcome to *Bluepin*! Your WhatsApp is not connected to an account yet.\n\n" +
+        "1. Open your Bluepin dashboard on web\n" +
+        "2. Click your profile icon > *WhatsApp Sync*\n" +
+        "3. Copy the 6-digit code and reply here with: `LINK <code>` (or just send the 6-digit code)",
     );
     return;
   }
