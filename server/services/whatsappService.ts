@@ -179,6 +179,62 @@ export async function sendWhatsAppMessage(
 }
 
 /**
+ * Sends an interactive reply button message (up to 3 buttons) via Meta Cloud API.
+ * Automatically falls back to formatted numbered text if interactive format fails.
+ */
+export async function sendWhatsAppButtons(
+  to: string,
+  bodyText: string,
+  buttons: Array<{ id: string; title: string }>,
+): Promise<boolean> {
+  const token = getWhatsAppToken();
+  const phoneId = getPhoneNumberId();
+
+  if (!token || !phoneId) return false;
+
+  try {
+    const url = `https://graph.facebook.com/v26.0/${phoneId}/messages`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: bodyText },
+          action: {
+            buttons: buttons.map((btn) => ({
+              type: "reply",
+              reply: { id: btn.id, title: btn.title },
+            })),
+          },
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn("[WhatsApp] Interactive buttons rejected, falling back to text:", errText);
+      const fallbackText =
+        `${bodyText}\n\n` +
+        buttons.map((b, i) => `${i + 1}️⃣ *${b.title}*`).join("\n") +
+        "\n\nReply with *1*, *2*, or *3* (or type *fasting*, *pp*, or *random*).";
+      return sendWhatsAppMessage(to, fallbackText);
+    }
+    return true;
+  } catch (err: any) {
+    console.error("[WhatsApp] Error sending buttons:", err);
+    return false;
+  }
+}
+
+/**
  * Downloads media (image, PDF, etc.) from WhatsApp servers using the media ID.
  */
 export async function downloadWhatsAppMedia(
@@ -420,12 +476,63 @@ export async function processIncomingWhatsAppMessage(message: any) {
 
   // 3. Handle Message Types
   try {
-    if (messageType === "text") {
-      await handleTextGlucoseLogging(
-        uid,
+    if (messageType === "interactive") {
+      const btnId =
+        message.interactive?.button_reply?.id ||
+        message.interactive?.list_reply?.id ||
+        "";
+      const btnTitle =
+        message.interactive?.button_reply?.title ||
+        message.interactive?.list_reply?.title ||
+        "";
+
+      let timingChoice: "Fasting" | "Post-Prandial" | "Random" | null = null;
+      if (btnId === "timing_fasting" || /fast/i.test(btnTitle)) {
+        timingChoice = "Fasting";
+      } else if (btnId === "timing_pp" || /post|pp|prandial/i.test(btnTitle)) {
+        timingChoice = "Post-Prandial";
+      } else if (btnId === "timing_random" || /random/i.test(btnTitle)) {
+        timingChoice = "Random";
+      }
+
+      if (timingChoice) {
+        const handled = await handleTimingSelection(senderPhone, timingChoice);
+        if (handled) return;
+      }
+
+      await sendWhatsAppMessage(
         senderPhone,
-        message.text.body.trim(),
+        "ℹ️ This option has already been recorded or expired. Send a new reading or meter photo anytime!",
       );
+      return;
+    } else if (messageType === "text") {
+      const rawText = (message.text?.body || "").trim();
+
+      // Check if user answered a pending timing prompt via text (e.g., "1", "2", "3", "fasting", "pp", "random")
+      const timingMatch = rawText.match(
+        /^(?:1|2|3|fasting|fast|pp|post-?prandial|post-?meal|after-?meal|random)$/i,
+      );
+      if (timingMatch) {
+        const lower = rawText.toLowerCase();
+        let timingChoice: "Fasting" | "Post-Prandial" | "Random" = "Random";
+        if (lower === "1" || lower.includes("fast")) {
+          timingChoice = "Fasting";
+        } else if (
+          lower === "2" ||
+          lower.includes("pp") ||
+          lower.includes("post") ||
+          lower.includes("after")
+        ) {
+          timingChoice = "Post-Prandial";
+        } else if (lower === "3" || lower.includes("random")) {
+          timingChoice = "Random";
+        }
+
+        const handled = await handleTimingSelection(senderPhone, timingChoice);
+        if (handled) return;
+      }
+
+      await handleTextGlucoseLogging(uid, senderPhone, rawText);
     } else if (messageType === "image") {
       await handleImageMessage(uid, senderPhone, message.image);
     } else if (messageType === "document") {
@@ -443,6 +550,47 @@ export async function processIncomingWhatsAppMessage(message: any) {
       "⚠️ An error occurred while processing your request. Please try again or check your Bluepin dashboard.",
     );
   }
+}
+
+/**
+ * Handles user selecting a timing (Fasting, Post-Prandial, or Random) for a pending glucometer reading.
+ */
+async function handleTimingSelection(
+  senderPhone: string,
+  timingChoice: "Fasting" | "Post-Prandial" | "Random",
+): Promise<boolean> {
+  const db = getAdminFirestore();
+  const pendingRef = db.doc(`whatsapp_pending_glucose/${senderPhone}`);
+  const pendingSnap = await pendingRef.get();
+
+  if (!pendingSnap.exists) {
+    return false;
+  }
+
+  const pendingData = pendingSnap.data()!;
+  const { uid, readingId, value, unit, time } = pendingData;
+
+  // 1. Update the glucose reading in Firestore
+  if (uid && readingId) {
+    await db.doc(`users/${uid}/glucoseReadings/${readingId}`).update({
+      timing: timingChoice,
+    });
+  }
+
+  // 2. Clear pending state
+  await pendingRef.delete();
+
+  // 3. Send confirmation
+  await sendWhatsAppMessage(
+    senderPhone,
+    `✅ *Timing Updated to ${timingChoice}!* 🩸\n\n` +
+      `• *Reading:* ${value} ${unit}\n` +
+      `• *Timing:* ${timingChoice}\n` +
+      `• *Time:* ${time}\n\n` +
+      `📊 *View in dashboard:*\n${getDashboardUrl()}`,
+  );
+
+  return true;
 }
 
 // ─── Text Glucose Handler ─────────────────────────────────────────────────────
@@ -625,8 +773,19 @@ async function handleImageMessage(
         id: readingId,
         value: result.value,
         unit: result.unit || "mg/dL",
-        timing: "Random",
+        timing: "Random", // Default until user selects
         source: "OCR",
+        date: dateStr,
+        time: timeStr,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      // Store pending timing selection state
+      batch.set(db.doc(`whatsapp_pending_glucose/${senderPhone}`), {
+        uid,
+        readingId,
+        value: result.value,
+        unit: result.unit || "mg/dL",
         date: dateStr,
         time: timeStr,
         createdAt: FieldValue.serverTimestamp(),
@@ -634,13 +793,16 @@ async function handleImageMessage(
 
       await batch.commit();
 
-      await sendWhatsAppMessage(
-        senderPhone,
-        `📸 *Glucometer Reading Extracted!*\n\n` +
-          `• *Value:* ${result.value} ${result.unit || "mg/dL"}\n` +
-          `• *Detected Time:* ${dateStr} ${timeStr}\n\n` +
-          `📊 *View in dashboard:*\n${getDashboardUrl()}`,
-      );
+      const promptText =
+        `📸 *Glucometer Reading Extracted: ${result.value} ${result.unit || "mg/dL"}*\n` +
+        `• *Detected Time:* ${dateStr} ${timeStr}\n\n` +
+        `When was this reading taken? Please choose below:`;
+
+      await sendWhatsAppButtons(senderPhone, promptText, [
+        { id: "timing_fasting", title: "Fasting" },
+        { id: "timing_pp", title: "Post-Prandial" },
+        { id: "timing_random", title: "Random" },
+      ]);
       return;
     }
   } catch {
