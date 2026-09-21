@@ -19,6 +19,116 @@ const getStorageBucket = () => {
   return getStorage().bucket(bucketName);
 };
 
+const getDashboardUrl = () => {
+  const base =
+    process.env.APP_URL || process.env.FRONTEND_URL || "https://app.bluepin.in";
+  return `${base.replace(/\/+$/, "")}/dashboard`;
+};
+
+/**
+ * Resolves local date and time strings (YYYY-MM-DD, HH:mm) based on user's phone country code.
+ */
+function getFormattedUserTime(
+  senderPhone: string,
+  dateObj = new Date(),
+): { dateStr: string; timeStr: string } {
+  let timeZone = "Asia/Kolkata";
+  if (senderPhone.startsWith("1")) timeZone = "America/New_York";
+  else if (senderPhone.startsWith("44")) timeZone = "Europe/London";
+  else if (senderPhone.startsWith("971")) timeZone = "Asia/Dubai";
+  else if (senderPhone.startsWith("65")) timeZone = "Asia/Singapore";
+  else if (senderPhone.startsWith("61")) timeZone = "Australia/Sydney";
+  if (process.env.APP_TIMEZONE) timeZone = process.env.APP_TIMEZONE;
+
+  const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone }).format(
+    dateObj,
+  ); // YYYY-MM-DD
+  const timeStr = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(dateObj); // HH:mm
+
+  return { dateStr, timeStr };
+}
+
+function getBiomarkerDisplayStatus(bm: any): { label: string; icon: string } {
+  const s = String(bm.status || "")
+    .toLowerCase()
+    .trim();
+  const raw = String(bm.rawValue || "")
+    .toLowerCase()
+    .trim();
+
+  if (
+    s === "normal" ||
+    s === "healthy" ||
+    raw === "absent" ||
+    raw === "nil" ||
+    raw === "negative" ||
+    raw === "clear" ||
+    raw === "straw" ||
+    raw === "pale yellow" ||
+    raw === "yellow"
+  ) {
+    return { label: "Normal", icon: "🟢" };
+  }
+  if (s === "borderline" || raw.includes("trace")) {
+    return { label: "Borderline", icon: "🟡" };
+  }
+  if (
+    s === "high" ||
+    s === "low" ||
+    s.includes("attention") ||
+    raw === "positive" ||
+    raw === "present" ||
+    raw === "reactive"
+  ) {
+    return { label: s ? s.toUpperCase() : "Out of Range", icon: "🔴" };
+  }
+  return { label: "Recorded", icon: "⚪" };
+}
+
+function formatKeyBiomarkersSummary(biomarkers: any[]): string {
+  if (!Array.isArray(biomarkers) || biomarkers.length === 0) {
+    return "• No specific biomarkers listed.";
+  }
+
+  // Filter out non-actionable physical specimen metadata if more specific clinical markers exist
+  const isPhysicalAttribute = (name: string) =>
+    /^(?:physical\s*appearance|colour|color|transparency|appearance|specimen|quantity|sample\s*type|volume)$/i.test(
+      name.trim(),
+    );
+
+  const clinicalMarkers = biomarkers.filter(
+    (b) => !isPhysicalAttribute(b.name || ""),
+  );
+  const pool = clinicalMarkers.length >= 3 ? clinicalMarkers : biomarkers;
+
+  // Sort to surface abnormal / needs attention markers first
+  const sorted = [...pool].sort((a, b) => {
+    const statusA = getBiomarkerDisplayStatus(a).icon;
+    const statusB = getBiomarkerDisplayStatus(b).icon;
+    const scoreA = statusA === "🔴" ? 2 : statusA === "🟡" ? 1 : 0;
+    const scoreB = statusB === "🔴" ? 2 : statusB === "🟡" ? 1 : 0;
+    return scoreB - scoreA;
+  });
+
+  return sorted
+    .slice(0, 5)
+    .map((bm: any) => {
+      const { icon } = getBiomarkerDisplayStatus(bm);
+      const displayVal =
+        bm.value !== null && bm.value !== undefined && !isNaN(Number(bm.value))
+          ? bm.value
+          : bm.rawValue || "Recorded";
+      const unitStr = bm.unit && bm.unit.trim() ? ` ${bm.unit.trim()}` : "";
+      return `• ${bm.name}: *${displayVal}${unitStr}* ${icon}`;
+    })
+    .join("\n");
+}
+
 // ─── Meta Graph API Helpers ───────────────────────────────────────────────────
 
 /**
@@ -410,8 +520,7 @@ async function handleTextGlucoseLogging(
   }
 
   const readingId = uuidv4();
-  const dateStr = now.toISOString().split("T")[0];
-  const timeStr = now.toTimeString().substring(0, 5);
+  const { dateStr, timeStr } = getFormattedUserTime(senderPhone, now);
 
   const batch = db.batch();
   batch.set(
@@ -438,7 +547,7 @@ async function handleTextGlucoseLogging(
       `• *Reading:* ${rawValue} ${unit}\n` +
       `• *Timing:* ${timing}\n` +
       `• *Logged:* Today at ${timeStr}\n\n` +
-      `Updated on your Bluepin dashboard.`,
+      `📊 *View in dashboard:*\n${getDashboardUrl()}`,
   );
 }
 
@@ -501,8 +610,10 @@ async function handleImageMessage(
       }
 
       const readingId = uuidv4();
-      const dateStr = result.readingDate || now.toISOString().split("T")[0];
-      const timeStr = result.readingTime || now.toTimeString().substring(0, 5);
+      const { dateStr: fallbackDate, timeStr: fallbackTime } =
+        getFormattedUserTime(senderPhone, now);
+      const dateStr = result.readingDate || fallbackDate;
+      const timeStr = result.readingTime || fallbackTime;
 
       const batch = db.batch();
       batch.set(
@@ -528,7 +639,7 @@ async function handleImageMessage(
         `📸 *Glucometer Reading Extracted!*\n\n` +
           `• *Value:* ${result.value} ${result.unit || "mg/dL"}\n` +
           `• *Detected Time:* ${dateStr} ${timeStr}\n\n` +
-          `Saved to your Bluepin logs.`,
+          `📊 *View in dashboard:*\n${getDashboardUrl()}`,
       );
       return;
     }
@@ -592,7 +703,7 @@ async function processMedicalReportBuffer(
   const db = getAdminFirestore();
   const reportId = uuidv4();
   const now = new Date();
-  const reportDate = now.toISOString().split("T")[0];
+  const { dateStr: reportDate } = getFormattedUserTime(senderPhone, now);
   const reportName = originalFileName.replace(/\.[^/.]+$/, "") || "Lab Report";
 
   try {
@@ -693,18 +804,7 @@ async function processMedicalReportBuffer(
     await batch.commit();
 
     // 5. Build summary of extracted biomarkers
-    const topMarkers = result.biomarkers
-      .slice(0, 5)
-      .map((bm: any) => {
-        const statusIcon =
-          bm.status === "Healthy"
-            ? "🟢"
-            : bm.status === "Borderline"
-              ? "🟡"
-              : "🔴";
-        return `• ${bm.name}: *${bm.value} ${bm.unit || ""}* ${statusIcon}`;
-      })
-      .join("\n");
+    const topMarkers = formatKeyBiomarkersSummary(result.biomarkers);
 
     await sendWhatsAppMessage(
       senderPhone,
@@ -713,7 +813,7 @@ async function processMedicalReportBuffer(
         `*Type:* ${result.reportType || "Diagnostic Test"}\n` +
         `*Biomarkers Detected:* ${result.biomarkers.length}\n\n` +
         `*Key Results:*\n${topMarkers}\n\n` +
-        `📊 Full analytics and trend graphs are ready on your Bluepin dashboard.`,
+        `📊 *View full report & trend graphs:*\n${getDashboardUrl()}`,
     );
 
     return true;
