@@ -101,6 +101,7 @@ export interface UserProfile {
   profileColor?: string;
   familyId?: string | null;
   hasSeenDashboardTour?: boolean;
+  whatsappPhone?: string;
 }
 
 export interface Invitation {

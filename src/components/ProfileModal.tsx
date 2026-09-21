@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet, Scale } from 'lucide-react';
+import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet, Scale, MessageCircle } from 'lucide-react';
 import { useAppStore } from '../store';
 import { auth } from '../lib/firebase';
 import { deleteUser } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { LegalDocsModal } from './LegalDocsModal';
+import { WhatsAppModal } from './WhatsAppModal';
 import { LegalDocType } from '../lib/consentManager';
 
 export function ProfileModal({ onClose }: { onClose: () => void }) {
@@ -18,6 +19,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   const [deleteInput, setDeleteInput] = useState('');
   
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -234,6 +236,29 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
             </div>
             
             <div
+              onClick={() => setShowWhatsAppModal(true)}
+              className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-2.5 text-neutral-900">
+                <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <MessageCircle size={14} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[13px] font-medium leading-tight">WhatsApp Sync</span>
+                  <span className="text-[10px] text-neutral-500">
+                    {profile.whatsappPhone ? `Connected (${profile.whatsappPhone})` : 'Log glucose & reports via chat'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {profile.whatsappPhone ? (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                ) : null}
+                <ChevronRight size={14} className="text-neutral-400" />
+              </div>
+            </div>
+
+            <div
               onClick={() => setOpenLegalDoc('terms')}
               className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]"
             >
@@ -265,6 +290,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       <LegalDocsModal isOpen={!!openLegalDoc} onClose={() => setOpenLegalDoc(null)} defaultTab={openLegalDoc || 'terms'} />
+      <WhatsAppModal isOpen={showWhatsAppModal} onClose={() => setShowWhatsAppModal(false)} />
     </div>
   );
 }
