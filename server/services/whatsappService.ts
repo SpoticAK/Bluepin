@@ -11,6 +11,13 @@ const getWhatsAppToken = () =>
   process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN || "";
 const getPhoneNumberId = () => process.env.WHATSAPP_PHONE_NUMBER_ID || "";
 const getAppSecret = () => process.env.WHATSAPP_APP_SECRET || "";
+const getStorageBucket = () => {
+  const bucketName =
+    process.env.FIREBASE_STORAGE_BUCKET ||
+    process.env.VITE_FIREBASE_STORAGE_BUCKET ||
+    "myhealthyfam-28c2c.firebasestorage.app";
+  return getStorage().bucket(bucketName);
+};
 
 // ─── Meta Graph API Helpers ───────────────────────────────────────────────────
 
@@ -345,7 +352,7 @@ async function handleTextGlucoseLogging(
   if (!match) {
     await sendWhatsAppMessage(
       senderPhone,
-      "🤔 I didn't recognize that reading format.\\n\\nTry sending: `120 Fasting`, `145 PP`, or just `110`. Send `HELP` for more options.",
+      "🤔 I didn't recognize that reading format.\n\nTry sending: `120 Fasting`, `145 PP`, or just `110`. Send `HELP` for more options.",
     );
     return;
   }
@@ -427,10 +434,10 @@ async function handleTextGlucoseLogging(
 
   await sendWhatsAppMessage(
     senderPhone,
-    `✅ *Glucose Logged Successfully!*\\n\\n` +
-      `• *Reading:* ${rawValue} ${unit}\\n` +
-      `• *Timing:* ${timing}\\n` +
-      `• *Logged:* Today at ${timeStr}\\n\\n` +
+    `✅ *Glucose Logged Successfully!*\n\n` +
+      `• *Reading:* ${rawValue} ${unit}\n` +
+      `• *Timing:* ${timing}\n` +
+      `• *Logged:* Today at ${timeStr}\n\n` +
       `Updated on your Bluepin dashboard.`,
   );
 }
@@ -518,9 +525,9 @@ async function handleImageMessage(
 
       await sendWhatsAppMessage(
         senderPhone,
-        `📸 *Glucometer Reading Extracted!*\\n\\n` +
-          `• *Value:* ${result.value} ${result.unit || "mg/dL"}\\n` +
-          `• *Detected Time:* ${dateStr} ${timeStr}\\n\\n` +
+        `📸 *Glucometer Reading Extracted!*\n\n` +
+          `• *Value:* ${result.value} ${result.unit || "mg/dL"}\n` +
+          `• *Detected Time:* ${dateStr} ${timeStr}\n\n` +
           `Saved to your Bluepin logs.`,
       );
       return;
@@ -541,7 +548,7 @@ async function handleImageMessage(
   if (!reportHandled) {
     await sendWhatsAppMessage(
       senderPhone,
-      "⚠️ Could not detect a clear glucose number or medical report from this photo.\\n\\n" +
+      "⚠️ Could not detect a clear glucose number or medical report from this photo.\n\n" +
         "Tip: Ensure the meter display is in focus and well lit, or type your reading directly (e.g. `115 Fasting`).",
     );
   }
@@ -559,7 +566,7 @@ async function handleDocumentReport(
 
   await sendWhatsAppMessage(
     senderPhone,
-    "⏳ *Analyzing your medical report...*\\nOur AI is extracting biomarkers. This usually takes 15-30 seconds.",
+    "⏳ *Analyzing your medical report...*\nOur AI is extracting biomarkers. This usually takes 15-30 seconds.",
   );
 
   const { buffer, mimeType } = await downloadWhatsAppMedia(mediaId);
@@ -613,7 +620,7 @@ async function processMedicalReportBuffer(
     }
 
     // 2. Upload to Firebase Storage with token URL
-    const bucket = getStorage().bucket();
+    const bucket = getStorageBucket();
     const downloadToken = uuidv4();
     const cleanExt = mimeType.includes("pdf") ? "pdf" : "jpg";
     const storagePath = `users/${uid}/labReports/${reportId}_${reportName.replace(/[^a-zA-Z0-9]/g, "_")}.${cleanExt}`;
@@ -697,15 +704,15 @@ async function processMedicalReportBuffer(
               : "🔴";
         return `• ${bm.name}: *${bm.value} ${bm.unit || ""}* ${statusIcon}`;
       })
-      .join("\\n");
+      .join("\n");
 
     await sendWhatsAppMessage(
       senderPhone,
-      `📄 *Medical Report Processed!*\\n\\n` +
-        `*Report:* ${reportName}\\n` +
-        `*Type:* ${result.reportType || "Diagnostic Test"}\\n` +
-        `*Biomarkers Detected:* ${result.biomarkers.length}\\n\\n` +
-        `*Key Results:*\\n${topMarkers}\\n\\n` +
+      `📄 *Medical Report Processed!*\n\n` +
+        `*Report:* ${reportName}\n` +
+        `*Type:* ${result.reportType || "Diagnostic Test"}\n` +
+        `*Biomarkers Detected:* ${result.biomarkers.length}\n\n` +
+        `*Key Results:*\n${topMarkers}\n\n` +
         `📊 Full analytics and trend graphs are ready on your Bluepin dashboard.`,
     );
 
