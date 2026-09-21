@@ -3,10 +3,14 @@ import { globalIpLimiter } from "../middleware/security";
 import uploadRouter from "./upload";
 import insightsRouter from "./insights";
 import feedbackRouter from "./feedback";
+import whatsappRouter from "./whatsapp";
 
 const apiRouter = Router();
 
-// Apply global rate limiting to all /api routes
+// Mount WhatsApp webhook & integration routes
+apiRouter.use(whatsappRouter);
+
+// Apply global rate limiting to other /api routes
 apiRouter.use(globalIpLimiter);
 
 // Mount feature routes
