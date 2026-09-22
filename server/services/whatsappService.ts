@@ -220,7 +220,10 @@ export async function sendWhatsAppButtons(
 
     if (!res.ok) {
       const errText = await res.text();
-      console.warn("[WhatsApp] Interactive buttons rejected, falling back to text:", errText);
+      console.warn(
+        "[WhatsApp] Interactive buttons rejected, falling back to text:",
+        errText,
+      );
       const fallbackText =
         `${bodyText}\n\n` +
         buttons.map((b, i) => `${i + 1}️⃣ *${b.title}*`).join("\n") +
@@ -796,12 +799,15 @@ async function handleImageMessage(
       const promptText =
         `📸 *Glucometer Reading Extracted: ${result.value} ${result.unit || "mg/dL"}*\n` +
         `• *Detected Time:* ${dateStr} ${timeStr}\n\n` +
-        `When was this reading taken? Please choose below:`;
+        `How long after eating or having a sugary drink was your reading taken? Please choose below 👇🏻:`;
 
       await sendWhatsAppButtons(senderPhone, promptText, [
-        { id: "timing_fasting", title: "Fasting" },
-        { id: "timing_pp", title: "Post-Prandial" },
-        { id: "timing_random", title: "Random" },
+        {
+          id: "timing_pp",
+          title: "Less than 2 hours — Post-meal (Post Prandial)",
+        },
+        { id: "timing_random", title: "2–8 hours — Random" },
+        { id: "timing_fasting", title: "More than 8 hours — Fasting" },
       ]);
       return;
     }
