@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet, Scale, MessageCircle } from 'lucide-react';
+import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet, Scale, MessageCircle, MessageSquare } from 'lucide-react';
 import { useAppStore } from '../store';
 import { auth } from '../lib/firebase';
 import { deleteUser } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { LegalDocsModal } from './LegalDocsModal';
 import { WhatsAppModal } from './WhatsAppModal';
+import { FeedbackWidget } from './FeedbackWidget';
 import { LegalDocType } from '../lib/consentManager';
 
 export function ProfileModal({ onClose }: { onClose: () => void }) {
@@ -257,6 +258,23 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
                 <ChevronRight size={14} className="text-neutral-400" />
               </div>
             </div>
+
+            <FeedbackWidget
+              trigger={
+                <div className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]">
+                  <div className="flex items-center gap-2.5 text-neutral-900">
+                    <div className="w-7 h-7 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                      <MessageSquare size={14} />
+                    </div>
+                    <div className="flex flex-col text-left">
+                      <span className="text-[13px] font-medium leading-tight">Talk to Us</span>
+                      <span className="text-[10px] text-neutral-500">Feedback, feature ideas & help</span>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="text-neutral-400" />
+                </div>
+              }
+            />
 
             <div
               onClick={() => setOpenLegalDoc('terms')}
