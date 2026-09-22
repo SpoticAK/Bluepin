@@ -556,6 +556,33 @@ function AppContent() {
   };
 
   useEffect(() => {
+    // Handle WhatsApp Magic Login Token (wa_t)
+    const urlParams = new URLSearchParams(window.location.search);
+    const waToken = urlParams.get("wa_t");
+    if (waToken) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("wa_t");
+      window.history.replaceState(
+        {},
+        document.title,
+        cleanUrl.pathname + (cleanUrl.search ? cleanUrl.search : ""),
+      );
+
+      fetch("/api/whatsapp/exchange-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: waToken }),
+      })
+        .then((res) => res.json())
+        .then(async (data) => {
+          if (data.success && data.customToken) {
+            const { signInWithCustomToken } = await import("firebase/auth");
+            await signInWithCustomToken(auth, data.customToken);
+          }
+        })
+        .catch((err) => console.error("WhatsApp magic login failed:", err));
+    }
+
     // Handle redirect sign-in results (e.g. mobile standalone PWA)
     getRedirectResult(auth).catch((err) => {
       if (err.code !== "auth/redirect-cancelled-by-user") {
