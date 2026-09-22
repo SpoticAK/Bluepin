@@ -8,7 +8,7 @@ import {
   processIncomingWhatsAppMessage,
   verifyMetaSignature,
 } from "../services/whatsappService";
-import { getAdminFirestore } from "../firebase";
+import { getAdminFirestore, getAdminAuth } from "../firebase";
 
 const router = Router();
 
@@ -134,6 +134,50 @@ router.post("/whatsapp/unlink", requireAuth, async (req: any, res) => {
   } catch (error: any) {
     console.error("[WhatsApp] Failed to unlink account:", error);
     return res.status(500).json({ error: "Failed to unlink WhatsApp account." });
+  }
+});
+
+// ─── 6. Exchange WhatsApp Magic Token for Firebase Custom Token ───────────────
+router.post("/whatsapp/exchange-token", async (req: any, res) => {
+  try {
+    const { token } = req.body || {};
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ error: "Missing token" });
+    }
+
+    const db = getAdminFirestore();
+    const tokenRef = db.doc(`whatsapp_magic_tokens/${token}`);
+    const tokenSnap = await tokenRef.get();
+
+    if (!tokenSnap.exists) {
+      return res.status(400).json({ error: "Invalid or expired token" });
+    }
+
+    const data = tokenSnap.data()!;
+    if (data.used) {
+      return res.status(400).json({ error: "Token already used" });
+    }
+
+    const expiresAt = data.expiresAt ? data.expiresAt.toDate() : null;
+    if (expiresAt && expiresAt < new Date()) {
+      await tokenRef.delete();
+      return res.status(400).json({ error: "Token expired" });
+    }
+
+    // Delete used token to prevent replay
+    await tokenRef.delete();
+
+    // Generate Firebase Custom Token
+    const authAdmin = getAdminAuth();
+    const customToken = await authAdmin.createCustomToken(data.uid);
+
+    return res.json({
+      success: true,
+      customToken,
+    });
+  } catch (error: any) {
+    console.error("[WhatsApp] Failed to exchange magic token:", error);
+    return res.status(500).json({ error: "Failed to exchange magic token" });
   }
 });
 

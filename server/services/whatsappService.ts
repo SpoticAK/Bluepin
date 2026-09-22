@@ -1,7 +1,6 @@
 import { getAdminFirestore } from "../firebase";
 import { FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
-import { v4 as uuidv4 } from "uuid";
 import crypto from "crypto";
 import { extractGlucoseFromBase64 } from "./glucoseService";
 import { extractLabReportFromUrl } from "./labReportServiceDirect";
@@ -11,19 +10,22 @@ const getWhatsAppToken = () =>
   process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN || "";
 const getPhoneNumberId = () => process.env.WHATSAPP_PHONE_NUMBER_ID || "";
 const getAppSecret = () => process.env.WHATSAPP_APP_SECRET || "";
-const getStorageBucket = () => {
-  const bucketName =
+const getStorageBucket = () =>
+  getStorage().bucket(
     process.env.FIREBASE_STORAGE_BUCKET ||
-    process.env.VITE_FIREBASE_STORAGE_BUCKET ||
-    "myhealthyfam-28c2c.firebasestorage.app";
-  return getStorage().bucket(bucketName);
-};
+      process.env.VITE_FIREBASE_STORAGE_BUCKET ||
+      "myhealthyfam-28c2c.firebasestorage.app",
+  );
+const getMetaBaseUrl = () =>
+  process.env.META_BASE_URL || "https://graph.facebook.com/v26.0";
+const getDashboardUrl = () =>
+  (process.env.APP_URL || process.env.FRONTEND_URL || "https://app.bluepin.in").replace(/\/+$/, "");
 
-const getDashboardUrl = () => {
-  const base =
-    process.env.APP_URL || process.env.FRONTEND_URL || "https://app.bluepin.in";
-  return `${base.replace(/\/+$/, "")}/dashboard`;
-};
+const getUtcDay = (d = new Date()) => ({
+  year: d.getUTCFullYear(),
+  month: d.getUTCMonth() + 1,
+  day: d.getUTCDate(),
+});
 
 /**
  * Resolves local date and time strings (YYYY-MM-DD, HH:mm) based on user's phone country code.
@@ -67,10 +69,7 @@ function getBiomarkerDisplayStatus(bm: any): { label: string; icon: string } {
     raw === "absent" ||
     raw === "nil" ||
     raw === "negative" ||
-    raw === "clear" ||
-    raw === "straw" ||
-    raw === "pale yellow" ||
-    raw === "yellow"
+    raw === "clear"
   ) {
     return { label: "Normal", icon: "🟢" };
   }
@@ -138,6 +137,7 @@ export async function sendWhatsAppMessage(
   to: string,
   text: string,
 ): Promise<boolean> {
+  const metaBaseUrl = getMetaBaseUrl();
   const token = getWhatsAppToken();
   const phoneId = getPhoneNumberId();
 
@@ -149,7 +149,7 @@ export async function sendWhatsAppMessage(
   }
 
   try {
-    const url = `https://graph.facebook.com/v26.0/${phoneId}/messages`;
+    const url = `${metaBaseUrl}/${phoneId}/messages`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -178,23 +178,18 @@ export async function sendWhatsAppMessage(
   }
 }
 
-/**
- * Sends an interactive reply button message (up to 3 buttons) via Meta Cloud API.
- * Automatically falls back to formatted numbered text if interactive format fails.
- */
-export async function sendWhatsAppButtons(
+async function sendMetaInteractive(
   to: string,
-  bodyText: string,
-  buttons: Array<{ id: string; title: string }>,
+  interactive: any,
+  fallbackText: string,
 ): Promise<boolean> {
+  const metaBaseUrl = getMetaBaseUrl();
   const token = getWhatsAppToken();
   const phoneId = getPhoneNumberId();
-
   if (!token || !phoneId) return false;
 
   try {
-    const url = `https://graph.facebook.com/v26.0/${phoneId}/messages`;
-    const res = await fetch(url, {
+    const res = await fetch(`${metaBaseUrl}/${phoneId}/messages`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -205,35 +200,105 @@ export async function sendWhatsAppButtons(
         recipient_type: "individual",
         to,
         type: "interactive",
-        interactive: {
-          type: "button",
-          body: { text: bodyText },
-          action: {
-            buttons: buttons.map((btn) => ({
-              type: "reply",
-              reply: { id: btn.id, title: btn.title },
-            })),
-          },
-        },
+        interactive,
       }),
     });
 
     if (!res.ok) {
-      const errText = await res.text();
       console.warn(
-        "[WhatsApp] Interactive buttons rejected, falling back to text:",
-        errText,
+        "[WhatsApp] Interactive rejected, falling back to text:",
+        await res.text(),
       );
-      const fallbackText =
-        `${bodyText}\n\n` +
-        buttons.map((b, i) => `${i + 1}️⃣ *${b.title}*`).join("\n") +
-        "\n\nReply with *1*, *2*, or *3* (or type *fasting*, *pp*, or *random*).";
       return sendWhatsAppMessage(to, fallbackText);
     }
     return true;
   } catch (err: any) {
-    console.error("[WhatsApp] Error sending buttons:", err);
-    return false;
+    console.error("[WhatsApp] Error sending interactive:", err);
+    return sendWhatsAppMessage(to, fallbackText);
+  }
+}
+
+/**
+ * Sends an interactive reply button message (up to 3 buttons) via Meta Cloud API.
+ */
+export async function sendWhatsAppButtons(
+  to: string,
+  bodyText: string,
+  buttons: Array<{ id: string; title: string }>,
+): Promise<boolean> {
+  const fallback =
+    `${bodyText}\n\n` +
+    buttons.map((b, i) => `${i + 1}️⃣ *${b.title}*`).join("\n") +
+    "\n\nReply with *1*, *2*, or *3*.";
+  return sendMetaInteractive(
+    to,
+    {
+      type: "button",
+      body: { text: bodyText },
+      action: {
+        buttons: buttons.map((b) => ({
+          type: "reply",
+          reply: { id: b.id, title: b.title.slice(0, 20) },
+        })),
+      },
+    },
+    fallback,
+  );
+}
+
+/**
+ * Sends an interactive Call-To-Action (CTA) URL button.
+ */
+export async function sendWhatsAppCtaUrl(
+  to: string,
+  bodyText: string,
+  buttonText: string,
+  url: string,
+): Promise<boolean> {
+  return sendMetaInteractive(
+    to,
+    {
+      type: "cta_url",
+      body: { text: bodyText },
+      action: {
+        name: "cta_url",
+        parameters: { display_text: buttonText.slice(0, 20), url },
+      },
+    },
+    `${bodyText}\n\n📊 *View in dashboard:*\n${url}`,
+  );
+}
+
+/**
+ * Generates a single-use 24-hour magic login link for a user's dashboard.
+ * When tapped, it automatically authenticates the user into Bluepin.
+ */
+export async function createWhatsAppMagicLoginUrl(
+  uid: string,
+): Promise<string> {
+  try {
+    const db = getAdminFirestore();
+    const token = crypto.randomBytes(24).toString("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await db.doc(`whatsapp_magic_tokens/${token}`).set({
+      uid,
+      expiresAt,
+      used: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    const base =
+      process.env.APP_URL ||
+      process.env.FRONTEND_URL ||
+      "https://app.bluepin.in";
+    return `${base.replace(/\/+$/, "")}?wa_t=${token}`;
+  } catch (err) {
+    console.error(
+      "[WhatsApp] Error creating magic login url, falling back to static dashboard url:",
+      err,
+    );
+    return getDashboardUrl();
   }
 }
 
@@ -243,13 +308,14 @@ export async function sendWhatsAppButtons(
 export async function downloadWhatsAppMedia(
   mediaId: string,
 ): Promise<{ buffer: Buffer; mimeType: string }> {
+  const metaBaseUrl = getMetaBaseUrl();
   const token = getWhatsAppToken();
   if (!token) {
     throw new Error("WHATSAPP_TOKEN is not configured.");
   }
 
   // 1. Retrieve the temporary media download URL
-  const metaRes = await fetch(`https://graph.facebook.com/v26.0/${mediaId}`, {
+  const metaRes = await fetch(`${metaBaseUrl}/${mediaId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -346,7 +412,7 @@ export async function createWhatsAppLinkCode(
 export async function linkWhatsAppAccount(
   senderPhone: string,
   code: string,
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; uid?: string }> {
   const db = getAdminFirestore();
   const cleanCode = code.trim();
   const linkRef = db.doc(`whatsapp_links/${cleanCode}`);
@@ -392,6 +458,7 @@ export async function linkWhatsAppAccount(
 
   return {
     success: true,
+    uid,
     message:
       "🎉 *Account successfully linked!*\n\nWelcome to Bluepin WhatsApp Sync. You can now:\n" +
       "• 🩸 *Log glucose:* Reply with readings like `115 Fasting`, `140 PP`, or `95`\n" +
@@ -444,7 +511,17 @@ export async function processIncomingWhatsAppMessage(message: any) {
     if (linkMatch) {
       const code = linkMatch[1];
       const result = await linkWhatsAppAccount(senderPhone, code);
-      await sendWhatsAppMessage(senderPhone, result.message);
+      if (result.success && result.uid) {
+        const magicUrl = await createWhatsAppMagicLoginUrl(result.uid);
+        await sendWhatsAppCtaUrl(
+          senderPhone,
+          result.message,
+          "Open Dashboard",
+          magicUrl,
+        );
+      } else {
+        await sendWhatsAppMessage(senderPhone, result.message);
+      }
       return;
     }
 
@@ -583,14 +660,18 @@ async function handleTimingSelection(
   // 2. Clear pending state
   await pendingRef.delete();
 
-  // 3. Send confirmation
-  await sendWhatsAppMessage(
+  // 3. Send confirmation with 1-click magic login CTA button
+  const magicUrl = uid
+    ? await createWhatsAppMagicLoginUrl(uid)
+    : getDashboardUrl();
+  await sendWhatsAppCtaUrl(
     senderPhone,
     `✅ *Timing Updated to ${timingChoice}!* 🩸\n\n` +
       `• *Reading:* ${value} ${unit}\n` +
       `• *Timing:* ${timingChoice}\n` +
-      `• *Time:* ${time}\n\n` +
-      `📊 *View in dashboard:*\n${getDashboardUrl()}`,
+      `• *Time:* ${time}`,
+    "Open Dashboard",
+    magicUrl,
   );
 
   return true;
@@ -652,10 +733,7 @@ async function handleTextGlucoseLogging(
   const limitsData = limitsSnap.exists ? limitsSnap.data()! : {};
 
   const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth() + 1;
-  const day = now.getUTCDate();
-
+  const { year, month, day } = getUtcDay(now);
   const isNewDay =
     limitsData.gYear !== year ||
     limitsData.gMonth !== month ||
@@ -670,7 +748,7 @@ async function handleTextGlucoseLogging(
     return;
   }
 
-  const readingId = uuidv4();
+  const readingId = crypto.randomUUID();
   const { dateStr, timeStr } = getFormattedUserTime(senderPhone, now);
 
   const batch = db.batch();
@@ -692,13 +770,15 @@ async function handleTextGlucoseLogging(
 
   await batch.commit();
 
-  await sendWhatsAppMessage(
+  const magicUrl = await createWhatsAppMagicLoginUrl(uid);
+  await sendWhatsAppCtaUrl(
     senderPhone,
     `✅ *Glucose Logged Successfully!*\n\n` +
       `• *Reading:* ${rawValue} ${unit}\n` +
       `• *Timing:* ${timing}\n` +
-      `• *Logged:* Today at ${timeStr}\n\n` +
-      `📊 *View in dashboard:*\n${getDashboardUrl()}`,
+      `• *Logged:* Today at ${timeStr}`,
+    "Open Dashboard",
+    magicUrl,
   );
 }
 
@@ -742,10 +822,7 @@ async function handleImageMessage(
       const limitsData = limitsSnap.exists ? limitsSnap.data()! : {};
 
       const now = new Date();
-      const year = now.getUTCFullYear();
-      const month = now.getUTCMonth() + 1;
-      const day = now.getUTCDate();
-
+      const { year, month, day } = getUtcDay(now);
       const isNewDay =
         limitsData.gYear !== year ||
         limitsData.gMonth !== month ||
@@ -760,7 +837,7 @@ async function handleImageMessage(
         return;
       }
 
-      const readingId = uuidv4();
+      const readingId = crypto.randomUUID();
       const { dateStr: fallbackDate, timeStr: fallbackTime } =
         getFormattedUserTime(senderPhone, now);
       const dateStr = result.readingDate || fallbackDate;
@@ -799,15 +876,12 @@ async function handleImageMessage(
       const promptText =
         `📸 *Glucometer Reading Extracted: ${result.value} ${result.unit || "mg/dL"}*\n` +
         `• *Detected Time:* ${dateStr} ${timeStr}\n\n` +
-        `How long after eating or having a sugary drink was your reading taken? Please choose below 👇🏻:`;
+        `How long after eating or drinking was this reading taken?`;
 
       await sendWhatsAppButtons(senderPhone, promptText, [
-        {
-          id: "timing_pp",
-          title: "Less than 2 hours — Post-meal (Post Prandial)",
-        },
-        { id: "timing_random", title: "2–8 hours — Random" },
-        { id: "timing_fasting", title: "More than 8 hours — Fasting" },
+        { id: "timing_pp", title: "Post-Meal (<2h)" },
+        { id: "timing_random", title: "Random (2–8h)" },
+        { id: "timing_fasting", title: "Fasting (>8h)" },
       ]);
       return;
     }
@@ -869,7 +943,7 @@ async function processMedicalReportBuffer(
   silentOnFailure = false,
 ): Promise<boolean> {
   const db = getAdminFirestore();
-  const reportId = uuidv4();
+  const reportId = crypto.randomUUID();
   const now = new Date();
   const { dateStr: reportDate } = getFormattedUserTime(senderPhone, now);
   const reportName = originalFileName.replace(/\.[^/.]+$/, "") || "Lab Report";
@@ -880,9 +954,7 @@ async function processMedicalReportBuffer(
     const limitsSnap = await limitsRef.get();
     const limitsData = limitsSnap.exists ? limitsSnap.data()! : {};
 
-    const year = now.getUTCFullYear();
-    const month = now.getUTCMonth() + 1;
-    const day = now.getUTCDate();
+    const { year, month, day } = getUtcDay(now);
     const isNewDay =
       limitsData.rYear !== year ||
       limitsData.rMonth !== month ||
@@ -900,7 +972,7 @@ async function processMedicalReportBuffer(
 
     // 2. Upload to Firebase Storage with token URL
     const bucket = getStorageBucket();
-    const downloadToken = uuidv4();
+    const downloadToken = crypto.randomUUID();
     const cleanExt = mimeType.includes("pdf") ? "pdf" : "jpg";
     const storagePath = `users/${uid}/labReports/${reportId}_${reportName.replace(/[^a-zA-Z0-9]/g, "_")}.${cleanExt}`;
     const storageFile = bucket.file(storagePath);
@@ -974,14 +1046,16 @@ async function processMedicalReportBuffer(
     // 5. Build summary of extracted biomarkers
     const topMarkers = formatKeyBiomarkersSummary(result.biomarkers);
 
-    await sendWhatsAppMessage(
+    const magicUrl = await createWhatsAppMagicLoginUrl(uid);
+    await sendWhatsAppCtaUrl(
       senderPhone,
       `📄 *Medical Report Processed!*\n\n` +
         `*Report:* ${reportName}\n` +
         `*Type:* ${result.reportType || "Diagnostic Test"}\n` +
         `*Biomarkers Detected:* ${result.biomarkers.length}\n\n` +
-        `*Key Results:*\n${topMarkers}\n\n` +
-        `📊 *View full report & trend graphs:*\n${getDashboardUrl()}`,
+        `*Key Results:*\n${topMarkers}`,
+      "Open Dashboard",
+      magicUrl,
     );
 
     return true;
