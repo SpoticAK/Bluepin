@@ -95,6 +95,7 @@ export async function handleTextGlucoseLogging(
       : "mg/dL";
   if (unit === "MG/DL") unit = "mg/dL";
 
+  const hasExplicitTiming = Boolean(match[3]);
   const rawTiming = (match[3] || "Random").toLowerCase();
   let timing: GlucoseTiming = "Random";
   if (rawTiming.includes("fast")) {
@@ -134,18 +135,44 @@ export async function handleTextGlucoseLogging(
     createdAt: FieldValue.serverTimestamp(),
   });
 
+  if (!hasExplicitTiming) {
+    // Store pending timing selection state so buttons can tag timing
+    batch.set(db.doc(`whatsapp_pending_glucose/${senderPhone}`), {
+      uid,
+      readingId,
+      value: rawValue,
+      unit,
+      date: dateStr,
+      time: timeStr,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+
   await batch.commit();
 
-  const magicUrl = await createWhatsAppMagicLoginUrl(uid);
-  await sendWhatsAppCtaUrl(
-    senderPhone,
-    `✅ *Glucose Logged Successfully!*\n\n` +
-      `• *Reading:* ${rawValue} ${unit}\n` +
-      `• *Timing:* ${timing}\n` +
-      `• *Logged:* Today at ${timeStr}`,
-    "Open Dashboard",
-    magicUrl,
-  );
+  if (!hasExplicitTiming) {
+    const promptText =
+      `🩸 *Glucose Reading Logged: ${rawValue} ${unit}*\n` +
+      `• *Time:* Today at ${timeStr}\n\n` +
+      `How long after eating or drinking was this reading taken?`;
+
+    await sendWhatsAppButtons(senderPhone, promptText, [
+      { id: "timing_pp", title: "Post-Meal (<2h)" },
+      { id: "timing_random", title: "Random (2–8h)" },
+      { id: "timing_fasting", title: "Fasting (>8h)" },
+    ]);
+  } else {
+    const magicUrl = await createWhatsAppMagicLoginUrl(uid);
+    await sendWhatsAppCtaUrl(
+      senderPhone,
+      `✅ *Glucose Logged Successfully!*\n\n` +
+        `• *Reading:* ${rawValue} ${unit}\n` +
+        `• *Timing:* ${timing}\n` +
+        `• *Logged:* Today at ${timeStr}`,
+      "Open Dashboard",
+      magicUrl,
+    );
+  }
 }
 
 /**
