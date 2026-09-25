@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Loader2, ArrowLeft, RotateCw, ShieldCheck } from "lucide-react";
+import { Loader2, ArrowLeft, RotateCw, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { cn } from "../../lib/utils";
 
 interface PhoneAuthFieldsProps {
   onSendOtp: (fullPhoneNumber: string) => Promise<boolean>;
@@ -26,11 +27,13 @@ export default function PhoneAuthFields({
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [resendTimer, setResendTimer] = useState<number>(30);
   const [canResend, setCanResend] = useState<boolean>(false);
+  const [isResending, setIsResending] = useState<boolean>(false);
+  const [resendSuccess, setResendSuccess] = useState<boolean>(false);
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Resend countdown timer
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (step === "otp" && resendTimer > 0) {
       timer = setTimeout(() => {
         setResendTimer((prev) => prev - 1);
@@ -46,6 +49,8 @@ export default function PhoneAuthFields({
     if (step === "otp") {
       setResendTimer(30);
       setCanResend(false);
+      setResendSuccess(false);
+      setIsResending(false);
       setOtpDigits(["", "", "", "", "", ""]);
       setTimeout(() => {
         otpInputRefs.current[0]?.focus();
@@ -109,15 +114,24 @@ export default function PhoneAuthFields({
   };
 
   const handleResend = async () => {
-    if (!canResend || loading) return;
+    if (!canResend || loading || isResending) return;
+    setIsResending(true);
+    setResendSuccess(false);
     const cleanNumber = phoneNumber.replace(/\D/g, "");
     const fullNumber = `${countryCode}${cleanNumber}`;
     const sent = await onSendOtp(fullNumber);
+    setIsResending(false);
     if (sent) {
+      setResendSuccess(true);
       setResendTimer(30);
       setCanResend(false);
       setOtpDigits(["", "", "", "", "", ""]);
-      otpInputRefs.current[0]?.focus();
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 100);
+      setTimeout(() => {
+        setResendSuccess(false);
+      }, 5000);
     }
   };
 
@@ -223,6 +237,13 @@ export default function PhoneAuthFields({
             </div>
           </div>
 
+          {resendSuccess && (
+            <div className="flex items-center justify-center gap-1.5 p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-600 text-xs font-medium">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span>A new verification code has been sent!</span>
+            </div>
+          )}
+
           {error && (
             <p className="text-xs text-theme-critical font-medium text-center">
               {error}
@@ -232,10 +253,10 @@ export default function PhoneAuthFields({
           <button
             type="button"
             onClick={() => onVerifyOtp(otpDigits.join(""))}
-            disabled={loading || otpDigits.some((d) => !d)}
+            disabled={loading || isResending || otpDigits.some((d) => !d)}
             className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
-            {loading ? (
+            {loading && !isResending ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Verifying...</span>
@@ -250,11 +271,11 @@ export default function PhoneAuthFields({
               <button
                 type="button"
                 onClick={handleResend}
-                disabled={loading}
-                className="text-xs text-[#1A73E8] hover:underline font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                disabled={loading || isResending}
+                className="text-xs text-[#1A73E8] hover:underline font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
-                <RotateCw className="w-3.5 h-3.5" />
-                <span>Resend OTP</span>
+                <RotateCw className={cn("w-3.5 h-3.5", isResending && "animate-spin")} />
+                <span>{isResending ? "Resending code..." : "Resend OTP"}</span>
               </button>
             ) : (
               <p className="text-xs text-theme-text-sec">
