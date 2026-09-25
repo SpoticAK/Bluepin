@@ -78,6 +78,9 @@ export default function OnboardingScreen({
           weight: weightNum,
           bmi,
           photoUrl: "",
+          ...(auth.currentUser.phoneNumber
+            ? { phoneNumber: auth.currentUser.phoneNumber }
+            : {}),
           profileColor: data.profileColor,
           diabetesStatus: data.diabetesStatus,
           consent: getConsentPayload(navigator.userAgent, consent.marketingConsent),

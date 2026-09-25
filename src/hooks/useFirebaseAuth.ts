@@ -4,6 +4,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  type ConfirmationResult,
   type UserCredential,
   getAdditionalUserInfo,
   deleteUser,
@@ -11,10 +14,18 @@ import {
 } from "firebase/auth";
 import { auth } from "../lib/firebase";
 
+declare global {
+  interface Window {
+    recaptchaVerifier?: RecaptchaVerifier;
+  }
+}
+
 interface UseFirebaseAuthResult {
   loading: boolean;
   googleLoading: boolean;
+  phoneLoading: boolean;
   error: string | null;
+  confirmationResult: ConfirmationResult | null;
   signInWithEmail: (
     email: string,
     password: string,
@@ -27,6 +38,17 @@ interface UseFirebaseAuthResult {
     result: UserCredential;
     isNewUser: boolean;
   } | null>;
+  sendPhoneOtp: (
+    phoneNumber: string,
+    containerId?: string,
+  ) => Promise<boolean>;
+  verifyPhoneOtp: (
+    otp: string,
+  ) => Promise<{
+    result: UserCredential;
+    isNewUser: boolean;
+  } | null>;
+  resetPhoneAuth: () => void;
   abandonUnconsentedGoogleSignup: () => Promise<void>;
   clearError: () => void;
 }
@@ -34,7 +56,10 @@ interface UseFirebaseAuthResult {
 export function useFirebaseAuth(): UseFirebaseAuthResult {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [phoneLoading, setPhoneLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmationResult, setConfirmationResult] =
+    useState<ConfirmationResult | null>(null);
 
   const runEmailAuth = useCallback(
     async (
@@ -84,6 +109,102 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
     }
   }, []);
 
+  const initRecaptcha = (containerId: string = "recaptcha-container") => {
+    if (typeof window === "undefined") return null;
+
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+      } catch (e) {
+        console.warn("Could not clear recaptchaVerifier:", e);
+      }
+      window.recaptchaVerifier = undefined;
+    }
+
+    const containerEl = document.getElementById(containerId);
+    if (!containerEl) {
+      throw new Error(`reCAPTCHA container #${containerId} not found in DOM`);
+    }
+
+    const verifier = new RecaptchaVerifier(auth, containerId, {
+      size: "invisible",
+      callback: () => {
+        // reCAPTCHA solved
+      },
+      "expired-callback": () => {
+        setError("reCAPTCHA expired. Please try sending OTP again.");
+      },
+    });
+
+    window.recaptchaVerifier = verifier;
+    return verifier;
+  };
+
+  const sendPhoneOtp = useCallback(
+    async (phoneNumber: string, containerId = "recaptcha-container") => {
+      setPhoneLoading(true);
+      setError(null);
+      try {
+        const verifier = initRecaptcha(containerId);
+        if (!verifier) throw new Error("Could not initialize reCAPTCHA.");
+        const confirmation = await signInWithPhoneNumber(
+          auth,
+          phoneNumber,
+          verifier,
+        );
+        setConfirmationResult(confirmation);
+        return true;
+      } catch (err: any) {
+        console.error("sendPhoneOtp error:", err);
+        setError(mapFirebaseError(err));
+        if (window.recaptchaVerifier) {
+          try {
+            window.recaptchaVerifier.clear();
+          } catch {}
+          window.recaptchaVerifier = undefined;
+        }
+        return false;
+      } finally {
+        setPhoneLoading(false);
+      }
+    },
+    [],
+  );
+
+  const verifyPhoneOtp = useCallback(
+    async (otp: string) => {
+      if (!confirmationResult) {
+        setError("Please request an OTP first.");
+        return null;
+      }
+      setPhoneLoading(true);
+      setError(null);
+      try {
+        const result = await confirmationResult.confirm(otp);
+        const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
+        return { result, isNewUser };
+      } catch (err: any) {
+        console.error("verifyPhoneOtp error:", err);
+        setError(mapFirebaseError(err));
+        return null;
+      } finally {
+        setPhoneLoading(false);
+      }
+    },
+    [confirmationResult],
+  );
+
+  const resetPhoneAuth = useCallback(() => {
+    setConfirmationResult(null);
+    setError(null);
+    if (window.recaptchaVerifier) {
+      try {
+        window.recaptchaVerifier.clear();
+      } catch {}
+      window.recaptchaVerifier = undefined;
+    }
+  }, []);
+
   const abandonUnconsentedGoogleSignup = useCallback(async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -101,10 +222,15 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
   return {
     loading,
     googleLoading,
+    phoneLoading,
     error,
+    confirmationResult,
     signInWithEmail,
     signUpWithEmail,
     signInWithGoogle,
+    sendPhoneOtp,
+    verifyPhoneOtp,
+    resetPhoneAuth,
     abandonUnconsentedGoogleSignup,
     clearError,
   };
@@ -127,6 +253,20 @@ function mapFirebaseError(err: unknown): string {
       return "No account found with this email.";
     case "auth/popup-closed-by-user":
       return "Google sign-in was cancelled.";
+    case "auth/invalid-phone-number":
+      return "Invalid phone number. Please enter a valid 10-digit mobile number.";
+    case "auth/missing-phone-number":
+      return "Please enter your mobile phone number.";
+    case "auth/quota-exceeded":
+      return "SMS quota exceeded for today. Please use Google sign-in or try later.";
+    case "auth/captcha-check-failed":
+      return "Security verification failed. Please try again.";
+    case "auth/invalid-verification-code":
+      return "Incorrect OTP. Please enter the 6-digit code sent to your phone.";
+    case "auth/code-expired":
+      return "The OTP code has expired. Please request a new code.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please wait a few minutes before trying again.";
     default:
       return "Something went wrong. Please try again.";
   }

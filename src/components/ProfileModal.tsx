@@ -202,7 +202,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
               {profile.name || 'Anonymous User'}
             </h2>
             <p className="text-neutral-500 text-[11px] truncate max-w-[200px] mx-auto">
-              {user?.email || 'No email provided'}
+              {user?.email || user?.phoneNumber || profile?.phoneNumber || 'No contact provided'}
             </p>
           </div>
         </div>
