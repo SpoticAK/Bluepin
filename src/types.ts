@@ -98,6 +98,8 @@ export interface UserProfile {
   bmi?: number;
   country?: string;
   photoUrl?: string;
+  phoneNumber?: string;
+  whatsappPhone?: string;
   profileColor?: string;
   familyId?: string | null;
   hasSeenDashboardTour?: boolean;
