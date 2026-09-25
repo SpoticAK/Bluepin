@@ -125,8 +125,9 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
     if (!containerEl) {
       throw new Error(`reCAPTCHA container #${containerId} not found in DOM`);
     }
+    containerEl.innerHTML = "";
 
-    const verifier = new RecaptchaVerifier(auth, containerId, {
+    const verifier = new RecaptchaVerifier(auth, containerEl, {
       size: "invisible",
       callback: () => {
         // reCAPTCHA solved
@@ -238,12 +239,13 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
 
 function mapFirebaseError(err: unknown): string {
   const code = (err as { code?: string })?.code ?? "";
-  // const code = (err as any)?.code || "unknown_error";
-  // const message = (err as any)?.message || "Something went wrong.";
+  const rawMsg = (err as { message?: string })?.message ?? "";
 
-  // 📱 Shows the exact error code on the mobile screen
-  // return `[${code}] ${message}: wholeerror: ${err}`;
   switch (code) {
+    case "auth/operation-not-allowed":
+      return "Phone sign-in is disabled in Firebase. Please enable 'Phone' under Firebase Console > Authentication > Sign-in method.";
+    case "auth/unauthorized-domain":
+      return "This domain is not authorized for Firebase Auth. Add it to Firebase Console > Authentication > Settings > Authorized domains.";
     case "auth/email-already-in-use":
       return "An account with this email already exists.";
     case "auth/invalid-credential":
@@ -258,16 +260,22 @@ function mapFirebaseError(err: unknown): string {
     case "auth/missing-phone-number":
       return "Please enter your mobile phone number.";
     case "auth/quota-exceeded":
-      return "SMS quota exceeded for today. Please use Google sign-in or try later.";
+      return "SMS quota exceeded for today. Please use Google sign-in or test numbers.";
     case "auth/captcha-check-failed":
-      return "Security verification failed. Please try again.";
+      return "Security / reCAPTCHA check failed. Please refresh and try again.";
     case "auth/invalid-verification-code":
       return "Incorrect OTP. Please enter the 6-digit code sent to your phone.";
     case "auth/code-expired":
       return "The OTP code has expired. Please request a new code.";
     case "auth/too-many-requests":
       return "Too many attempts. Please wait a few minutes before trying again.";
+    case "auth/network-request-failed":
+      return "Network error. Please check your internet connection.";
+    case "auth/invalid-app-credential":
+      return "Invalid Firebase App configuration for phone auth. Check phone sign-in settings in Firebase.";
+    case "auth/internal-error":
+      return "Firebase internal error. Please ensure Phone provider is enabled in Firebase Console, and test numbers are configured.";
     default:
-      return "Something went wrong. Please try again.";
+      return rawMsg ? `${rawMsg} (${code || "unknown"})` : "Something went wrong. Please try again.";
   }
 }
