@@ -168,7 +168,7 @@ export default function PhoneAuthFields({
               />
             </div>
             <p className="text-[11px] text-theme-text-sec mt-1.5">
-              We'll send a 6-digit one-time password via SMS.
+              We'll send a 6-digit one-time password via SMS. Standard carrier rates may apply.
             </p>
           </div>
 

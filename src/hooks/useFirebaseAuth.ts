@@ -38,19 +38,34 @@ interface UseFirebaseAuthResult {
     result: UserCredential;
     isNewUser: boolean;
   } | null>;
-  sendPhoneOtp: (
-    phoneNumber: string,
-    containerId?: string,
-  ) => Promise<boolean>;
-  verifyPhoneOtp: (
-    otp: string,
-  ) => Promise<{
+  sendPhoneOtp: (phoneNumber: string, containerId?: string) => Promise<boolean>;
+  verifyPhoneOtp: (otp: string) => Promise<{
     result: UserCredential;
     isNewUser: boolean;
   } | null>;
   resetPhoneAuth: () => void;
   abandonUnconsentedGoogleSignup: () => Promise<void>;
   clearError: () => void;
+}
+
+function cleanupRecaptcha(containerId = "recaptcha-container") {
+  if (typeof window === "undefined") return;
+
+  if (window.recaptchaVerifier) {
+    try {
+      window.recaptchaVerifier.clear();
+    } catch (e) {
+      console.warn("Could not clear recaptchaVerifier:", e);
+    }
+    window.recaptchaVerifier = undefined;
+  }
+
+  const containerEl = document.getElementById(containerId);
+  if (containerEl && containerEl.parentNode) {
+    const fresh = document.createElement("div");
+    fresh.id = containerId;
+    containerEl.parentNode.replaceChild(fresh, containerEl);
+  }
 }
 
 export function useFirebaseAuth(): UseFirebaseAuthResult {
@@ -109,25 +124,29 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
     }
   }, []);
 
-  const initRecaptcha = (containerId: string = "recaptcha-container") => {
+  const getOrCreateRecaptcha = (
+    containerId: string = "recaptcha-container",
+  ) => {
     if (typeof window === "undefined") return null;
 
+    // Reuse existing verifier if available (prevents "reCAPTCHA already rendered" on Resend OTP)
     if (window.recaptchaVerifier) {
-      try {
-        window.recaptchaVerifier.clear();
-      } catch (e) {
-        console.warn("Could not clear recaptchaVerifier:", e);
-      }
-      window.recaptchaVerifier = undefined;
+      return window.recaptchaVerifier;
     }
 
     const containerEl = document.getElementById(containerId);
     if (!containerEl) {
       throw new Error(`reCAPTCHA container #${containerId} not found in DOM`);
     }
-    containerEl.innerHTML = "";
 
-    const verifier = new RecaptchaVerifier(auth, containerEl, {
+    // Ensure container is a brand new DOM node so grecaptcha doesn't detect previous renders
+    const freshContainer = document.createElement("div");
+    freshContainer.id = containerId;
+    if (containerEl.parentNode) {
+      containerEl.parentNode.replaceChild(freshContainer, containerEl);
+    }
+
+    const verifier = new RecaptchaVerifier(auth, freshContainer, {
       size: "invisible",
       callback: () => {
         // reCAPTCHA solved
@@ -146,7 +165,7 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
       setPhoneLoading(true);
       setError(null);
       try {
-        const verifier = initRecaptcha(containerId);
+        const verifier = getOrCreateRecaptcha(containerId);
         if (!verifier) throw new Error("Could not initialize reCAPTCHA.");
         const confirmation = await signInWithPhoneNumber(
           auth,
@@ -158,12 +177,7 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
       } catch (err: any) {
         console.error("sendPhoneOtp error:", err);
         setError(mapFirebaseError(err));
-        if (window.recaptchaVerifier) {
-          try {
-            window.recaptchaVerifier.clear();
-          } catch {}
-          window.recaptchaVerifier = undefined;
-        }
+        cleanupRecaptcha(containerId);
         return false;
       } finally {
         setPhoneLoading(false);
@@ -186,6 +200,11 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
         return { result, isNewUser };
       } catch (err: any) {
         console.error("verifyPhoneOtp error:", err);
+        const code = (err as { code?: string })?.code ?? "";
+        // If the code/session has expired, reset confirmationResult so user requests a fresh OTP
+        if (code === "auth/code-expired" || code === "auth/session-expired") {
+          setConfirmationResult(null);
+        }
         setError(mapFirebaseError(err));
         return null;
       } finally {
@@ -198,12 +217,7 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
   const resetPhoneAuth = useCallback(() => {
     setConfirmationResult(null);
     setError(null);
-    if (window.recaptchaVerifier) {
-      try {
-        window.recaptchaVerifier.clear();
-      } catch {}
-      window.recaptchaVerifier = undefined;
-    }
+    cleanupRecaptcha();
   }, []);
 
   const abandonUnconsentedGoogleSignup = useCallback(async () => {
@@ -276,6 +290,9 @@ function mapFirebaseError(err: unknown): string {
     case "auth/internal-error":
       return "Firebase internal error. Please ensure Phone provider is enabled in Firebase Console, and test numbers are configured.";
     default:
-      return rawMsg ? `${rawMsg} (${code || "unknown"})` : "Something went wrong. Please try again.";
+      // Don't leak raw internal messages to consumer UI in production
+      return import.meta.env.DEV && rawMsg
+        ? `${rawMsg} (${code || "unknown"})`
+        : "Something went wrong. Please try again.";
   }
 }
