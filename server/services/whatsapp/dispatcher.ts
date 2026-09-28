@@ -3,11 +3,10 @@ import {
   sendWhatsAppMessage,
   sendWhatsAppCtaUrl,
   downloadWhatsAppMedia,
+  sendWhatsAppButtons,
+  sendWhatsAppMainMenu,
 } from "./client";
-import {
-  linkWhatsAppAccount,
-  createWhatsAppMagicLoginUrl,
-} from "./auth";
+import { linkWhatsAppAccount, createWhatsAppMagicLoginUrl } from "./auth";
 import {
   handleTimingSelection,
   handleTextGlucoseLogging,
@@ -73,8 +72,8 @@ async function handleImageMessage(
     await sendWhatsAppMessage(
       senderPhone,
       "I could not find a glucose reading in that. 🤔\n" +
-      "Send me the number, like 126, or a photo of your glucometer and I will take it from there.\n\n" +
-      "Type help if you need anything."
+        "Send me the number, like 126, or a photo of your glucometer and I will take it from there.\n\n" +
+        "Type help if you need anything.",
     );
   }
 }
@@ -82,7 +81,9 @@ async function handleImageMessage(
 /**
  * Main handler and dispatcher for incoming WhatsApp webhook messages.
  */
-export async function processIncomingWhatsAppMessage(message: any): Promise<void> {
+export async function processIncomingWhatsAppMessage(
+  message: any,
+): Promise<void> {
   const senderPhone = (message.from || "").replace(/[^0-9]/g, "");
   const messageType = message.type;
   const db = getAdminFirestore();
@@ -115,38 +116,27 @@ export async function processIncomingWhatsAppMessage(message: any): Promise<void
     }
 
     if (rawText.toLowerCase() === "help") {
+      await sendWhatsAppMainMenu(senderPhone, "help");
+      // Send the email string in a separate text.
       await sendWhatsAppMessage(
         senderPhone,
-        "Of course. Here is what I can help you with:\n\n" +
-        "- Log glucose\n" +
-        "Send me a reading or a photo of your glucometer.\n\n" +
-        "- Upload health report\n" +
-        "Send me a PDF health report under 5 MB.\n\n" +
-        "- Set a reminder\n" +
-        "Choose when you would like me to remind you to log your glucose.\n\n" +
-        "- View health profile\n" +
-        "See your health history, trends and personalised insights.\n\n" +
-        "Need to speak to someone?\n" +
-        "Email sparsh@bluepin.in and we will get back to you within 24 hours."
+        "_Need to speak to someone?_\n" +
+          "Email sparsh@bluepin.in and we will get back to you within 24 hours.",
       );
       return;
     }
 
     if (rawText.toLowerCase().includes("remind")) {
-      const promptText = 
+      const promptText =
         "When would you like me to remind you to log your glucose?\n" +
         "Choose a time below and I will remember it for you.\n\n" +
         "Type help if you need anything.";
 
-      await sendWhatsAppButtons(
-        senderPhone,
-        promptText,
-        [
-          { id: "remind_morning", title: "Morning (8 AM)" },
-          { id: "remind_afternoon", title: "Afternoon (1 PM)" },
-          { id: "remind_evening", title: "Evening (8 PM)" },
-        ]
-      );
+      await sendWhatsAppButtons(senderPhone, promptText, [
+        { id: "remind_morning", title: "Morning (8 AM)" },
+        { id: "remind_afternoon", title: "Afternoon (1 PM)" },
+        { id: "remind_evening", title: "Evening (8 PM)" },
+      ]);
       return;
     }
   }
@@ -154,21 +144,7 @@ export async function processIncomingWhatsAppMessage(message: any): Promise<void
   // 2. Identify linked user by phone
   const userDoc = await db.doc(`whatsapp_users/${senderPhone}`).get();
   if (!userDoc.exists) {
-    await sendWhatsAppMessage(
-      senderPhone,
-      "Hi, I am Aarika from Bluepin. 🙏\n" +
-      "I will be your WhatsApp companion for managing your diabetes, right here every day.\n\n" +
-      "Here is what I can help you with:\n" +
-      "- Log glucose\n" +
-      "Send me a reading or a photo of your glucometer.\n\n" +
-      "- Upload health report\n" +
-      "Send me your health reports and I will add them to your health profile.\n\n" +
-      "- Set a reminder\n" +
-      "Choose when you would like me to remind you to log your glucose.\n\n" +
-      "- View health profile\n" +
-      "See your health history, trends and personalised insights.\n\n" +
-      "Type help if you need anything."
-    );
+    await sendWhatsAppMainMenu(senderPhone, "welcome");
     return;
   }
 
@@ -207,20 +183,58 @@ export async function processIncomingWhatsAppMessage(message: any): Promise<void
           remind_evening: { display: "8:00 PM", hour: 20 },
         };
         const config = hourMap[btnId] || hourMap["remind_morning"];
-        
+
         await db.doc(`whatsapp_reminders/${senderPhone}`).set({
           uid,
           phone: senderPhone,
           reminderHour: config.hour,
           timezone: "Asia/Kolkata",
-          updatedAt: new Date()
+          updatedAt: new Date(),
         });
 
         await sendWhatsAppMessage(
           senderPhone,
           `Done. I will remind you at ${config.display} each day.\n` +
-          `I will be here when you are ready to log your reading.\n\n` +
-          `Type help if you need anything.`
+            `I will be here when you are ready to log your reading.\n\n` +
+            `Type help if you need anything.`,
+        );
+        return;
+      }
+
+      if (btnId === "menu_log_glucose") {
+        await sendWhatsAppMessage(
+          senderPhone,
+          "Send me your glucose reading (e.g., `120 Fasting`) or a photo of your glucometer.",
+        );
+        return;
+      }
+      if (btnId === "menu_upload_report") {
+        await sendWhatsAppMessage(
+          senderPhone,
+          "Send me a PDF health report (under 5 MB) or a clear photo of your lab test.",
+        );
+        return;
+      }
+      if (btnId === "menu_set_reminder") {
+        const promptText =
+          "When would you like me to remind you to log your glucose?\n" +
+          "Choose a time below and I will remember it for you.\n\n" +
+          "Type help if you need anything.";
+
+        await sendWhatsAppButtons(senderPhone, promptText, [
+          { id: "remind_morning", title: "Morning (8 AM)" },
+          { id: "remind_afternoon", title: "Afternoon (1 PM)" },
+          { id: "remind_evening", title: "Evening (8 PM)" },
+        ]);
+        return;
+      }
+      if (btnId === "menu_view_profile") {
+        const magicUrl = await createWhatsAppMagicLoginUrl(uid);
+        await sendWhatsAppCtaUrl(
+          senderPhone,
+          "Here is your secure link to view your health profile, trends, and personalised insights.",
+          "View health profile",
+          magicUrl,
         );
         return;
       }
@@ -257,26 +271,17 @@ export async function processIncomingWhatsAppMessage(message: any): Promise<void
         if (handled) return;
       }
 
-      await handleTextGlucoseLogging(uid, senderPhone, rawText);
+      if (/\d/.test(rawText)) {
+        await handleTextGlucoseLogging(uid, senderPhone, rawText);
+      } else {
+        await sendWhatsAppMainMenu(senderPhone, "fallback");
+      }
     } else if (messageType === "image") {
       await handleImageMessage(uid, senderPhone, message.image);
     } else if (messageType === "document") {
       await handleDocumentReport(uid, senderPhone, message.document);
     } else {
-      await sendWhatsAppMessage(
-        senderPhone,
-        "Hi, I am Aarika from Bluepin.\n\n" +
-        "Here is what I can help you with:\n\n" +
-        "- Log glucose\n" +
-        "Send me a reading or a photo of your glucometer.\n\n" +
-        "- Upload health report\n" +
-        "Send me your health reports and I will add them to your health profile.\n\n" +
-        "- Set a reminder\n" +
-        "Choose when you would like me to remind you to log your glucose.\n\n" +
-        "- View health profile\n" +
-        "See your health history, trends and personalised insights.\n\n" +
-        "Type help if you need anything."
-      );
+      await sendWhatsAppMainMenu(senderPhone, "fallback");
     }
   } catch (err: any) {
     console.error("[WhatsApp] Error processing message:", err);
