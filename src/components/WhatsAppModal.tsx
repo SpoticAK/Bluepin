@@ -1,7 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { X, MessageCircle, Copy, Check, ExternalLink, CheckCircle2, Unlink, RefreshCw, AlertCircle, Sparkles, FileText, Droplet } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  X,
+  MessageSquare,
+  Copy,
+  Check,
+  ExternalLink,
+  CheckCircle2,
+  Unlink,
+  AlertCircle,
+  Sparkles,
+  FileText,
+  Droplet,
+  ArrowLeft,
+  Loader2,
+  RotateCw,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { useAppStore } from '../store';
+import { cn } from '../lib/utils';
 
 interface WhatsAppModalProps {
   isOpen: boolean;
@@ -11,13 +30,26 @@ interface WhatsAppModalProps {
 export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
   const { profile, updateProfile } = useAppStore();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [linkedPhone, setLinkedPhone] = useState<string | null>(profile.whatsappPhone || null);
+
+  // In-App OTP linking states
+  const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [countryCode] = useState('+91');
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [resendTimer, setResendTimer] = useState<number>(30);
+  const [canResend, setCanResend] = useState<boolean>(false);
+  const [isResending, setIsResending] = useState<boolean>(false);
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Fallback bot code states
+  const [showManualCode, setShowManualCode] = useState(false);
   const [code, setCode] = useState<string | null>(null);
   const [expiresIn, setExpiresIn] = useState<number>(600);
   const [deepLink, setDeepLink] = useState<string | null>(null);
   const [botPhone, setBotPhone] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [linkedPhone, setLinkedPhone] = useState<string | null>(profile.whatsappPhone || null);
 
   // Sync state if profile updates
   useEffect(() => {
@@ -26,7 +58,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     }
   }, [profile.whatsappPhone]);
 
-  // Check linking status
+  // Check linking status on open
   const checkStatus = async () => {
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -50,30 +82,46 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
         }
       }
     } catch {
-      // Background check error ignored
+      // Ignore background check error
     }
   };
 
   useEffect(() => {
     if (isOpen) {
       checkStatus();
+      setError(null);
+      setStep('phone');
+      setOtpDigits(['', '', '', '', '', '']);
     }
   }, [isOpen]);
 
-  // Poll status while waiting for link code to be used
+  // Resend countdown timer for in-app OTP
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    if (isOpen && code && !linkedPhone) {
-      interval = setInterval(async () => {
-        await checkStatus();
-      }, 3000);
+    let timer: ReturnType<typeof setTimeout>;
+    if (step === 'otp' && resendTimer > 0) {
+      timer = setTimeout(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (step === 'otp' && resendTimer === 0) {
+      setCanResend(true);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isOpen, code, linkedPhone]);
+    return () => clearTimeout(timer);
+  }, [step, resendTimer]);
 
-  // Countdown timer for link code
+  // Focus first OTP input when entering OTP step
+  useEffect(() => {
+    if (step === 'otp') {
+      setResendTimer(30);
+      setCanResend(false);
+      setIsResending(false);
+      setOtpDigits(['', '', '', '', '', '']);
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 150);
+    }
+  }, [step]);
+
+  // Countdown timer for fallback link code
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
     if (code && expiresIn > 0 && !linkedPhone) {
@@ -92,6 +140,185 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     };
   }, [code, expiresIn, linkedPhone]);
 
+  // ─── 1. Send OTP to WhatsApp Phone ──────────────────────────────────────────
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanNumber = phoneNumber.replace(/\D/g, "");
+    if (cleanNumber.length < 10) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('You must be signed in.');
+
+      const fullNumber = `${countryCode}${cleanNumber}`;
+      const res = await fetch('/api/whatsapp/link/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phone: fullNumber }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send WhatsApp verification code.');
+      }
+
+      setStep('otp');
+    } catch (err: any) {
+      setError(err.message || 'Could not send verification code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── 2. Verify OTP and Link Account ─────────────────────────────────────────
+  const handleVerifyOtp = async (codeToVerify?: string) => {
+    const otpValue = codeToVerify || otpDigits.join('');
+    if (otpValue.length < 6) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('You must be signed in.');
+
+      const cleanNumber = phoneNumber.replace(/\D/g, "");
+      const fullNumber = `${countryCode}${cleanNumber}`;
+
+      const res = await fetch('/api/whatsapp/link/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phone: fullNumber, otp: otpValue }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to verify code.');
+      }
+
+      setLinkedPhone(data.phone || cleanNumber);
+      updateProfile({ whatsappPhone: data.phone || cleanNumber });
+      setStep('phone');
+    } catch (err: any) {
+      setError(err.message || 'Invalid verification code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── OTP Input Controls ──────────────────────────────────────────────────────
+  const handleOtpChange = (index: number, val: string) => {
+    const digit = val.replace(/\D/g, '').slice(-1);
+    const newDigits = [...otpDigits];
+    newDigits[index] = digit;
+    setOtpDigits(newDigits);
+
+    if (digit && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+
+    if (digit && index === 5 && newDigits.every((d) => d.length === 1)) {
+      handleVerifyOtp(newDigits.join(''));
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pasted) return;
+
+    const newDigits = [...otpDigits];
+    for (let i = 0; i < pasted.length; i++) {
+      newDigits[i] = pasted[i];
+    }
+    setOtpDigits(newDigits);
+
+    if (pasted.length === 6) {
+      handleVerifyOtp(pasted);
+    } else {
+      otpInputRefs.current[pasted.length]?.focus();
+    }
+  };
+
+  const handleResend = async () => {
+    if (!canResend || isResending) return;
+    setIsResending(true);
+    setError(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('You must be signed in.');
+
+      const cleanNumber = phoneNumber.replace(/\D/g, "");
+      const fullNumber = `${countryCode}${cleanNumber}`;
+
+      const res = await fetch('/api/whatsapp/link/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phone: fullNumber }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to resend code.');
+      }
+
+      setResendTimer(30);
+      setCanResend(false);
+      setOtpDigits(['', '', '', '', '', '']);
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 100);
+    } catch (err: any) {
+      setError(err.message || 'Could not resend code.');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  // ─── 3. Unlink Account ────────────────────────────────────────────────────────
+  const handleUnlink = async () => {
+    if (!confirm('Are you sure you want to disconnect WhatsApp from Bluepin?')) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('You must be signed in.');
+
+      const res = await fetch('/api/whatsapp/unlink', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setLinkedPhone(null);
+        setCode(null);
+        setStep('phone');
+        setPhoneNumber('');
+        updateProfile({ whatsappPhone: undefined });
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to unlink account.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── 4. Fallback Bot Code Generator ──────────────────────────────────────────
   const generateLinkCode = async () => {
     setLoading(true);
     setError(null);
@@ -119,30 +346,6 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     }
   };
 
-  const handleUnlink = async () => {
-    if (!confirm('Are you sure you want to disconnect WhatsApp from Bluepin?')) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error('You must be signed in.');
-
-      const res = await fetch('/api/whatsapp/unlink', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setLinkedPhone(null);
-        setCode(null);
-        updateProfile({ whatsappPhone: undefined });
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to unlink account.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const copyCode = () => {
     if (!code) return;
     navigator.clipboard.writeText(`LINK ${code}`);
@@ -152,9 +355,6 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
   if (!isOpen) return null;
 
-  const minutes = Math.floor(expiresIn / 60);
-  const seconds = expiresIn % 60;
-
   return (
     <div
       className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
@@ -162,13 +362,13 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     >
       <div
         className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative border border-neutral-100 flex flex-col max-h-[90vh]"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100 bg-emerald-50/40">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100 bg-neutral-50/60">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm">
-              <MessageCircle size={18} />
+            <div className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center shadow-sm">
+              <MessageSquare size={16} />
             </div>
             <div>
               <h3 className="text-[15px] font-bold text-neutral-900 leading-tight">WhatsApp Sync</h3>
@@ -177,7 +377,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="text-neutral-400 hover:text-neutral-700 transition-colors p-1.5 rounded-full hover:bg-neutral-100"
+            className="text-neutral-400 hover:text-neutral-700 transition-colors p-1.5 rounded-full hover:bg-neutral-100 cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -195,20 +395,20 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
           {linkedPhone ? (
             /* Connected State */
             <div className="flex flex-col gap-4">
-              <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-4 flex items-center justify-between">
+              <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <div className="w-9 h-9 rounded-full bg-blue-50 text-[#1A73E8] border border-blue-200 flex items-center justify-center shrink-0 shadow-sm">
                     <CheckCircle2 size={20} />
                   </div>
                   <div>
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">Connected</span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#1A73E8]">Connected</span>
                     <p className="text-[14px] font-bold text-neutral-900">{linkedPhone}</p>
                   </div>
                 </div>
                 <button
                   onClick={handleUnlink}
                   disabled={loading}
-                  className="text-neutral-500 hover:text-red-600 text-xs font-semibold py-1.5 px-3 rounded-lg border border-neutral-200 hover:border-red-200 hover:bg-red-50 transition-all flex items-center gap-1.5"
+                  className="text-neutral-500 hover:text-red-600 text-xs font-semibold py-1.5 px-3 rounded-lg border border-neutral-200 hover:border-red-200 hover:bg-red-50 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Unlink size={13} />
                   Disconnect
@@ -257,73 +457,203 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
               </div>
             </div>
           ) : (
-            /* Unconnected State */
+            /* Unconnected State: In-App OTP Flow */
             <div className="flex flex-col gap-4">
               <div className="text-xs text-neutral-600 leading-relaxed">
-                Connect your WhatsApp account to seamlessly record glucose logs and upload lab reports on the go without opening the app.
+                Connect your WhatsApp account to log blood sugar readings, send meter photos, and parse lab reports instantly via WhatsApp.
               </div>
 
-              {!code ? (
-                <button
-                  onClick={generateLinkCode}
-                  disabled={loading}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm py-3 rounded-2xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
-                >
-                  {loading ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      Generating Code...
-                    </>
-                  ) : (
-                    <>
-                      <MessageCircle size={17} />
-                      Generate Link Code
-                    </>
-                  )}
-                </button>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <div className="bg-emerald-50/50 border border-emerald-200 rounded-2xl p-4 text-center">
-                    <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Your One-Time Code</span>
-                    <div className="text-3xl font-black tracking-widest text-neutral-900 my-1 font-mono">
-                      {code}
+              {step === 'phone' ? (
+                /* Step 1: Enter Phone Number */
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-800 mb-1.5">
+                      WhatsApp Mobile Number
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 px-3 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-neutral-800 text-sm font-semibold select-none">
+                        <span>🇮🇳</span>
+                        <span>{countryCode}</span>
+                      </div>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoComplete="tel"
+                        required
+                        autoFocus
+                        placeholder="Enter 10-digit number"
+                        value={phoneNumber}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setPhoneNumber(cleaned);
+                        }}
+                        className="flex-1 px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1A73E8] text-neutral-900 placeholder:text-neutral-400 text-[15px]"
+                      />
                     </div>
-                    <div className="text-[11px] text-neutral-500">
-                      Expires in <span className="font-semibold text-neutral-800">{minutes}:{seconds.toString().padStart(2, '0')}</span>
-                    </div>
+                    <p className="text-[11px] text-neutral-500 mt-1.5 flex items-center gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      <span>We'll send a 6-digit verification code to your WhatsApp.</span>
+                    </p>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={copyCode}
-                      className="flex-1 py-2.5 px-3 rounded-xl border border-neutral-200 hover:border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-xs font-semibold text-neutral-700 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                      {copied ? 'Copied Command!' : 'Copy "LINK ' + code + '"'}
-                    </button>
-
-                    {deepLink && (
-                      <a
-                        href={deepLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20"
-                      >
-                        <ExternalLink size={14} />
-                        Open WhatsApp
-                      </a>
+                  <button
+                    type="submit"
+                    disabled={loading || phoneNumber.replace(/\D/g, '').length < 10}
+                    className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Sending code to WhatsApp...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Send WhatsApp Code</span>
+                      </>
                     )}
+                  </button>
+                </form>
+              ) : (
+                /* Step 2: Enter 6-digit OTP */
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between bg-neutral-50 border border-neutral-200 p-3 rounded-xl">
+                    <div className="flex items-center gap-2 text-xs">
+                      <ShieldCheck className="w-4 h-4 text-[#1A73E8] shrink-0" />
+                      <span className="text-neutral-600">
+                        Code sent to WhatsApp{' '}
+                        <span className="font-semibold text-neutral-900">
+                          {countryCode} {phoneNumber}
+                        </span>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStep('phone')}
+                      className="text-xs text-[#1A73E8] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3 h-3" /> Change
+                    </button>
                   </div>
 
-                  <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-100 text-[11px] text-neutral-600 space-y-1">
-                    <p className="font-semibold text-neutral-800">Instructions:</p>
-                    <p>1. Open WhatsApp chat with our bot {botPhone ? <strong>({botPhone})</strong> : ''}.</p>
-                    <p>2. Send the message: <code className="bg-white px-1 py-0.5 rounded border border-neutral-200 font-mono text-neutral-900 font-bold">LINK {code}</code></p>
-                    <p>3. This window will automatically update as soon as you send it.</p>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-800 mb-2 text-center">
+                      Enter 6-Digit WhatsApp Code
+                    </label>
+                    <div className="flex justify-between gap-1.5 sm:gap-2">
+                      {otpDigits.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          ref={(el) => {
+                            otpInputRefs.current[idx] = el;
+                          }}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) => handleOtpChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                          onPaste={handleOtpPaste}
+                          className="w-11 sm:w-12 h-13 text-center text-xl font-bold bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1A73E8] text-neutral-900 transition-all"
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleVerifyOtp()}
+                    disabled={loading || isResending || otpDigits.some((d) => !d)}
+                    className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    {loading && !isResending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Verifying...</span>
+                      </>
+                    ) : (
+                      <span>Verify & Connect WhatsApp</span>
+                    )}
+                  </button>
+
+                  <div className="text-center pt-1">
+                    {canResend ? (
+                      <button
+                        type="button"
+                        onClick={handleResend}
+                        disabled={loading || isResending}
+                        className="text-xs text-[#1A73E8] hover:underline font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <RotateCw className={cn("w-3.5 h-3.5", isResending && "animate-spin")} />
+                        <span>{isResending ? "Resending code..." : "Resend Code"}</span>
+                      </button>
+                    ) : (
+                      <p className="text-xs text-neutral-500">
+                        Resend code in <span className="font-semibold text-neutral-800">{resendTimer}s</span>
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
+
+              {/* Collapsible Alternative: Bot Link Code */}
+              <div className="pt-2 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowManualCode(!showManualCode);
+                    if (!code && !showManualCode) generateLinkCode();
+                  }}
+                  className="w-full flex items-center justify-between text-xs text-neutral-500 hover:text-neutral-800 py-1 transition-colors cursor-pointer"
+                >
+                  <span>Prefer to message our bot directly?</span>
+                  {showManualCode ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+
+                {showManualCode && (
+                  <div className="mt-3 flex flex-col gap-3 animate-in fade-in duration-150">
+                    {!code ? (
+                      <button
+                        onClick={generateLinkCode}
+                        disabled={loading}
+                        className="w-full py-2.5 px-3 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-xs font-semibold text-neutral-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {loading ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />}
+                        Generate Manual Code
+                      </button>
+                    ) : (
+                      <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-3 text-center space-y-2">
+                        <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">Manual Code</span>
+                        <div className="text-2xl font-black tracking-widest text-neutral-900 font-mono">
+                          {code}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={copyCode}
+                            className="flex-1 py-2 px-2.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 text-[11px] font-semibold text-neutral-700 flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            {copied ? <Check size={12} className="text-[#1A73E8]" /> : <Copy size={12} />}
+                            {copied ? 'Copied!' : 'Copy'}
+                          </button>
+                          {deepLink && (
+                            <a
+                              href={deepLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 py-2 px-2.5 rounded-lg bg-[#1A73E8] hover:bg-[#1557B0] text-white text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <ExternalLink size={12} />
+                              Open Chat
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
