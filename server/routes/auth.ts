@@ -155,7 +155,12 @@ router.post("/auth/whatsapp/verify-otp", async (req, res) => {
         try {
           user = await authAdmin.getUser(mappedUid);
         } catch (err: any) {
-          console.warn(`[WhatsApp Auth] Mapped user ${mappedUid} not found in Firebase Auth:`, err.message);
+          if (err.code === "auth/user-not-found") {
+            console.warn(`[WhatsApp Auth] Mapped user ${mappedUid} was deleted in Firebase Auth. Removing orphaned link.`);
+            await db.doc(`whatsapp_users/${digitsOnly}`).delete();
+          } else {
+            console.warn(`[WhatsApp Auth] Mapped user ${mappedUid} not found in Firebase Auth:`, err.message);
+          }
         }
       }
     }

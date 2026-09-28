@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
-import { getAdminFirestore } from "../../firebase";
+import { getAdminFirestore, getAdminAuth } from "../../firebase";
 import { LinkAccountResult } from "./types";
 
 export const getDashboardUrl = () =>
@@ -97,11 +97,23 @@ export async function linkWhatsAppAccount(
   if (existingMapping.exists) {
     const existingUid = existingMapping.data()?.uid;
     if (existingUid && existingUid !== uid) {
-      return {
-        success: false,
-        message:
-          "⚠️ This WhatsApp number is already linked to another Bluepin account. Please log in with that account or unlink it first.",
-      };
+      const authAdmin = getAdminAuth();
+      let accountActive = true;
+      try {
+        await authAdmin.getUser(existingUid);
+      } catch (err: any) {
+        if (err.code === "auth/user-not-found") {
+          accountActive = false;
+        }
+      }
+
+      if (accountActive) {
+        return {
+          success: false,
+          message:
+            "⚠️ This WhatsApp number is already linked to another Bluepin account. Please log in with that account or unlink it first.",
+        };
+      }
     }
   }
 
