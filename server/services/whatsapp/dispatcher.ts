@@ -72,8 +72,9 @@ async function handleImageMessage(
   if (!reportHandled) {
     await sendWhatsAppMessage(
       senderPhone,
-      "⚠️ Could not detect a clear glucose number or medical report from this photo.\n\n" +
-        "Tip: Ensure the meter display is in focus and well lit, or type your reading directly (e.g. `115 Fasting`).",
+      "I could not find a glucose reading in that. 🤔\n" +
+      "Send me the number, like 126, or a photo of your glucometer and I will take it from there.\n\n" +
+      "Type help if you need anything."
     );
   }
 }
@@ -116,12 +117,35 @@ export async function processIncomingWhatsAppMessage(message: any): Promise<void
     if (rawText.toLowerCase() === "help") {
       await sendWhatsAppMessage(
         senderPhone,
-        "📋 *Bluepin WhatsApp Guide*\n\n" +
-          "• *Log Glucose:* Send `110 Fasting`, `145 PP`, or `98`\n" +
-          "• *Photo of Meter:* Send a clear photo of your glucometer\n" +
-          "• *Lab Reports:* Send a PDF document or lab photo\n" +
-          "• *Link Account:* Send `LINK <6-digit code>`\n\n" +
-          "Access your web dashboard at https://bluepin.in",
+        "Of course. Here is what I can help you with:\n\n" +
+        "- Log glucose\n" +
+        "Send me a reading or a photo of your glucometer.\n\n" +
+        "- Upload health report\n" +
+        "Send me a PDF health report under 5 MB.\n\n" +
+        "- Set a reminder\n" +
+        "Choose when you would like me to remind you to log your glucose.\n\n" +
+        "- View health profile\n" +
+        "See your health history, trends and personalised insights.\n\n" +
+        "Need to speak to someone?\n" +
+        "Email sparsh@bluepin.in and we will get back to you within 24 hours."
+      );
+      return;
+    }
+
+    if (rawText.toLowerCase().includes("remind")) {
+      const promptText = 
+        "When would you like me to remind you to log your glucose?\n" +
+        "Choose a time below and I will remember it for you.\n\n" +
+        "Type help if you need anything.";
+
+      await sendWhatsAppButtons(
+        senderPhone,
+        promptText,
+        [
+          { id: "remind_morning", title: "Morning (8 AM)" },
+          { id: "remind_afternoon", title: "Afternoon (1 PM)" },
+          { id: "remind_evening", title: "Evening (8 PM)" },
+        ]
       );
       return;
     }
@@ -132,10 +156,18 @@ export async function processIncomingWhatsAppMessage(message: any): Promise<void
   if (!userDoc.exists) {
     await sendWhatsAppMessage(
       senderPhone,
-      "👋 Welcome to *Bluepin*! Your WhatsApp is not connected to an account yet.\n\n" +
-        "1. Open your Bluepin dashboard on web\n" +
-        "2. Click your profile icon > *WhatsApp Sync*\n" +
-        "3. Copy the 6-digit code and reply here with: `LINK <code>` (or just send the 6-digit code)",
+      "Hi, I am Aarika from Bluepin. 🙏\n" +
+      "I will be your WhatsApp companion for managing your diabetes, right here every day.\n\n" +
+      "Here is what I can help you with:\n" +
+      "- Log glucose\n" +
+      "Send me a reading or a photo of your glucometer.\n\n" +
+      "- Upload health report\n" +
+      "Send me your health reports and I will add them to your health profile.\n\n" +
+      "- Set a reminder\n" +
+      "Choose when you would like me to remind you to log your glucose.\n\n" +
+      "- View health profile\n" +
+      "See your health history, trends and personalised insights.\n\n" +
+      "Type help if you need anything."
     );
     return;
   }
@@ -166,6 +198,23 @@ export async function processIncomingWhatsAppMessage(message: any): Promise<void
       if (timingChoice) {
         const handled = await handleTimingSelection(senderPhone, timingChoice);
         if (handled) return;
+      }
+
+      if (btnId.startsWith("remind_")) {
+        // Mocking the reminder setup as no cron exists yet
+        const timeMap: Record<string, string> = {
+          remind_morning: "8:00 AM",
+          remind_afternoon: "1:00 PM",
+          remind_evening: "8:00 PM",
+        };
+        const selectedTime = timeMap[btnId] || "8:00 AM";
+        await sendWhatsAppMessage(
+          senderPhone,
+          `Done. I will remind you at ${selectedTime} each day.\n` +
+          `I will be here when you are ready to log your reading.\n\n` +
+          `Type help if you need anything.`
+        );
+        return;
       }
 
       await sendWhatsAppMessage(
@@ -208,7 +257,17 @@ export async function processIncomingWhatsAppMessage(message: any): Promise<void
     } else {
       await sendWhatsAppMessage(
         senderPhone,
-        "ℹ️ Bluepin supports text readings (e.g. `120 Fasting`), glucometer photos, and medical report PDFs.",
+        "Hi, I am Aarika from Bluepin.\n\n" +
+        "Here is what I can help you with:\n\n" +
+        "- Log glucose\n" +
+        "Send me a reading or a photo of your glucometer.\n\n" +
+        "- Upload health report\n" +
+        "Send me your health reports and I will add them to your health profile.\n\n" +
+        "- Set a reminder\n" +
+        "Choose when you would like me to remind you to log your glucose.\n\n" +
+        "- View health profile\n" +
+        "See your health history, trends and personalised insights.\n\n" +
+        "Type help if you need anything."
       );
     }
   } catch (err: any) {

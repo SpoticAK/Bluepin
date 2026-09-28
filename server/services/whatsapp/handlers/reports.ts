@@ -98,7 +98,9 @@ export async function processMedicalReportBuffer(
       if (!silentOnFailure) {
         await sendWhatsAppMessage(
           senderPhone,
-          "⚠️ We analyzed the document but couldn't detect recognized lab biomarkers. Please ensure the report contains blood or diagnostic tests.",
+          "I could not process that report. 🤔\n" +
+          "Send me a PDF health report under 5 MB and I will take it from there.\n\n" +
+          "Type help if you need anything."
         );
       }
       return false;
@@ -144,12 +146,10 @@ export async function processMedicalReportBuffer(
     const magicUrl = await createWhatsAppMagicLoginUrl(uid);
     await sendWhatsAppCtaUrl(
       senderPhone,
-      `📄 *Medical Report Processed!*\n\n` +
-        `*Report:* ${reportName}\n` +
-        `*Type:* ${result.reportType || "Diagnostic Test"}\n` +
-        `*Biomarkers Detected:* ${result.biomarkers.length}\n\n` +
-        `*Key Results:*\n${topMarkers}`,
-      "Open Dashboard",
+      "Got it, I have your health report.\n" +
+      "I will add it to your health profile.\n\n" +
+      "Type help if you need anything.",
+      "View health profile",
       magicUrl,
     );
 
@@ -159,7 +159,9 @@ export async function processMedicalReportBuffer(
     if (!silentOnFailure) {
       await sendWhatsAppMessage(
         senderPhone,
-        "⚠️ Failed to process this medical report. Please try uploading it directly from the Bluepin web app.",
+        "I could not process that report. 🤔\n" +
+        "Send me a PDF health report under 5 MB and I will take it from there.\n\n" +
+        "Type help if you need anything."
       );
     }
     return false;

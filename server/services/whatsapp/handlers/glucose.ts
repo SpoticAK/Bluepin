@@ -43,13 +43,13 @@ export async function handleTimingSelection(
   const magicUrl = uid
     ? await createWhatsAppMagicLoginUrl(uid)
     : getDashboardUrl();
+  let displayTiming = timingChoice === "Post-Prandial" ? "post-meal" : timingChoice.toLowerCase();
   await sendWhatsAppCtaUrl(
     senderPhone,
-    `✅ *Timing Updated to ${timingChoice}!* 🩸\n\n` +
-      `• *Reading:* ${value} ${unit}\n` +
-      `• *Timing:* ${timingChoice}\n` +
-      `• *Time:* ${time}`,
-    "Open Dashboard",
+    `Got it. I have logged ${value} ${unit} as a ${displayTiming} reading.\n` +
+    `Your health profile is up to date.\n\n` +
+    `Type help if you need anything.`,
+    "View health profile",
     magicUrl,
   );
 
@@ -72,9 +72,14 @@ export async function handleTextGlucoseLogging(
   const match = text.match(regex);
 
   if (!match) {
+    // If it's a known non-glucose word that shouldn't trigger this?
+    // Wait, any text goes here. If we can't parse it as glucose, it could be unsupported text.
+    // Let's use Guideline 3 here, as they tried to send text but it wasn't valid glucose.
     await sendWhatsAppMessage(
       senderPhone,
-      "🤔 I didn't recognize that reading format.\n\nTry sending: `120 Fasting`, `145 PP`, or just `110`. Send `HELP` for more options.",
+      "I could not find a glucose reading in that. 🤔\n" +
+      "Send me the number, like 126, or a photo of your glucometer and I will take it from there.\n\n" +
+      "Type help if you need anything.",
     );
     return;
   }
@@ -83,7 +88,9 @@ export async function handleTextGlucoseLogging(
   if (isNaN(rawValue) || rawValue <= 0 || rawValue > 1000) {
     await sendWhatsAppMessage(
       senderPhone,
-      "⚠️ Please enter a valid glucose number between 20 and 800.",
+      "I could not find a glucose reading in that. 🤔\n" +
+      "Send me the number, like 126, or a photo of your glucometer and I will take it from there.\n\n" +
+      "Type help if you need anything.",
     );
     return;
   }
@@ -152,24 +159,24 @@ export async function handleTextGlucoseLogging(
 
   if (!hasExplicitTiming) {
     const promptText =
-      `🩸 *Glucose Reading Logged: ${rawValue} ${unit}*\n` +
-      `• *Time:* Today at ${timeStr}\n\n` +
-      `How long after eating or drinking was this reading taken?`;
+      `I got ${rawValue} ${unit}.\n\n` +
+      `One more thing: when was this taken relative to your last meal or sugary drink?\n` +
+      `Type help if you need anything.`;
 
     await sendWhatsAppButtons(senderPhone, promptText, [
-      { id: "timing_pp", title: "Post-Meal (<2h)" },
-      { id: "timing_random", title: "Random (2–8h)" },
       { id: "timing_fasting", title: "Fasting (>8h)" },
+      { id: "timing_random", title: "Random (2–8h)" },
+      { id: "timing_pp", title: "Post meal (<2h)" },
     ]);
   } else {
+    let displayTiming = timing === "Post-Prandial" ? "post-meal" : timing.toLowerCase();
     const magicUrl = await createWhatsAppMagicLoginUrl(uid);
     await sendWhatsAppCtaUrl(
       senderPhone,
-      `✅ *Glucose Logged Successfully!*\n\n` +
-        `• *Reading:* ${rawValue} ${unit}\n` +
-        `• *Timing:* ${timing}\n` +
-        `• *Logged:* Today at ${timeStr}`,
-      "Open Dashboard",
+      `Got it. I have logged ${rawValue} ${unit} as a ${displayTiming} reading.\n` +
+      `Your health profile is up to date.\n\n` +
+      `Type help if you need anything.`,
+      "View health profile",
       magicUrl,
     );
   }
@@ -234,14 +241,14 @@ export async function handleGlucometerImage(
       await batch.commit();
 
       const promptText =
-        `📸 *Glucometer Reading Extracted: ${result.value} ${result.unit || "mg/dL"}*\n` +
-        `• *Detected Time:* ${dateStr} ${timeStr}\n\n` +
-        `How long after eating or drinking was this reading taken?`;
+        `I got ${result.value} ${result.unit || "mg/dL"}.\n\n` +
+        `One more thing: when was this taken relative to your last meal or sugary drink?\n` +
+        `Type help if you need anything.`;
 
       await sendWhatsAppButtons(senderPhone, promptText, [
-        { id: "timing_pp", title: "Post-Meal (<2h)" },
-        { id: "timing_random", title: "Random (2–8h)" },
         { id: "timing_fasting", title: "Fasting (>8h)" },
+        { id: "timing_random", title: "Random (2–8h)" },
+        { id: "timing_pp", title: "Post meal (<2h)" },
       ]);
       return true;
     }
