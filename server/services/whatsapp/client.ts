@@ -60,6 +60,144 @@ export async function sendWhatsAppMessage(
 }
 
 /**
+ * Sends a 6-digit verification code to the recipient's WhatsApp.
+ * Supports Meta Authentication templates as well as direct text messages.
+ */
+export async function sendWhatsAppOtp(
+  to: string,
+  otp: string,
+): Promise<{ success: boolean; error?: string }> {
+  const metaBaseUrl = getMetaBaseUrl();
+  const token = getWhatsAppToken();
+  const phoneId = getPhoneNumberId();
+
+  if (!token || !phoneId) {
+    console.warn(
+      "[WhatsApp OTP] Cannot send OTP: WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID is not configured.",
+    );
+    return {
+      success: false,
+      error: "WhatsApp service credentials not configured on server.",
+    };
+  }
+
+  // Meta expects E.164 without '+' or special characters (e.g. 919876543210)
+  const cleanTo = to.replace(/\D/g, "");
+  const templateName = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+
+  try {
+    const url = `${metaBaseUrl}/${phoneId}/messages`;
+
+    // 1. If an approved Authentication / OTP template is configured, try it first
+    if (templateName) {
+      const templatePayload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanTo,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: process.env.WHATSAPP_TEMPLATE_LANG || "en_US" },
+          components: [
+            {
+              type: "body",
+              parameters: [{ type: "text", text: otp }],
+            },
+            {
+              type: "button",
+              sub_type: "url",
+              index: "0",
+              parameters: [{ type: "text", text: otp }],
+            },
+          ],
+        },
+      };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(templatePayload),
+      });
+
+      if (res.ok) {
+        return { success: true };
+      }
+
+      // If button-style failed (e.g. template has no button), retry with body parameters only
+      const bodyOnlyPayload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanTo,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: process.env.WHATSAPP_TEMPLATE_LANG || "en_US" },
+          components: [
+            {
+              type: "body",
+              parameters: [{ type: "text", text: otp }],
+            },
+          ],
+        },
+      };
+
+      const retryRes = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bodyOnlyPayload),
+      });
+
+      if (retryRes.ok) {
+        return { success: true };
+      }
+
+      const errText = await retryRes.text();
+      console.warn("[WhatsApp OTP] Template send failed, falling back to text payload:", errText);
+    }
+
+    // 2. Direct text payload (supported in sandbox or within active window)
+    const textBody =
+      `🔒 *${otp}* is your Bluepin verification code.\n\n` +
+      `For your security, do not share this code with anyone. It expires in 5 minutes.`;
+
+    const textRes = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: cleanTo,
+        type: "text",
+        text: { body: textBody, preview_url: false },
+      }),
+    });
+
+    if (!textRes.ok) {
+      const errText = await textRes.text();
+      console.error("[WhatsApp OTP] Error sending WhatsApp OTP:", errText);
+      return {
+        success: false,
+        error: "Failed to dispatch WhatsApp message. Check number and Meta API quota.",
+      };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("[WhatsApp OTP] Exception sending OTP:", err.message || err);
+    return { success: false, error: err.message || "Failed to send WhatsApp OTP" };
+  }
+}
+
+/**
  * Sends an interactive payload to WhatsApp, falling back to plaintext if rejected.
  */
 export async function sendMetaInteractive(

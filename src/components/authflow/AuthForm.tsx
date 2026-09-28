@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Smartphone, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
+import { WhatsAppIcon } from "../CustomEmojis";
 import { useFirebaseAuth } from "../../hooks/useFirebaseAuth";
 import { loginSchema, signUpSchema, type AuthFormValues } from "./types";
 import EmailPasswordFields from "./EmailPasswordFields";
@@ -59,7 +60,9 @@ export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
     setPhoneStep("phone");
   };
 
-  const handlePhoneSendOtp = async (fullPhoneNumber: string): Promise<boolean> => {
+  const handlePhoneSendOtp = async (
+    fullPhoneNumber: string,
+  ): Promise<boolean> => {
     clearError();
     const success = await sendPhoneOtp(fullPhoneNumber);
     if (success) {
@@ -85,7 +88,7 @@ export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
         }
       }
       trackEvent("user_signed_up", {
-        method: "Phone",
+        method: "WhatsApp",
         type: res.isNewUser ? "signup" : "login",
       });
     }
@@ -141,8 +144,8 @@ export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
               : "text-theme-text-sec hover:text-theme-text"
           }`}
         >
-          <Smartphone className="w-3.5 h-3.5" />
-          <span>Phone OTP</span>
+          <WhatsAppIcon className="size-3.5" />
+          <span>WhatsApp</span>
         </button>
         <button
           type="button"

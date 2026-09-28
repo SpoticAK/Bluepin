@@ -92,6 +92,19 @@ export async function linkWhatsAppAccount(
 
   const uid = data.uid;
 
+  // Check if this WhatsApp number is already linked to another account
+  const existingMapping = await db.doc(`whatsapp_users/${senderPhone}`).get();
+  if (existingMapping.exists) {
+    const existingUid = existingMapping.data()?.uid;
+    if (existingUid && existingUid !== uid) {
+      return {
+        success: false,
+        message:
+          "⚠️ This WhatsApp number is already linked to another Bluepin account. Please log in with that account or unlink it first.",
+      };
+    }
+  }
+
   const batch = db.batch();
   // Store mapping: phone -> uid
   batch.set(db.doc(`whatsapp_users/${senderPhone}`), {
@@ -101,9 +114,13 @@ export async function linkWhatsAppAccount(
   });
 
   // Store mapping in user's profile
-  batch.update(db.doc(`users/${uid}`), {
-    whatsappPhone: senderPhone,
-  });
+  batch.set(
+    db.doc(`users/${uid}`),
+    {
+      whatsappPhone: senderPhone,
+    },
+    { merge: true },
+  );
 
   // Remove used code
   batch.delete(linkRef);

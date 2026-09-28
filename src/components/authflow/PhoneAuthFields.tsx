@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Loader2, ArrowLeft, RotateCw, ShieldCheck, CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  RotateCw,
+  ShieldCheck,
+  CheckCircle2,
+  MessageSquare,
+} from "lucide-react";
 import { cn } from "../../lib/utils";
+import { WhatsAppIcon } from "../CustomEmojis";
 
 interface PhoneAuthFieldsProps {
   onSendOtp: (fullPhoneNumber: string) => Promise<boolean>;
@@ -24,7 +32,14 @@ export default function PhoneAuthFields({
   onPhoneNumberChange,
 }: PhoneAuthFieldsProps) {
   const [countryCode, setCountryCode] = useState("+91");
-  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const [otpDigits, setOtpDigits] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
   const [resendTimer, setResendTimer] = useState<number>(30);
   const [canResend, setCanResend] = useState<boolean>(false);
   const [isResending, setIsResending] = useState<boolean>(false);
@@ -96,7 +111,10 @@ export default function PhoneAuthFields({
 
   const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 6);
     if (!pasted) return;
 
     const newDigits = [...otpDigits];
@@ -137,14 +155,11 @@ export default function PhoneAuthFields({
 
   return (
     <div>
-      {/* Invisible reCAPTCHA container required by Firebase */}
-      <div id="recaptcha-container" />
-
       {step === "phone" ? (
         <form onSubmit={handlePhoneSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-theme-text mb-1.5">
-              Mobile Number
+              WhatsApp Mobile Number
             </label>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 px-3 py-3 bg-theme-card-sec border border-theme-border rounded-xl text-theme-text text-sm font-semibold select-none">
@@ -161,14 +176,18 @@ export default function PhoneAuthFields({
                 placeholder="Enter 10-digit number"
                 value={phoneNumber}
                 onChange={(e) => {
-                  const cleaned = e.target.value.replace(/\D/g, "").slice(0, 10);
+                  const cleaned = e.target.value
+                    .replace(/\D/g, "")
+                    .slice(0, 10);
                   onPhoneNumberChange(cleaned);
                 }}
-                className="flex-1 px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1A73E8] text-theme-text placeholder:text-theme-text-sec/50 text-[15px]"
+                className="flex-1 px-4 py-3 bg-theme-card-sec border border-theme-border rounded-xl focus:outline-none focus:ring-2 focus:ring-theme-border text-theme-text placeholder:text-theme-text-sec/50 text-[15px]"
               />
             </div>
-            <p className="text-[11px] text-theme-text-sec mt-1.5">
-              We'll send a 6-digit one-time password via SMS. Standard carrier rates may apply.
+            <p className="text-[11px] text-theme-text-sec mt-1.5 flex items-center gap-1.5 pl-2">
+              <span>
+                We'll send a 6-digit verification code to your WhatsApp.
+              </span>
             </p>
           </div>
 
@@ -184,10 +203,13 @@ export default function PhoneAuthFields({
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Sending OTP...</span>
+                <span>Sending code via WhatsApp...</span>
               </>
             ) : (
-              <span>Get OTP</span>
+              <>
+                <WhatsAppIcon className="size-6" />
+                <span>Get WhatsApp OTP</span>
+              </>
             )}
           </button>
         </form>
@@ -195,9 +217,9 @@ export default function PhoneAuthFields({
         <div className="space-y-4">
           <div className="flex items-center justify-between bg-theme-card-sec/70 border border-theme-border p-3 rounded-xl">
             <div className="flex items-center gap-2 text-xs">
-              <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+              <ShieldCheck className="w-4 h-4 text-theme-text-sec shrink-0" />
               <span className="text-theme-text-sec">
-                Code sent to{" "}
+                Code sent to WhatsApp{" "}
                 <span className="font-semibold text-theme-text">
                   {countryCode} {phoneNumber}
                 </span>
@@ -214,7 +236,7 @@ export default function PhoneAuthFields({
 
           <div>
             <label className="block text-xs font-bold text-theme-text mb-2 text-center">
-              Enter 6-Digit OTP
+              Enter 6-Digit WhatsApp Code
             </label>
             <div className="flex justify-between gap-1.5 sm:gap-2">
               {otpDigits.map((digit, idx) => (
@@ -238,7 +260,7 @@ export default function PhoneAuthFields({
           </div>
 
           {resendSuccess && (
-            <div className="flex items-center justify-center gap-1.5 p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-600 text-xs font-medium">
+            <div className="flex items-center justify-center gap-1.5 p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[#1A73E8] text-xs font-medium">
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
               <span>A new verification code has been sent!</span>
             </div>
@@ -274,7 +296,9 @@ export default function PhoneAuthFields({
                 disabled={loading || isResending}
                 className="text-xs text-[#1A73E8] hover:underline font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
-                <RotateCw className={cn("w-3.5 h-3.5", isResending && "animate-spin")} />
+                <RotateCw
+                  className={cn("w-3.5 h-3.5", isResending && "animate-spin")}
+                />
                 <span>{isResending ? "Resending code..." : "Resend OTP"}</span>
               </button>
             ) : (
