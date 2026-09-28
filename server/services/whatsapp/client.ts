@@ -11,13 +11,49 @@ export const getAppSecret = () => process.env.WHATSAPP_APP_SECRET || "";
 export const getMetaBaseUrl = () =>
   process.env.META_BASE_URL || "https://graph.facebook.com/v26.0";
 
+const META_TIMEOUT_MS = Number(process.env.WHATSAPP_API_TIMEOUT_MS) || 15_000;
+const MEDIA_MAX_BYTES = Number(process.env.WHATSAPP_MEDIA_MAX_BYTES) || 5 * 1024 * 1024;
+
+/** Template language code, used consistently by OTP and utility templates. */
+export const getTemplateLang = () => process.env.WHATSAPP_TEMPLATE_LANG || "en_US";
+
 /**
- * Sends a plain text WhatsApp message via Meta Cloud API.
+ * Canonical recipient form: E.164 digits with no "+" (e.g. 919876543210).
+ * Every Firestore key derived from a phone number must use this, because Meta
+ * webhook payloads always report `from` in this format.
  */
-export async function sendWhatsAppMessage(
-  to: string,
-  text: string,
-): Promise<boolean> {
+export function normalizePhone(input: string): string | null {
+  const digits = String(input || "").replace(/\D/g, "");
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length >= 11 && digits.length <= 15) return digits;
+  return null;
+}
+
+/** Same canonical form, but "+"-prefixed for Firebase Auth phoneNumber fields. */
+export const toE164 = (input: string): string | null => {
+  const canonical = normalizePhone(input);
+  return canonical ? `+${canonical}` : null;
+};
+
+/** Masks a phone number for logs: 919876543210 -> 9198******10 */
+export const maskPhone = (input: string): string => {
+  const digits = String(input || "").replace(/\D/g, "");
+  if (digits.length <= 4) return "*".repeat(digits.length);
+  return `${digits.slice(0, 4)}${"*".repeat(digits.length - 6)}${digits.slice(-2)}`;
+};
+
+interface MetaApiResponse {
+  ok: boolean;
+  errorCode?: number;
+  errorMessage?: string;
+  raw?: string;
+}
+
+/**
+ * Single entry point for every outbound Meta Cloud API call.
+ * Applies auth, a request timeout, and structured error parsing.
+ */
+async function postMessage(payload: Record<string, unknown>): Promise<MetaApiResponse> {
   const metaBaseUrl = getMetaBaseUrl();
   const token = getWhatsAppToken();
   const phoneId = getPhoneNumberId();
@@ -26,239 +62,11 @@ export async function sendWhatsAppMessage(
     console.warn(
       "[WhatsApp] Cannot send message: WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID is not configured.",
     );
-    return false;
-  }
-
-  try {
-    const url = `${metaBaseUrl}/${phoneId}/messages`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to,
-        type: "text",
-        text: { body: text, preview_url: false },
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("[WhatsApp] Error sending message:", errText);
-      return false;
-    }
-
-    return true;
-  } catch (err: any) {
-    console.error("[WhatsApp] Exception sending message:", err.message || err);
-    return false;
-  }
-}
-
-/**
- * Sends a pre-approved Utility or Marketing template via Meta Cloud API.
- * Use this to initiate conversations outside the 24-hour window.
- */
-export async function sendWhatsAppUtilityTemplate(
-  to: string,
-  templateName: string,
-  languageCode: string = "en", // Often "en" or "en_US"
-): Promise<boolean> {
-  const metaBaseUrl = getMetaBaseUrl();
-  const token = getWhatsAppToken();
-  const phoneId = getPhoneNumberId();
-
-  if (!token || !phoneId) return false;
-
-  try {
-    const url = `${metaBaseUrl}/${phoneId}/messages`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to,
-        type: "template",
-        template: {
-          name: templateName,
-          language: { code: languageCode },
-          // If your template has variables like {{1}}, you would add the `components` array here.
-          // Since the reminder copy has no variables, we can omit it.
-        },
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`[WhatsApp] Error sending template '${templateName}':`, errText);
-      return false;
-    }
-
-    return true;
-  } catch (err: any) {
-    console.error(`[WhatsApp] Exception sending template '${templateName}':`, err.message || err);
-    return false;
-  }
-}
-
-/**
- * Sends a 6-digit verification code to the recipient's WhatsApp.
- * Supports Meta Authentication templates as well as direct text messages.
- */
-export async function sendWhatsAppOtp(
-  to: string,
-  otp: string,
-): Promise<{ success: boolean; error?: string }> {
-  const metaBaseUrl = getMetaBaseUrl();
-  const token = getWhatsAppToken();
-  const phoneId = getPhoneNumberId();
-
-  if (!token || !phoneId) {
-    console.warn(
-      "[WhatsApp OTP] Cannot send OTP: WHATSAPP_TOKEN or WHATSAPP_PHONE_NUMBER_ID is not configured.",
-    );
     return {
-      success: false,
-      error: "WhatsApp service credentials not configured on server.",
+      ok: false,
+      errorMessage: "WhatsApp service credentials not configured on server.",
     };
   }
-
-  // Meta expects E.164 without '+' or special characters (e.g. 919876543210)
-  const cleanTo = to.replace(/\D/g, "");
-  const templateName = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
-
-  try {
-    const url = `${metaBaseUrl}/${phoneId}/messages`;
-
-    // 1. If an approved Authentication / OTP template is configured, try it first
-    if (templateName) {
-      const templatePayload = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: cleanTo,
-        type: "template",
-        template: {
-          name: templateName,
-          language: { code: process.env.WHATSAPP_TEMPLATE_LANG || "en_US" },
-          components: [
-            {
-              type: "body",
-              parameters: [{ type: "text", text: otp }],
-            },
-            {
-              type: "button",
-              sub_type: "url",
-              index: "0",
-              parameters: [{ type: "text", text: otp }],
-            },
-          ],
-        },
-      };
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(templatePayload),
-      });
-
-      if (res.ok) {
-        return { success: true };
-      }
-
-      // If button-style failed (e.g. template has no button), retry with body parameters only
-      const bodyOnlyPayload = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: cleanTo,
-        type: "template",
-        template: {
-          name: templateName,
-          language: { code: process.env.WHATSAPP_TEMPLATE_LANG || "en_US" },
-          components: [
-            {
-              type: "body",
-              parameters: [{ type: "text", text: otp }],
-            },
-          ],
-        },
-      };
-
-      const retryRes = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(bodyOnlyPayload),
-      });
-
-      if (retryRes.ok) {
-        return { success: true };
-      }
-
-      const errText = await retryRes.text();
-      console.warn("[WhatsApp OTP] Template send failed, falling back to text payload:", errText);
-    }
-
-    // 2. Direct text payload (supported in sandbox or within active window)
-    const textBody =
-      `🔒 *${otp}* is your Bluepin verification code.\n\n` +
-      `For your security, do not share this code with anyone. It expires in 5 minutes.`;
-
-    const textRes = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: cleanTo,
-        type: "text",
-        text: { body: textBody, preview_url: false },
-      }),
-    });
-
-    if (!textRes.ok) {
-      const errText = await textRes.text();
-      console.error("[WhatsApp OTP] Error sending WhatsApp OTP:", errText);
-      return {
-        success: false,
-        error: "Failed to dispatch WhatsApp message. Check number and Meta API quota.",
-      };
-    }
-
-    return { success: true };
-  } catch (err: any) {
-    console.error("[WhatsApp OTP] Exception sending OTP:", err.message || err);
-    return { success: false, error: err.message || "Failed to send WhatsApp OTP" };
-  }
-}
-
-/**
- * Sends an interactive payload to WhatsApp, falling back to plaintext if rejected.
- */
-export async function sendMetaInteractive(
-  to: string,
-  interactive: any,
-  fallbackText: string,
-): Promise<boolean> {
-  const metaBaseUrl = getMetaBaseUrl();
-  const token = getWhatsAppToken();
-  const phoneId = getPhoneNumberId();
-  if (!token || !phoneId) return false;
 
   try {
     const res = await fetch(`${metaBaseUrl}/${phoneId}/messages`, {
@@ -270,38 +78,242 @@ export async function sendMetaInteractive(
       body: JSON.stringify({
         messaging_product: "whatsapp",
         recipient_type: "individual",
-        to,
-        type: "interactive",
-        interactive,
+        ...payload,
       }),
+      signal: AbortSignal.timeout(META_TIMEOUT_MS),
     });
 
-    if (!res.ok) {
-      console.warn(
-        "[WhatsApp] Interactive rejected, falling back to text:",
-        await res.text(),
-      );
-      return sendWhatsAppMessage(to, fallbackText);
+    if (res.ok) return { ok: true };
+
+    const raw = await res.text();
+    let errorCode: number | undefined;
+    let errorMessage = raw.slice(0, 300);
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.error?.code) errorCode = Number(parsed.error.code);
+      if (parsed?.error?.message) errorMessage = String(parsed.error.message);
+    } catch {
+      // Non-JSON error body; keep the truncated text.
     }
-    return true;
+
+    if (errorCode === 131047) {
+      console.warn("[WhatsApp] Outside the 24-hour customer service window.", { errorCode });
+    } else if (errorCode === 131030) {
+      console.warn("[WhatsApp] Recipient has not accepted messages from this number.", { errorCode });
+    }
+
+    return { ok: false, errorCode, errorMessage, raw };
   } catch (err: any) {
-    console.error("[WhatsApp] Error sending interactive:", err);
-    return sendWhatsAppMessage(to, fallbackText);
+    const message = err?.message || String(err);
+    console.error("[WhatsApp] Exception calling Meta API:", message);
+    return { ok: false, errorMessage: message };
   }
 }
 
 /**
+ * Sends a plain text WhatsApp message via Meta Cloud API.
+ */
+export async function sendWhatsAppMessage(
+  to: string,
+  text: string,
+): Promise<boolean> {
+  const cleanTo = normalizePhone(to);
+  if (!cleanTo) {
+    console.warn("[WhatsApp] Refusing to send: invalid recipient number.", { to: maskPhone(to) });
+    return false;
+  }
+
+  const res = await postMessage({
+    to: cleanTo,
+    type: "text",
+    text: { body: text, preview_url: false },
+  });
+
+  if (!res.ok) {
+    console.error("[WhatsApp] Error sending message:", res.errorMessage);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Sends a pre-approved Utility or Marketing template via Meta Cloud API.
+ * Use this to initiate conversations outside the 24-hour window.
+ */
+export async function sendWhatsAppUtilityTemplate(
+  to: string,
+  templateName: string,
+  languageCode?: string,
+): Promise<boolean> {
+  const cleanTo = normalizePhone(to);
+  if (!cleanTo) return false;
+
+  const res = await postMessage({
+    to: cleanTo,
+    type: "template",
+    template: {
+      name: templateName,
+      language: { code: languageCode || getTemplateLang() },
+    },
+  });
+
+  if (!res.ok) {
+    console.error(`[WhatsApp] Error sending template '${templateName}':`, res.errorMessage);
+    return false;
+  }
+  return true;
+}
+
+// Codes indicating the template body/button component shape did not match the
+// approved template. Only these justify retrying without the button component.
+const TEMPLATE_SHAPE_MISMATCH_CODES = new Set([132000, 132001, 132005, 132007, 132012]);
+
+/**
+ * Sends a 6-digit verification code to the recipient's WhatsApp.
+ * Prefers an approved Authentication template; falls back to a text message,
+ * which Meta only delivers inside an active 24-hour window.
+ */
+export async function sendWhatsAppOtp(
+  to: string,
+  otp: string,
+): Promise<{ success: boolean; error?: string }> {
+  const cleanTo = normalizePhone(to);
+  if (!cleanTo) {
+    return { success: false, error: "Invalid WhatsApp phone number." };
+  }
+
+  const templateName = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+  if (!templateName && process.env.NODE_ENV === "production") {
+    console.error(
+      "[WhatsApp OTP] WHATSAPP_OTP_TEMPLATE_NAME is not set. OTP delivery relies on the text " +
+        "fallback, which Meta only delivers inside a 24-hour customer service window. " +
+        "Users who have never messaged the bot will not receive codes.",
+    );
+  }
+
+  if (templateName) {
+    const templateWithButton = await postMessage({
+      to: cleanTo,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: getTemplateLang() },
+        components: [
+          { type: "body", parameters: [{ type: "text", text: otp }] },
+          {
+            type: "button",
+            sub_type: "url",
+            index: "0",
+            parameters: [{ type: "text", text: otp }],
+          },
+        ],
+      },
+    });
+
+    if (templateWithButton.ok) return { success: true };
+
+    console.warn(
+      `[WhatsApp OTP] Template send with button failed for '${templateName}':`,
+      { errorCode: templateWithButton.errorCode, errorMessage: templateWithButton.errorMessage },
+    );
+
+    if (!TEMPLATE_SHAPE_MISMATCH_CODES.has(templateWithButton.errorCode ?? -1)) {
+      return {
+        success: false,
+        error: templateWithButton.errorMessage || "Failed to send verification code.",
+      };
+    }
+
+    // Retry without the button component for templates without a URL button.
+    const bodyOnly = await postMessage({
+      to: cleanTo,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: getTemplateLang() },
+        components: [{ type: "body", parameters: [{ type: "text", text: otp }] }],
+      },
+    });
+
+    if (bodyOnly.ok) return { success: true };
+
+    console.error("[WhatsApp OTP] Body-only template retry failed:", {
+      errorCode: bodyOnly.errorCode,
+      errorMessage: bodyOnly.errorMessage,
+    });
+    return {
+      success: false,
+      error: bodyOnly.errorMessage || "Failed to send verification code.",
+    };
+  }
+
+  const textBody =
+    `🔒 *${otp}* is your Bluepin verification code.\n\n` +
+    `For your security, do not share this code with anyone. It expires in 5 minutes.`;
+
+  const textRes = await postMessage({
+    to: cleanTo,
+    type: "text",
+    text: { body: textBody, preview_url: false },
+  });
+
+  if (!textRes.ok) {
+    console.error("[WhatsApp OTP] Error sending WhatsApp OTP:", textRes.errorMessage);
+    return {
+      success: false,
+      error: textRes.errorMessage || "Failed to dispatch WhatsApp message. Check number and Meta API quota.",
+    };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Sends an interactive payload to WhatsApp, falling back to plaintext if rejected.
+ */
+export async function sendMetaInteractive(
+  to: string,
+  interactive: unknown,
+  fallbackText: string,
+): Promise<boolean> {
+  const cleanTo = normalizePhone(to);
+  if (!cleanTo) return false;
+
+  const res = await postMessage({
+    to: cleanTo,
+    type: "interactive",
+    interactive,
+  });
+
+  if (!res.ok) {
+    console.warn(
+      "[WhatsApp] Interactive rejected, falling back to text:",
+      { errorCode: res.errorCode, errorMessage: res.errorMessage },
+    );
+    return sendWhatsAppMessage(cleanTo, fallbackText);
+  }
+  return true;
+}
+
+/**
  * Sends an interactive reply button message (up to 3 buttons) via Meta Cloud API.
+ *
+ * `fallbackReplyHint` overrides the "Reply with 1, 2, or 3" line in the plaintext
+ * fallback. Callers whose buttons overlap with other numbered prompts (such as
+ * the glucose timing selection) should pass keyword-based hints to avoid the
+ * fallback path colliding with a different 1/2/3 menu.
  */
 export async function sendWhatsAppButtons(
   to: string,
   bodyText: string,
   buttons: InteractiveButton[],
+  fallbackReplyHint?: string,
 ): Promise<boolean> {
-  const fallback =
-    `${bodyText}\n\n` +
-    buttons.map((b, i) => `${i + 1}️⃣ *${b.title}*`).join("\n") +
-    "\n\nReply with *1*, *2*, or *3*.";
+  const numbered = buttons.map((b, i) => `${i + 1}️⃣ *${b.title}*`).join("\n");
+  const hint =
+    fallbackReplyHint ?? `\n\nReply with *1*, *2*, or *3*.`;
+  const fallback = `${bodyText}\n\n${numbered}${hint}`;
+
   return sendMetaInteractive(
     to,
     {
@@ -421,6 +433,8 @@ export async function sendWhatsAppCtaUrl(
 
 /**
  * Downloads media (image, PDF, etc.) from WhatsApp servers using the media ID.
+ * Enforces a hard size cap and request timeouts so a large or slow payload
+ * cannot exhaust memory or hold the worker open.
  */
 export async function downloadWhatsAppMedia(
   mediaId: string,
@@ -434,11 +448,12 @@ export async function downloadWhatsAppMedia(
   // 1. Retrieve the temporary media download URL
   const metaRes = await fetch(`${metaBaseUrl}/${mediaId}`, {
     headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(META_TIMEOUT_MS),
   });
 
   if (!metaRes.ok) {
     const errText = await metaRes.text();
-    throw new Error(`Failed to fetch media metadata: ${errText}`);
+    throw new Error(`Failed to fetch media metadata: ${errText.slice(0, 200)}`);
   }
 
   const metaData = await metaRes.json();
@@ -449,14 +464,32 @@ export async function downloadWhatsAppMedia(
   // 2. Download the binary payload using the Bearer token
   const fileRes = await fetch(metaData.url, {
     headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(META_TIMEOUT_MS),
   });
 
   if (!fileRes.ok) {
-    throw new Error(`Failed to download media binary from ${metaData.url}`);
+    throw new Error("Failed to download media binary from WhatsApp servers.");
+  }
+
+  const declaredLength = Number(fileRes.headers.get("content-length") || "0");
+  if (declaredLength > MEDIA_MAX_BYTES) {
+    throw new Error(
+      `Media is ${(declaredLength / 1024 / 1024).toFixed(1)} MB, over the ${
+        MEDIA_MAX_BYTES / 1024 / 1024
+      } MB limit.`,
+    );
   }
 
   const arrayBuf = await fileRes.arrayBuffer();
   const buffer = Buffer.from(arrayBuf);
+  if (buffer.length > MEDIA_MAX_BYTES) {
+    throw new Error(
+      `Media is ${(buffer.length / 1024 / 1024).toFixed(1)} MB, over the ${
+        MEDIA_MAX_BYTES / 1024 / 1024
+      } MB limit.`,
+    );
+  }
+
   const mimeType = (
     metaData.mime_type ||
     fileRes.headers.get("content-type") ||
@@ -470,6 +503,8 @@ export async function downloadWhatsAppMedia(
 
 /**
  * Validates Meta's X-Hub-Signature-256 header against the raw request body.
+ * Fails closed in production: a missing app secret rejects the request rather
+ * than silently accepting forged webhooks.
  */
 export function verifyMetaSignature(
   rawBody: Buffer | string,
@@ -477,10 +512,22 @@ export function verifyMetaSignature(
 ): boolean {
   const appSecret = getAppSecret();
   if (!appSecret) {
-    // If not configured in dev/testing, log warning and allow
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[WhatsApp] WHATSAPP_APP_SECRET is not set; rejecting webhook in production.",
+      );
+      return false;
+    }
+    console.warn(
+      "[WhatsApp] WHATSAPP_APP_SECRET is not set; signature verification skipped (dev only).",
+    );
     return true;
   }
-  if (!signatureHeader) {
+
+  if (!signatureHeader) return false;
+
+  const parts = signatureHeader.split("=");
+  if (parts.length !== 2 || parts[0] !== "sha256" || !/^[0-9a-f]+$/.test(parts[1])) {
     return false;
   }
 
@@ -489,13 +536,9 @@ export function verifyMetaSignature(
     .update(rawBody)
     .digest("hex");
 
-  const parts = signatureHeader.split("=");
-  if (parts.length !== 2 || parts[0] !== "sha256") {
-    return false;
-  }
+  const given = Buffer.from(parts[1], "hex");
+  const expected = Buffer.from(expectedSig, "hex");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(parts[1], "hex"),
-    Buffer.from(expectedSig, "hex"),
-  );
+  // timingSafeEqual throws on a length mismatch, so compare lengths first.
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
 }
