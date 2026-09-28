@@ -8,6 +8,8 @@ import {
   unlinkWhatsAppAccount,
   processIncomingWhatsAppMessage,
   verifyMetaSignature,
+  sendWhatsAppList,
+  sendWhatsAppMainMenu
 } from "../services/whatsappService";
 import { getAdminFirestore, getAdminAuth } from "../firebase";
 
@@ -244,21 +246,7 @@ router.post("/whatsapp/link/verify-otp", requireAuth, async (req: any, res) => {
       // Ignored if phone already claimed on another auth record
     }
     // Send welcome confirmation message on WhatsApp in background
-    sendWhatsAppMessage(
-      cleanPhone,
-      "Hi, I am Aarika from Bluepin. 🙏\n" +
-      "I will be your WhatsApp companion for managing your diabetes, right here every day.\n\n" +
-      "Here is what I can help you with:\n" +
-      "- Log glucose\n" +
-      "Send me a reading or a photo of your glucometer.\n\n" +
-      "- Upload health report\n" +
-      "Send me your health reports and I will add them to your health profile.\n\n" +
-      "- Set a reminder\n" +
-      "Choose when you would like me to remind you to log your glucose.\n\n" +
-      "- View health profile\n" +
-      "See your health history, trends and personalised insights.\n\n" +
-      "Type help if you need anything.",
-    ).catch(() => {});
+    sendWhatsAppMainMenu(cleanPhone, "welcome").catch(() => {});
 
     return res.json({
       success: true,

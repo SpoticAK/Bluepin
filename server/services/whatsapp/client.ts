@@ -318,6 +318,84 @@ export async function sendWhatsAppButtons(
   );
 }
 
+export interface InteractiveListSection {
+  title?: string;
+  rows: { id: string; title: string; description?: string }[];
+}
+
+/**
+ * Sends an interactive List Message (up to 10 rows).
+ */
+export async function sendWhatsAppList(
+  to: string,
+  bodyText: string,
+  buttonText: string,
+  sections: InteractiveListSection[],
+): Promise<boolean> {
+  const fallback =
+    `${bodyText}\n\n` +
+    sections
+      .flatMap((s) => s.rows)
+      .map((r, i) => `${i + 1}. *${r.title}*`)
+      .join("\n") +
+    "\n\nReply with your choice.";
+    
+  return sendMetaInteractive(
+    to,
+    {
+      type: "list",
+      header: { type: "text", text: "Menu" },
+      body: { text: bodyText },
+      action: {
+        button: buttonText.slice(0, 20),
+        sections: sections.map((s) => ({
+          title: s.title ? s.title.slice(0, 24) : "Options",
+          rows: s.rows.map((r) => ({
+            id: r.id,
+            title: r.title.slice(0, 24),
+            description: r.description ? r.description.slice(0, 72) : undefined,
+          })),
+        })),
+      },
+    },
+    fallback,
+  );
+}
+
+export const WHATSAPP_MAIN_MENU_SECTIONS: InteractiveListSection[] = [
+  {
+    title: "Bluepin Features",
+    rows: [
+      { id: "menu_log_glucose", title: "Log glucose", description: "Send a reading or meter photo" },
+      { id: "menu_upload_report", title: "Upload health report", description: "Send a PDF report under 5 MB" },
+      { id: "menu_set_reminder", title: "Set a reminder", description: "Get reminded to log glucose" },
+      { id: "menu_view_profile", title: "View health profile", description: "See history and insights" },
+    ],
+  },
+];
+
+/**
+ * Sends the main interactive menu with the appropriate greeting text.
+ */
+export async function sendWhatsAppMainMenu(
+  to: string,
+  introType: "welcome" | "help" | "fallback"
+): Promise<boolean> {
+  let bodyText = "";
+  if (introType === "welcome") {
+    bodyText = 
+      "Hi, I am Aarika from Bluepin. 🙏\n" +
+      "I will be your WhatsApp companion for managing your diabetes, right here every day.\n\n" +
+      "Here is what I can help you with:";
+  } else if (introType === "help") {
+    bodyText = "Of course. Here is what I can help you with:";
+  } else {
+    bodyText = "Hi, I am Aarika from Bluepin.\nHere is what I can help you with:";
+  }
+
+  return sendWhatsAppList(to, bodyText, "Main Menu", WHATSAPP_MAIN_MENU_SECTIONS);
+}
+
 /**
  * Sends an interactive Call-To-Action (CTA) URL button.
  */

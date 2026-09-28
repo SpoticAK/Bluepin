@@ -30,15 +30,12 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
 
     console.log(`[Cron] Running WhatsApp reminders for hour: ${currentHourIST} IST on ${todayDateStr}`);
 
+    // --- 1. Scheduled Reminders (Guideline 9) ---
     const remindersSnap = await db.collection("whatsapp_reminders")
       .where("reminderHour", "==", currentHourIST)
       .get();
 
-    if (remindersSnap.empty) {
-      return res.json({ success: true, sent: 0, message: "No reminders scheduled for this hour." });
-    }
-
-    let sentCount = 0;
+    let sentScheduledCount = 0;
 
     for (const doc of remindersSnap.docs) {
       const { uid, phone } = doc.data();
@@ -54,24 +51,56 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
       }
 
       try {
-        // IMPORTANT: Because of Meta's 24-hour rule, we MUST use a pre-approved template
-        // for cron job reminders. 
-        // 1. Create a Utility Template in Meta Business Manager named "daily_glucose_reminder"
-        // 2. Add Guideline 9 text to it.
-        // 3. Once approved, uncomment the line below:
-        
+        // Template for Guideline 9
         await sendWhatsAppUtilityTemplate(phone, "daily_glucose_reminder", "en");
-
-        // We also fall back to standard text just in case the 24-hour window IS open during testing
-        // await sendWhatsAppMessage(phone, "It is time to check in.\nWhenever you are ready, send me your glucose reading or a photo of your glucometer.\n\nType help if you need anything.");
-
-        sentCount++;
+        sentScheduledCount++;
       } catch (err) {
-        console.error(`[Cron] Failed to send reminder to ${phone}:`, err);
+        console.error(`[Cron] Failed to send scheduled reminder to ${phone}:`, err);
       }
     }
 
-    return res.json({ success: true, sent: sentCount });
+    // --- 2. End-of-Day Sweep (Guideline 10) ---
+    // If it is 8:00 PM IST (20), we sweep everyone who missed logging today.
+    const END_OF_DAY_HOUR = 20; 
+    let sentSweepCount = 0;
+
+    if (currentHourIST === END_OF_DAY_HOUR) {
+      const allUsersSnap = await db.collection("whatsapp_users").get();
+      
+      for (const doc of allUsersSnap.docs) {
+        const { uid, phone } = doc.data();
+        if (!uid || !phone) continue;
+
+        // Skip if they explicitly scheduled an 8PM reminder (they already got Guideline 9 above)
+        const has8pmReminderSnap = await db.collection("whatsapp_reminders").doc(phone).get();
+        if (has8pmReminderSnap.exists && has8pmReminderSnap.data()?.reminderHour === END_OF_DAY_HOUR) {
+          continue; 
+        }
+
+        const readingsSnap = await db.collection(`users/${uid}/glucoseReadings`)
+          .where("date", "==", todayDateStr)
+          .limit(1)
+          .get();
+
+        if (!readingsSnap.empty) {
+          continue;
+        }
+
+        try {
+          // Template for Guideline 10: "I have not seen a glucose reading from you today..."
+          await sendWhatsAppUtilityTemplate(phone, "missed_glucose_reminder", "en");
+          sentSweepCount++;
+        } catch (err) {
+          console.error(`[Cron] Failed to send sweep reminder to ${phone}:`, err);
+        }
+      }
+    }
+
+    return res.json({ 
+      success: true, 
+      scheduledSent: sentScheduledCount,
+      sweepSent: sentSweepCount
+    });
   } catch (err: any) {
     console.error("[Cron] Error running whatsapp reminders:", err);
     return res.status(500).json({ error: "Failed to process reminders" });
