@@ -36,3 +36,53 @@ export interface InteractiveButton {
   id: string;
   title: string;
 }
+
+/* ─── Meta webhook payload shapes ─────────────────────────────────────────── */
+
+export interface MetaMediaObject {
+  id: string;
+  mime_type?: string;
+  sha256?: string;
+  caption?: string;
+  filename?: string;
+}
+
+export interface MetaInteractiveObject {
+  type: string;
+  button_reply?: { id: string; title: string };
+  list_reply?: { id: string; title: string; description?: string };
+}
+
+export interface MetaMessageObject {
+  id?: string;
+  from: string;
+  timestamp?: string;
+  type: string;
+  text?: { body: string };
+  image?: MetaMediaObject;
+  document?: MetaMediaObject;
+  interactive?: MetaInteractiveObject;
+}
+
+export interface MetaChangeValue {
+  messaging_product?: string;
+  metadata?: { display_phone_number?: string; phone_number_id?: string };
+  messages?: MetaMessageObject[];
+  statuses?: unknown[];
+  errors?: unknown[];
+}
+
+export interface MetaChange {
+  field?: string;
+  value?: MetaChangeValue;
+}
+
+export interface MetaEntry {
+  id?: string;
+  changes?: MetaChange[];
+}
+
+export interface MetaWebhookBody {
+  object?: string;
+  entry?: MetaEntry[];
+}

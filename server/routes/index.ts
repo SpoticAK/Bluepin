@@ -9,13 +9,15 @@ import cronRouter from "./cron";
 
 const apiRouter = Router();
 
+// Apply the global IP limiter to every /api route first. Routes that need a
+// looser budget (the Meta webhook, which is called from Meta's IPs) install
+// their own limiter on the router itself.
+apiRouter.use(globalIpLimiter);
+
 // Mount WhatsApp webhook & integration routes
 apiRouter.use(whatsappRouter);
 apiRouter.use(authRouter);
 apiRouter.use(cronRouter);
-
-// Apply global rate limiting to other /api routes
-apiRouter.use(globalIpLimiter);
 
 // Mount feature routes
 apiRouter.use(uploadRouter);

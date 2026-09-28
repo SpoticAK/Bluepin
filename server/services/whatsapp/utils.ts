@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { getStorage } from "firebase-admin/storage";
 import { getAdminFirestore } from "../../firebase";
 import { BiomarkerItem } from "./types";
@@ -8,6 +9,55 @@ export const getStorageBucket = () =>
       process.env.VITE_FIREBASE_STORAGE_BUCKET ||
       "myhealthyfam-28c2c.firebasestorage.app",
   );
+
+let cachedOtpSecret: string | null = null;
+
+/**
+ * Secret used to HMAC one-time codes before they are written to Firestore.
+ * Prefers an explicit OTP_SECRET, falling back to the Meta app secret. In
+ * development without either, a per-process random secret is used, which
+ * invalidates outstanding codes on restart (acceptable for local dev only).
+ */
+function getOtpSecret(): string {
+  if (cachedOtpSecret) return cachedOtpSecret;
+
+  const configured = process.env.OTP_SECRET || process.env.WHATSAPP_APP_SECRET;
+  if (configured) {
+    cachedOtpSecret = configured;
+  } else {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[WhatsApp OTP] Neither OTP_SECRET nor WHATSAPP_APP_SECRET is set. " +
+          "Falling back to an ephemeral secret; OTPs will not survive a restart.",
+      );
+    }
+    cachedOtpSecret = crypto.randomBytes(32).toString("hex");
+  }
+
+  return cachedOtpSecret;
+}
+
+/** Cryptographically secure 6-digit numeric code. */
+export const generateNumericCode = (digits = 6): string => {
+  const min = Math.pow(10, digits - 1);
+  const max = Math.pow(10, digits);
+  return crypto.randomInt(min, max).toString();
+};
+
+/** HMACs a code so a Firestore dump never reveals a usable OTP. */
+export const hashOtp = (otp: string, scope: string): string =>
+  crypto
+    .createHmac("sha256", getOtpSecret())
+    .update(`${scope}:${otp}`)
+    .digest("hex");
+
+/** Constant-time comparison of a submitted code against a stored hash. */
+export const verifyOtpHash = (otp: string, scope: string, storedHash: string): boolean => {
+  if (!storedHash) return false;
+  const given = Buffer.from(hashOtp(otp, scope), "hex");
+  const expected = Buffer.from(storedHash, "hex");
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+};
 
 export const getUtcDay = (d = new Date()) => ({
   year: d.getUTCFullYear(),

@@ -1,6 +1,10 @@
 import express from "express";
 import { getAdminFirestore } from "../firebase";
-import { sendWhatsAppMessage, sendWhatsAppUtilityTemplate } from "../services/whatsapp/client";
+import {
+  sendWhatsAppUtilityTemplate,
+  getTemplateLang,
+  maskPhone,
+} from "../services/whatsapp/client";
 
 const router = express.Router();
 
@@ -52,10 +56,10 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
 
       try {
         // Template for Guideline 9
-        await sendWhatsAppUtilityTemplate(phone, "daily_glucose_reminder", "en");
+        await sendWhatsAppUtilityTemplate(phone, "daily_glucose_reminder", getTemplateLang());
         sentScheduledCount++;
       } catch (err) {
-        console.error(`[Cron] Failed to send scheduled reminder to ${phone}:`, err);
+        console.error(`[Cron] Failed to send scheduled reminder to ${maskPhone(phone)}:`, err);
       }
     }
 
@@ -86,13 +90,13 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
           continue;
         }
 
-        try {
-          // Template for Guideline 10: "I have not seen a glucose reading from you today..."
-          await sendWhatsAppUtilityTemplate(phone, "missed_glucose_reminder", "en");
-          sentSweepCount++;
-        } catch (err) {
-          console.error(`[Cron] Failed to send sweep reminder to ${phone}:`, err);
-        }
+      try {
+        // Template for Guideline 10: "I have not seen a glucose reading from you today..."
+        await sendWhatsAppUtilityTemplate(phone, "missed_glucose_reminder", getTemplateLang());
+        sentSweepCount++;
+      } catch (err) {
+        console.error(`[Cron] Failed to send sweep reminder to ${maskPhone(phone)}:`, err);
+      }
       }
     }
 

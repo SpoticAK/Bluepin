@@ -53,8 +53,10 @@ export const helmetConfig: HelmetOptions = {
 export const globalIpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  // The Meta webhook is called from Meta's own infrastructure, not from users.
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === "/whatsapp/webhook" || req.path.startsWith("/whatsapp/webhook?"),
   message: { error: "Too many requests from this IP, please try again after 15 minutes" }
 });
 
