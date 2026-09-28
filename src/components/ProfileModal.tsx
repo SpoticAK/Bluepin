@@ -35,6 +35,18 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     setIsDeleting(true);
     try {
       if (user) {
+        try {
+          const idToken = await user.getIdToken();
+          await fetch('/api/whatsapp/unlink', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`,
+            },
+          });
+        } catch (unlinkErr) {
+          console.warn("Could not unlink WhatsApp before account deletion:", unlinkErr);
+        }
         await deleteUser(user);
       }
     } catch (e: any) {
