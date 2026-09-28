@@ -598,13 +598,38 @@ function AppContent() {
           try {
             localStorage.setItem("bluepin_welcome_seen", "true");
           } catch {}
-          try {
-            const docRef = doc(db, "users", u.uid);
-            const docSnap = await getDoc(docRef);
-            setNeedsOnboarding(!docSnap.exists() || !docSnap.data()?.name);
-          } catch (e: any) {
-            console.error("Firestore user doc fetch error:", e);
-            setNeedsOnboarding(true);
+          let isOnboarded = false;
+          let fetchSuccess = false;
+
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const docRef = doc(db, "users", u.uid);
+              const docSnap = await getDoc(docRef);
+              if (docSnap.exists()) {
+                fetchSuccess = true;
+                const data = docSnap.data();
+                isOnboarded = Boolean(data?.name);
+                break;
+              } else {
+                fetchSuccess = true;
+                isOnboarded = false;
+                break;
+              }
+            } catch (e: any) {
+              console.warn(
+                `Firestore user doc fetch attempt ${attempt + 1} failed:`,
+                e?.message || e,
+              );
+              // Wait 250ms before retrying to allow auth token propagation to Firestore client
+              await new Promise((res) => setTimeout(res, 250));
+            }
+          }
+
+          if (fetchSuccess) {
+            setNeedsOnboarding(!isOnboarded);
+          } else {
+            // If all fetch attempts failed, do not trap an existing user in onboarding
+            setNeedsOnboarding(false);
           }
         }
         setSessionUser(u);
