@@ -75,18 +75,6 @@ export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
     clearError();
     const res = await verifyPhoneOtp(otp);
     if (res?.result.user) {
-      const user = res.result.user;
-      if (user.phoneNumber) {
-        try {
-          await setDoc(
-            doc(db, "users", user.uid),
-            { phoneNumber: user.phoneNumber },
-            { merge: true },
-          );
-        } catch (e) {
-          console.warn("Could not sync phone number to user profile:", e);
-        }
-      }
       trackEvent("user_signed_up", {
         method: "WhatsApp",
         type: res.isNewUser ? "signup" : "login",
