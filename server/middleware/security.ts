@@ -23,6 +23,9 @@ export const helmetConfig: HelmetOptions = {
         "https://*.bluepin.in",
         "https://*.gstatic.com", 
         "https://apis.google.com",
+        "https://www.google.com/recaptcha/",
+        "https://www.gstatic.com/recaptcha/",
+        "https://recaptcha.google.com/",
         "https://www.googletagmanager.com",
         "https://www.google-analytics.com",
         "https://*.clarity.ms"
@@ -37,6 +40,9 @@ export const helmetConfig: HelmetOptions = {
         "https://*.bluepin.in",
         "https://apis.google.com", 
         "https://accounts.google.com",
+        "https://www.google.com",
+        "https://www.google.com/recaptcha/",
+        "https://recaptcha.google.com/",
         "https://www.googletagmanager.com"
       ],
       objectSrc: ["'none'"]

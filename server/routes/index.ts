@@ -4,11 +4,13 @@ import uploadRouter from "./upload";
 import insightsRouter from "./insights";
 import feedbackRouter from "./feedback";
 import whatsappRouter from "./whatsapp";
+import authRouter from "./auth";
 
 const apiRouter = Router();
 
 // Mount WhatsApp webhook & integration routes
 apiRouter.use(whatsappRouter);
+apiRouter.use(authRouter);
 
 // Apply global rate limiting to other /api routes
 apiRouter.use(globalIpLimiter);

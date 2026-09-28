@@ -11,6 +11,7 @@
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit",
     "test:tokens": "tsx scripts/test_lab_report_tokens.ts",
+    "test:wa": "tsx scripts/test_whatsapp.ts",
     "start": "node dist/server.cjs"
   },
   "dependencies": {
