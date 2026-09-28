@@ -201,16 +201,24 @@ export async function processIncomingWhatsAppMessage(message: any): Promise<void
       }
 
       if (btnId.startsWith("remind_")) {
-        // Mocking the reminder setup as no cron exists yet
-        const timeMap: Record<string, string> = {
-          remind_morning: "8:00 AM",
-          remind_afternoon: "1:00 PM",
-          remind_evening: "8:00 PM",
+        const hourMap: Record<string, { display: string; hour: number }> = {
+          remind_morning: { display: "8:00 AM", hour: 8 },
+          remind_afternoon: { display: "1:00 PM", hour: 13 },
+          remind_evening: { display: "8:00 PM", hour: 20 },
         };
-        const selectedTime = timeMap[btnId] || "8:00 AM";
+        const config = hourMap[btnId] || hourMap["remind_morning"];
+        
+        await db.doc(`whatsapp_reminders/${senderPhone}`).set({
+          uid,
+          phone: senderPhone,
+          reminderHour: config.hour,
+          timezone: "Asia/Kolkata",
+          updatedAt: new Date()
+        });
+
         await sendWhatsAppMessage(
           senderPhone,
-          `Done. I will remind you at ${selectedTime} each day.\n` +
+          `Done. I will remind you at ${config.display} each day.\n` +
           `I will be here when you are ready to log your reading.\n\n` +
           `Type help if you need anything.`
         );

@@ -60,6 +60,56 @@ export async function sendWhatsAppMessage(
 }
 
 /**
+ * Sends a pre-approved Utility or Marketing template via Meta Cloud API.
+ * Use this to initiate conversations outside the 24-hour window.
+ */
+export async function sendWhatsAppUtilityTemplate(
+  to: string,
+  templateName: string,
+  languageCode: string = "en", // Often "en" or "en_US"
+): Promise<boolean> {
+  const metaBaseUrl = getMetaBaseUrl();
+  const token = getWhatsAppToken();
+  const phoneId = getPhoneNumberId();
+
+  if (!token || !phoneId) return false;
+
+  try {
+    const url = `${metaBaseUrl}/${phoneId}/messages`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          // If your template has variables like {{1}}, you would add the `components` array here.
+          // Since the reminder copy has no variables, we can omit it.
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[WhatsApp] Error sending template '${templateName}':`, errText);
+      return false;
+    }
+
+    return true;
+  } catch (err: any) {
+    console.error(`[WhatsApp] Exception sending template '${templateName}':`, err.message || err);
+    return false;
+  }
+}
+
+/**
  * Sends a 6-digit verification code to the recipient's WhatsApp.
  * Supports Meta Authentication templates as well as direct text messages.
  */
