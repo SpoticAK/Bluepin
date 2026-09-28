@@ -24,6 +24,7 @@ const app = initializeApp(firebaseConfig);
 
 export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseId); // CRITICAL
 export const auth = getAuth(app);
+auth.useDeviceLanguage();
 export const storage = getStorage(app);
 
 export enum OperationType {
