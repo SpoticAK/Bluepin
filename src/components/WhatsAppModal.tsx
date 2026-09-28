@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   MessageSquare,
@@ -17,10 +17,11 @@ import {
   ShieldCheck,
   ChevronDown,
   ChevronUp,
-} from 'lucide-react';
-import { auth } from '../lib/firebase';
-import { useAppStore } from '../store';
-import { cn } from '../lib/utils';
+} from "lucide-react";
+import { auth } from "../lib/firebase";
+import { useAppStore } from "../store";
+import { cn } from "../lib/utils";
+import { WhatsAppIcon } from "./CustomEmojis";
 
 interface WhatsAppModalProps {
   isOpen: boolean;
@@ -31,13 +32,22 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
   const { profile, updateProfile } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [linkedPhone, setLinkedPhone] = useState<string | null>(profile.whatsappPhone || null);
+  const [linkedPhone, setLinkedPhone] = useState<string | null>(
+    profile.whatsappPhone || null,
+  );
 
   // In-App OTP linking states
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [countryCode] = useState('+91');
-  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [countryCode] = useState("+91");
+  const [otpDigits, setOtpDigits] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
   const [resendTimer, setResendTimer] = useState<number>(30);
   const [canResend, setCanResend] = useState<boolean>(false);
   const [isResending, setIsResending] = useState<boolean>(false);
@@ -64,8 +74,8 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
       const token = await auth.currentUser?.getIdToken();
       if (!token) return;
 
-      const res = await fetch('/api/whatsapp/status', {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch("/api/whatsapp/status", {
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -90,19 +100,19 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     if (isOpen) {
       checkStatus();
       setError(null);
-      setStep('phone');
-      setOtpDigits(['', '', '', '', '', '']);
+      setStep("phone");
+      setOtpDigits(["", "", "", "", "", ""]);
     }
   }, [isOpen]);
 
   // Resend countdown timer for in-app OTP
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
-    if (step === 'otp' && resendTimer > 0) {
+    if (step === "otp" && resendTimer > 0) {
       timer = setTimeout(() => {
         setResendTimer((prev) => prev - 1);
       }, 1000);
-    } else if (step === 'otp' && resendTimer === 0) {
+    } else if (step === "otp" && resendTimer === 0) {
       setCanResend(true);
     }
     return () => clearTimeout(timer);
@@ -110,11 +120,11 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
   // Focus first OTP input when entering OTP step
   useEffect(() => {
-    if (step === 'otp') {
+    if (step === "otp") {
       setResendTimer(30);
       setCanResend(false);
       setIsResending(false);
-      setOtpDigits(['', '', '', '', '', '']);
+      setOtpDigits(["", "", "", "", "", ""]);
       setTimeout(() => {
         otpInputRefs.current[0]?.focus();
       }, 150);
@@ -126,7 +136,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     let timer: ReturnType<typeof setInterval> | null = null;
     if (code && expiresIn > 0 && !linkedPhone) {
       timer = setInterval(() => {
-        setExpiresIn(prev => {
+        setExpiresIn((prev) => {
           if (prev <= 1) {
             setCode(null);
             return 0;
@@ -150,13 +160,13 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     setError(null);
     try {
       const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error('You must be signed in.');
+      if (!token) throw new Error("You must be signed in.");
 
       const fullNumber = `${countryCode}${cleanNumber}`;
-      const res = await fetch('/api/whatsapp/link/send-otp', {
-        method: 'POST',
+      const res = await fetch("/api/whatsapp/link/send-otp", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ phone: fullNumber }),
@@ -164,12 +174,14 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to send WhatsApp verification code.');
+        throw new Error(
+          data.error || "Failed to send WhatsApp verification code.",
+        );
       }
 
-      setStep('otp');
+      setStep("otp");
     } catch (err: any) {
-      setError(err.message || 'Could not send verification code.');
+      setError(err.message || "Could not send verification code.");
     } finally {
       setLoading(false);
     }
@@ -177,22 +189,22 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
   // ─── 2. Verify OTP and Link Account ─────────────────────────────────────────
   const handleVerifyOtp = async (codeToVerify?: string) => {
-    const otpValue = codeToVerify || otpDigits.join('');
+    const otpValue = codeToVerify || otpDigits.join("");
     if (otpValue.length < 6) return;
 
     setLoading(true);
     setError(null);
     try {
       const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error('You must be signed in.');
+      if (!token) throw new Error("You must be signed in.");
 
       const cleanNumber = phoneNumber.replace(/\D/g, "");
       const fullNumber = `${countryCode}${cleanNumber}`;
 
-      const res = await fetch('/api/whatsapp/link/verify-otp', {
-        method: 'POST',
+      const res = await fetch("/api/whatsapp/link/verify-otp", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ phone: fullNumber, otp: otpValue }),
@@ -200,14 +212,14 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to verify code.');
+        throw new Error(data.error || "Failed to verify code.");
       }
 
       setLinkedPhone(data.phone || cleanNumber);
       updateProfile({ whatsappPhone: data.phone || cleanNumber });
-      setStep('phone');
+      setStep("phone");
     } catch (err: any) {
-      setError(err.message || 'Invalid verification code.');
+      setError(err.message || "Invalid verification code.");
     } finally {
       setLoading(false);
     }
@@ -215,7 +227,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
   // ─── OTP Input Controls ──────────────────────────────────────────────────────
   const handleOtpChange = (index: number, val: string) => {
-    const digit = val.replace(/\D/g, '').slice(-1);
+    const digit = val.replace(/\D/g, "").slice(-1);
     const newDigits = [...otpDigits];
     newDigits[index] = digit;
     setOtpDigits(newDigits);
@@ -225,19 +237,25 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     }
 
     if (digit && index === 5 && newDigits.every((d) => d.length === 1)) {
-      handleVerifyOtp(newDigits.join(''));
+      handleVerifyOtp(newDigits.join(""));
     }
   };
 
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+  const handleOtpKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
       otpInputRefs.current[index - 1]?.focus();
     }
   };
 
   const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 6);
     if (!pasted) return;
 
     const newDigits = [...otpDigits];
@@ -259,15 +277,15 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     setError(null);
     try {
       const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error('You must be signed in.');
+      if (!token) throw new Error("You must be signed in.");
 
       const cleanNumber = phoneNumber.replace(/\D/g, "");
       const fullNumber = `${countryCode}${cleanNumber}`;
 
-      const res = await fetch('/api/whatsapp/link/send-otp', {
-        method: 'POST',
+      const res = await fetch("/api/whatsapp/link/send-otp", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ phone: fullNumber }),
@@ -275,17 +293,17 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to resend code.');
+        throw new Error(data.error || "Failed to resend code.");
       }
 
       setResendTimer(30);
       setCanResend(false);
-      setOtpDigits(['', '', '', '', '', '']);
+      setOtpDigits(["", "", "", "", "", ""]);
       setTimeout(() => {
         otpInputRefs.current[0]?.focus();
       }, 100);
     } catch (err: any) {
-      setError(err.message || 'Could not resend code.');
+      setError(err.message || "Could not resend code.");
     } finally {
       setIsResending(false);
     }
@@ -293,26 +311,27 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
   // ─── 3. Unlink Account ────────────────────────────────────────────────────────
   const handleUnlink = async () => {
-    if (!confirm('Are you sure you want to disconnect WhatsApp from Bluepin?')) return;
+    if (!confirm("Are you sure you want to disconnect WhatsApp from Bluepin?"))
+      return;
     setLoading(true);
     setError(null);
     try {
       const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error('You must be signed in.');
+      if (!token) throw new Error("You must be signed in.");
 
-      const res = await fetch('/api/whatsapp/unlink', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch("/api/whatsapp/unlink", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         setLinkedPhone(null);
         setCode(null);
-        setStep('phone');
-        setPhoneNumber('');
+        setStep("phone");
+        setPhoneNumber("");
         updateProfile({ whatsappPhone: undefined });
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to unlink account.');
+      setError(err.message || "Failed to unlink account.");
     } finally {
       setLoading(false);
     }
@@ -324,15 +343,15 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
     setError(null);
     try {
       const token = await auth.currentUser?.getIdToken();
-      if (!token) throw new Error('You must be signed in.');
+      if (!token) throw new Error("You must be signed in.");
 
-      const res = await fetch('/api/whatsapp/link-code', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch("/api/whatsapp/link-code", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to generate link code.');
+        throw new Error(data.error || "Failed to generate link code.");
       }
 
       setCode(data.code);
@@ -340,7 +359,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
       setDeepLink(data.deepLink);
       setBotPhone(data.botPhone);
     } catch (err: any) {
-      setError(err.message || 'Could not create link code.');
+      setError(err.message || "Could not create link code.");
     } finally {
       setLoading(false);
     }
@@ -367,12 +386,17 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100 bg-neutral-50/60">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center shadow-sm">
-              <MessageSquare size={16} />
+            <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+              {/* <MessageSquare size={16} /> */}
+              <WhatsAppIcon className="size-4.5" />
             </div>
             <div>
-              <h3 className="text-[15px] font-bold text-neutral-900 leading-tight">WhatsApp Sync</h3>
-              <p className="text-[11px] text-neutral-500">Log glucose & reports directly from WhatsApp</p>
+              <h3 className="text-[15px] font-bold text-neutral-900 leading-tight">
+                WhatsApp Sync
+              </h3>
+              <p className="text-[11px] text-neutral-500">
+                Log glucose & reports directly from WhatsApp
+              </p>
             </div>
           </div>
           <button
@@ -401,8 +425,12 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                     <CheckCircle2 size={20} />
                   </div>
                   <div>
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#1A73E8]">Connected</span>
-                    <p className="text-[14px] font-bold text-neutral-900">{linkedPhone}</p>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#1A73E8]">
+                      Connected
+                    </span>
+                    <p className="text-[14px] font-bold text-neutral-900">
+                      {linkedPhone}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -417,16 +445,32 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
               {/* How it works */}
               <div className="flex flex-col gap-2.5">
-                <h4 className="text-xs font-bold text-neutral-700 uppercase tracking-wider">How to log with WhatsApp</h4>
+                <h4 className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
+                  How to log with WhatsApp
+                </h4>
 
                 <div className="bg-neutral-50 rounded-2xl p-3 border border-neutral-100 flex items-start gap-3">
                   <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
                     <Droplet size={14} className="fill-red-600" />
                   </div>
                   <div className="text-xs">
-                    <p className="font-semibold text-neutral-900">Text Your Glucose</p>
+                    <p className="font-semibold text-neutral-900">
+                      Text Your Glucose
+                    </p>
                     <p className="text-neutral-500 mt-0.5">
-                      Send messages like <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-800 font-mono">115 Fasting</code>, <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-800 font-mono">140 PP</code>, or just <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-800 font-mono">98</code>.
+                      Send messages like{" "}
+                      <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-800 font-mono">
+                        115 Fasting
+                      </code>
+                      ,{" "}
+                      <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-800 font-mono">
+                        140 PP
+                      </code>
+                      , or just{" "}
+                      <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-800 font-mono">
+                        98
+                      </code>
+                      .
                     </p>
                   </div>
                 </div>
@@ -436,9 +480,12 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                     <Sparkles size={14} />
                   </div>
                   <div className="text-xs">
-                    <p className="font-semibold text-neutral-900">Send Glucometer Photos</p>
+                    <p className="font-semibold text-neutral-900">
+                      Send Glucometer Photos
+                    </p>
                     <p className="text-neutral-500 mt-0.5">
-                      Take a picture of your glucometer display. Bluepin's AI will automatically parse the reading and unit.
+                      Take a picture of your glucometer display. Bluepin's AI
+                      will automatically parse the reading and unit.
                     </p>
                   </div>
                 </div>
@@ -448,9 +495,12 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                     <FileText size={14} />
                   </div>
                   <div className="text-xs">
-                    <p className="font-semibold text-neutral-900">Upload Medical Reports</p>
+                    <p className="font-semibold text-neutral-900">
+                      Upload Medical Reports
+                    </p>
                     <p className="text-neutral-500 mt-0.5">
-                      Send a PDF lab report or photo. Biomarkers (HbA1c, CBC, Lipids) will be extracted and saved to your dashboard.
+                      Send a PDF lab report or photo. Biomarkers (HbA1c, CBC,
+                      Lipids) will be extracted and saved to your dashboard.
                     </p>
                   </div>
                 </div>
@@ -460,10 +510,11 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
             /* Unconnected State: In-App OTP Flow */
             <div className="flex flex-col gap-4">
               <div className="text-xs text-neutral-600 leading-relaxed">
-                Connect your WhatsApp account to log blood sugar readings, send meter photos, and parse lab reports instantly via WhatsApp.
+                Connect your WhatsApp account to log blood sugar readings, send
+                meter photos, and analyse lab reports instantly via WhatsApp.
               </div>
 
-              {step === 'phone' ? (
+              {step === "phone" ? (
                 /* Step 1: Enter Phone Number */
                 <form onSubmit={handleSendOtp} className="space-y-4">
                   <div>
@@ -485,21 +536,26 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                         placeholder="Enter 10-digit number"
                         value={phoneNumber}
                         onChange={(e) => {
-                          const cleaned = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          const cleaned = e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 10);
                           setPhoneNumber(cleaned);
                         }}
                         className="flex-1 px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1A73E8] text-neutral-900 placeholder:text-neutral-400 text-[15px]"
                       />
                     </div>
-                    <p className="text-[11px] text-neutral-500 mt-1.5 flex items-center gap-1.5">
-                      <MessageSquare className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                      <span>We'll send a 6-digit verification code to your WhatsApp.</span>
+                    <p className="text-[11px] text-neutral-500 mt-1.5 flex items-center gap-1.5 pl-2">
+                      <span>
+                        We'll send a 6-digit verification code to your WhatsApp.
+                      </span>
                     </p>
                   </div>
 
                   <button
                     type="submit"
-                    disabled={loading || phoneNumber.replace(/\D/g, '').length < 10}
+                    disabled={
+                      loading || phoneNumber.replace(/\D/g, "").length < 10
+                    }
                     className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   >
                     {loading ? (
@@ -509,7 +565,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                       </>
                     ) : (
                       <>
-                        <MessageSquare className="w-4 h-4" />
+                        <WhatsAppIcon className="size-5" />
                         <span>Send WhatsApp Code</span>
                       </>
                     )}
@@ -522,7 +578,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                     <div className="flex items-center gap-2 text-xs">
                       <ShieldCheck className="w-4 h-4 text-[#1A73E8] shrink-0" />
                       <span className="text-neutral-600">
-                        Code sent to WhatsApp{' '}
+                        Code sent to WhatsApp{" "}
                         <span className="font-semibold text-neutral-900">
                           {countryCode} {phoneNumber}
                         </span>
@@ -530,7 +586,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setStep('phone')}
+                      onClick={() => setStep("phone")}
                       className="text-xs text-[#1A73E8] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <ArrowLeft className="w-3 h-3" /> Change
@@ -565,7 +621,9 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                   <button
                     type="button"
                     onClick={() => handleVerifyOtp()}
-                    disabled={loading || isResending || otpDigits.some((d) => !d)}
+                    disabled={
+                      loading || isResending || otpDigits.some((d) => !d)
+                    }
                     className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                   >
                     {loading && !isResending ? (
@@ -586,12 +644,22 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                         disabled={loading || isResending}
                         className="text-xs text-[#1A73E8] hover:underline font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
-                        <RotateCw className={cn("w-3.5 h-3.5", isResending && "animate-spin")} />
-                        <span>{isResending ? "Resending code..." : "Resend Code"}</span>
+                        <RotateCw
+                          className={cn(
+                            "w-3.5 h-3.5",
+                            isResending && "animate-spin",
+                          )}
+                        />
+                        <span>
+                          {isResending ? "Resending code..." : "Resend Code"}
+                        </span>
                       </button>
                     ) : (
                       <p className="text-xs text-neutral-500">
-                        Resend code in <span className="font-semibold text-neutral-800">{resendTimer}s</span>
+                        Resend code in{" "}
+                        <span className="font-semibold text-neutral-800">
+                          {resendTimer}s
+                        </span>
                       </p>
                     )}
                   </div>
@@ -609,7 +677,11 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                   className="w-full flex items-center justify-between text-xs text-neutral-500 hover:text-neutral-800 py-1 transition-colors cursor-pointer"
                 >
                   <span>Prefer to message our bot directly?</span>
-                  {showManualCode ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  {showManualCode ? (
+                    <ChevronUp size={14} />
+                  ) : (
+                    <ChevronDown size={14} />
+                  )}
                 </button>
 
                 {showManualCode && (
@@ -620,12 +692,18 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                         disabled={loading}
                         className="w-full py-2.5 px-3 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-xs font-semibold text-neutral-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
-                        {loading ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />}
+                        {loading ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <MessageSquare size={14} />
+                        )}
                         Generate Manual Code
                       </button>
                     ) : (
                       <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-3 text-center space-y-2">
-                        <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">Manual Code</span>
+                        <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
+                          Manual Code
+                        </span>
                         <div className="text-2xl font-black tracking-widest text-neutral-900 font-mono">
                           {code}
                         </div>
@@ -634,8 +712,12 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                             onClick={copyCode}
                             className="flex-1 py-2 px-2.5 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-100 text-[11px] font-semibold text-neutral-700 flex items-center justify-center gap-1 cursor-pointer"
                           >
-                            {copied ? <Check size={12} className="text-[#1A73E8]" /> : <Copy size={12} />}
-                            {copied ? 'Copied!' : 'Copy'}
+                            {copied ? (
+                              <Check size={12} className="text-[#1A73E8]" />
+                            ) : (
+                              <Copy size={12} />
+                            )}
+                            {copied ? "Copied!" : "Copy"}
                           </button>
                           {deepLink && (
                             <a
