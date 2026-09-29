@@ -1,8 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useAppStore } from "../store";
 import { AddGlucoseModal } from "./AddGlucoseModal";
-import { LegalDocsModal } from "./LegalDocsModal";
-import { LegalDocType } from "../lib/consentManager";
 import {
   ComposedChart,
   Area,
@@ -60,13 +58,12 @@ export default function GlucoseTab() {
   const [showHba1cInfo, setShowHba1cInfo] = useState(false);
   const [showCriteriaModal, setShowCriteriaModal] = useState(false);
   const [hasCalculated, setHasCalculated] = useState(false);
-  const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
 
   const [showSugarHealth, setShowSugarHealth] = useState(false);
   const sugarInsights = useMemo(() => {
     if (!glucoseReadings) return null;
 
-    const history = glucoseReadings.filter((h) => h.timing !== "HbA1c");
+    const history = glucoseReadings.filter((h) => (h.timing as string) !== "HbA1c");
 
     const now = new Date();
     const thirtyDaysAgo = subDays(now, 30);
@@ -452,7 +449,7 @@ export default function GlucoseTab() {
     const hasRecentHbA1c =
       glucoseReadings.some(
         (h) =>
-          h.timing === "HbA1c" &&
+          (h.timing as string) === "HbA1c" &&
           (() => {
             try {
               return parseISO(h.date) >= subMonths(now, 4);
@@ -857,6 +854,47 @@ export default function GlucoseTab() {
 
   const idealRange = getIdealRange(selectedType);
 
+  const targetStats = useMemo(() => {
+    if (!idealRange || filteredReadings.length === 0) {
+      return { count: 0, percent: null };
+    }
+    const inside = filteredReadings.filter(
+      (r) => r.value >= idealRange.min && r.value <= idealRange.max,
+    ).length;
+    return {
+      count: inside,
+      percent: Math.round((inside / filteredReadings.length) * 100),
+    };
+  }, [filteredReadings, idealRange]);
+
+  const dateRangeText = useMemo(() => {
+    if (filteredReadings.length === 0) return "";
+    const firstDate = filteredReadings[0].date;
+    const lastDate = filteredReadings[filteredReadings.length - 1].date;
+    if (firstDate === lastDate) {
+      return safeFormat(firstDate, "MMMM d, yyyy");
+    }
+    return `${safeFormat(firstDate, "MMM d")} – ${safeFormat(lastDate, "MMM d, yyyy")}`;
+  }, [filteredReadings]);
+
+  const timeRangeOptions = useMemo(() => {
+    if (selectedType === "HbA1c") {
+      return [
+        { label: "3M", days: 90, title: "90 Days" },
+        { label: "6M", days: 180, title: "180 Days" },
+        { label: "1Y", days: 365, title: "1 Year" },
+        { label: "All", days: 9999, title: "Lifetime" },
+      ];
+    }
+    return [
+      { label: "7D", days: 7, title: "7 Days" },
+      { label: "30D", days: 30, title: "30 Days" },
+      { label: "90D", days: 90, title: "90 Days" },
+      { label: "1Y", days: 365, title: "1 Year" },
+      { label: "All", days: 9999, title: "Lifetime" },
+    ];
+  }, [selectedType]);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 mt-4 md:-mt-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -865,8 +903,6 @@ export default function GlucoseTab() {
         </h2>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <button
-            id="add-glucose-reading-button"
-            data-tour="add-glucose-reading-button"
             onClick={() => setShowAddModal(true)}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-linear-to-r from-theme-accent to-theme-accent/80 hover:opacity-90 text-white px-5 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
@@ -874,8 +910,6 @@ export default function GlucoseTab() {
             Add Reading
           </button>
           <button
-            id="sugar-health-button"
-            data-tour="sugar-health-button"
             onClick={() => setShowSugarHealth(true)}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-linear-to-r from-purple-500 to-violet-600 hover:opacity-90 text-white px-5 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
@@ -891,11 +925,7 @@ export default function GlucoseTab() {
       {/* Premium Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Today's Glucose */}
-        <div 
-          id="todays-glucose-card"
-          data-tour="todays-glucose-card"
-          className="bg-theme-card rounded-4xl p-6 sm:p-8 border border-theme-border shadow-lg relative overflow-hidden group"
-        >
+        <div className="bg-theme-card rounded-4xl p-6 sm:p-8 border border-theme-border shadow-lg relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Droplet size={100} fill="currentColor" />
           </div>
@@ -1144,73 +1174,85 @@ export default function GlucoseTab() {
         </div>
       </div>
 
-      {/* Chart Section */}
-      <div className="bg-linear-to-br from-theme-card to-theme-card-sec/30 p-6 sm:p-8 rounded-4xl border border-theme-border shadow-lg relative overflow-hidden">
-        {/* Decorative background blur */}
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-theme-accent/5 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 relative z-10">
-          <div className="flex flex-wrap items-center gap-2">
-            {(["Fasting", "Random", "Post-Prandial", "HbA1c"] as const).map(
-              (type) => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedType(type)}
-                  className={cn(
-                    "px-3 py-1.5 text-sm font-bold transition-all border-b-2 rounded-none",
-                    selectedType === type
-                      ? "border-theme-text text-theme-text"
-                      : "border-transparent text-theme-text-sec hover:text-theme-text",
-                  )}
-                >
-                  {type}
-                </button>
-              ),
-            )}
-          </div>
-          <div className="bg-theme-card-sec rounded-xl p-1">
-            <select
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(Number(e.target.value))}
-              className="text-xs font-bold text-theme-text-sec bg-transparent py-1 px-2 focus:outline-none cursor-pointer"
-            >
-              {selectedType === "HbA1c" ? (
-                <>
-                  <option value={90}>90 Days</option>
-                  <option value={180}>180 Days</option>
-                  <option value={365}>1 Year</option>
-                  <option value={9999}>Lifetime</option>
-                </>
-              ) : (
-                <>
-                  <option value={7}>7 Days</option>
-                  <option value={30}>30 Days</option>
-                  <option value={90}>90 Days</option>
-                  <option value={365}>1 Year</option>
-                  <option value={9999}>Lifetime</option>
-                </>
+      {/* Chart Section (Apple Health Design) */}
+      <div className="bg-theme-card p-5 sm:p-7 rounded-3xl border border-theme-border/60 shadow-xs relative">
+        {/* Top Header: Metric + Time Range Selector */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-theme-text-sec uppercase tracking-wider">
+                Average
+              </span>
+              {idealRange && (
+                <span className="text-[11px] text-theme-text-sec font-medium">
+                  · Target {idealRange.text}
+                </span>
               )}
-            </select>
+            </div>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className="text-3xl sm:text-4xl font-display font-semibold tracking-tight text-theme-text tabular-nums">
+                {stats.avg !== "--" ? stats.avg : "—"}
+              </span>
+              <span className="text-sm font-medium text-theme-text-sec">
+                {selectedType === "HbA1c" ? "%" : "mg/dL"}
+              </span>
+            </div>
+            <p className="text-xs text-theme-text-sec mt-1 font-medium">
+              {dateRangeText || "No readings in this period"}
+            </p>
+          </div>
+
+          {/* Apple Health Segmented Time Filter */}
+          <div className="inline-flex p-1 rounded-xl bg-theme-bg/80 border border-theme-border/60 self-start sm:self-auto">
+            {timeRangeOptions.map((opt) => (
+              <button
+                key={opt.days}
+                onClick={() => setTimeFilter(opt.days)}
+                title={opt.title}
+                className={cn(
+                  "px-3 py-1 text-xs font-semibold rounded-lg transition-all",
+                  timeFilter === opt.days
+                    ? "bg-theme-card text-theme-text shadow-xs"
+                    : "text-theme-text-sec hover:text-theme-text",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {idealRange && (
-          <div className="mb-4 flex items-center gap-2 bg-theme-success/10 text-theme-success border border-theme-success/20 px-3 py-2 rounded-xl text-xs font-bold w-max">
-            <Info size={14} />
-            <span>Target Range: {idealRange.text}</span>
-          </div>
-        )}
+        {/* Timing Tabs: Clean Segmented Control */}
+        <div className="flex items-center gap-1.5 p-1 bg-theme-bg/60 rounded-xl border border-theme-border/40 mb-3 overflow-x-auto w-full sm:w-fit">
+          {(["Fasting", "Post-Prandial", "Random", "HbA1c"] as const).map(
+            (type) => (
+              <button
+                key={type}
+                onClick={() => setSelectedType(type)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-lg transition-all shrink-0",
+                  selectedType === type
+                    ? "bg-theme-card text-theme-text shadow-xs font-semibold"
+                    : "text-theme-text-sec hover:text-theme-text",
+                )}
+              >
+                {type}
+              </button>
+            ),
+          )}
+        </div>
 
-        <div className="h-80 w-full relative mt-4 pb-4">
+        {/* Graph Canvas */}
+        <div className="h-64 sm:h-72 w-full relative">
           {filteredReadings.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
                 data={filteredReadings}
-                margin={{ top: 20, right: 20, left: -20, bottom: 20 }}
+                margin={{ top: 12, right: 12, left: -24, bottom: 0 }}
               >
                 <defs>
                   <linearGradient
-                    id="colorSelected"
+                    id="appleHealthGradient"
                     x1="0"
                     y1="0"
                     x2="0"
@@ -1219,7 +1261,7 @@ export default function GlucoseTab() {
                     <stop
                       offset="0%"
                       stopColor={chartColor}
-                      stopOpacity={0.35}
+                      stopOpacity={0.16}
                     />
                     <stop
                       offset="100%"
@@ -1227,52 +1269,38 @@ export default function GlucoseTab() {
                       stopOpacity={0.0}
                     />
                   </linearGradient>
-                  <pattern
-                    id="diagonal-stripe"
-                    width="8"
-                    height="8"
-                    patternUnits="userSpaceOnUse"
-                    patternTransform="rotate(45)"
-                  >
-                    <rect
-                      width="4"
-                      height="8"
-                      transform="translate(0,0)"
-                      fill="var(--color-theme-success)"
-                      fillOpacity={0.1}
-                    ></rect>
-                  </pattern>
                 </defs>
                 <CartesianGrid
-                  strokeDasharray="3 3"
+                  strokeDasharray="2 3"
                   vertical={false}
                   stroke="var(--color-theme-border)"
-                  opacity={0.4}
+                  opacity={0.35}
                 />
 
                 {idealRange && (
                   <ReferenceArea
                     y1={idealRange.min}
                     y2={idealRange.max}
-                    {...({ fill: "url(#diagonal-stripe)" } as any)}
+                    fill="#10b981"
+                    fillOpacity={0.06}
                   />
                 )}
                 {idealRange && idealRange.max && (
                   <ReferenceLine
                     y={idealRange.max}
-                    stroke="var(--color-theme-success)"
-                    strokeDasharray="3 3"
-                    opacity={0.5}
-                    strokeWidth={2}
+                    stroke="#10b981"
+                    strokeDasharray="2 3"
+                    strokeOpacity={0.4}
+                    strokeWidth={1}
                   />
                 )}
-                {idealRange && idealRange.min && (
+                {idealRange && idealRange.min && idealRange.min > 0 && (
                   <ReferenceLine
                     y={idealRange.min}
-                    stroke="var(--color-theme-success)"
-                    strokeDasharray="3 3"
-                    opacity={0.5}
-                    strokeWidth={2}
+                    stroke="#10b981"
+                    strokeDasharray="2 3"
+                    strokeOpacity={0.4}
+                    strokeWidth={1}
                   />
                 )}
 
@@ -1281,19 +1309,22 @@ export default function GlucoseTab() {
                   scale="time"
                   domain={["auto", new Date().getTime()]}
                   dataKey="timestamp"
-                  tickFormatter={(tick) => safeFormat(new Date(tick), "MMM d")}
+                  tickFormatter={(tick) =>
+                    safeFormat(
+                      new Date(tick),
+                      timeFilter <= 7 ? "EEE" : timeFilter <= 90 ? "MMM d" : "MMM yy",
+                    )
+                  }
                   axisLine={false}
                   tickLine={false}
                   tick={{
-                    fontSize: 10,
+                    fontSize: 11,
                     fill: "var(--color-theme-text-sec)",
-                    fontWeight: 600,
+                    fontWeight: 500,
                   }}
-                  dy={10}
-                  angle={0}
-                  textAnchor="middle"
-                  height={30}
-                  minTickGap={40}
+                  dy={4}
+                  height={22}
+                  minTickGap={timeFilter <= 7 ? 20 : 35}
                 />
                 <YAxis
                   axisLine={false}
@@ -1303,13 +1334,14 @@ export default function GlucoseTab() {
                     fill: "var(--color-theme-text-sec)",
                     fontWeight: 500,
                   }}
-                  dx={-10}
+                  dx={-4}
                 />
                 <Tooltip
                   content={
                     <CustomTooltip
                       chartColor={chartColor}
                       unit={selectedType === "HbA1c" ? "%" : "mg/dL"}
+                      idealRange={idealRange}
                     />
                   }
                 />
@@ -1318,14 +1350,14 @@ export default function GlucoseTab() {
                   type="monotone"
                   dataKey="value"
                   stroke="none"
-                  fill="url(#colorSelected)"
+                  fill="url(#appleHealthGradient)"
                   connectNulls
                 />
                 <Line
                   type="monotone"
                   dataKey="value"
                   stroke={chartColor}
-                  strokeWidth={4}
+                  strokeWidth={2.5}
                   dot={
                     <CustomDot
                       chartColor={chartColor}
@@ -1334,8 +1366,8 @@ export default function GlucoseTab() {
                     />
                   }
                   activeDot={{
-                    r: 6,
-                    strokeWidth: 3,
+                    r: 5,
+                    strokeWidth: 2,
                     fill: "var(--color-theme-card)",
                     stroke: chartColor,
                   }}
@@ -1344,51 +1376,69 @@ export default function GlucoseTab() {
               </ComposedChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-theme-text-sec space-y-3">
-              <Activity size={32} className="opacity-20" />
-              <p>No reading data for this period.</p>
+            <div className="h-full flex flex-col items-center justify-center text-theme-text-sec space-y-2">
+              <Activity size={28} className="opacity-25" />
+              <p className="text-sm font-medium">No readings for this period.</p>
             </div>
           )}
         </div>
 
-        {/* Statistics for selected type */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-theme-border">
+        {/* Apple Health Summary Row (Seamlessly connected, no large gaps) */}
+        <div className="pt-3.5 mt-1 border-t border-theme-border/50 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <div>
-            <p className="text-[10px] font-bold text-theme-text-sec ">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-theme-text-sec">
               Average
             </p>
-            <p className="text-xl font-bold text-theme-text">
-              {stats.avg}{" "}
-              <span className="text-xs font-normal">
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-xl font-bold font-display text-theme-text tabular-nums">
+                {stats.avg}
+              </span>
+              <span className="text-xs text-theme-text-sec font-medium">
                 {selectedType === "HbA1c" ? "%" : "mg/dL"}
               </span>
-            </p>
+            </div>
           </div>
+
           <div>
-            <p className="text-[10px] font-bold text-theme-text-sec ">
-              Highest
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-theme-text-sec">
+              Range
             </p>
-            <p className="text-xl font-bold text-theme-text">
-              {stats.max}{" "}
-              <span className="text-xs font-normal">
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-xl font-bold font-display text-theme-text tabular-nums">
+                {stats.min !== "--" ? `${stats.min} – ${stats.max}` : "—"}
+              </span>
+              <span className="text-xs text-theme-text-sec font-medium">
                 {selectedType === "HbA1c" ? "%" : "mg/dL"}
               </span>
-            </p>
+            </div>
           </div>
+
           <div>
-            <p className="text-[10px] font-bold text-theme-text-sec ">Lowest</p>
-            <p className="text-xl font-bold text-theme-text">
-              {stats.min}{" "}
-              <span className="text-xs font-normal">
-                {selectedType === "HbA1c" ? "%" : "mg/dL"}
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-theme-text-sec">
+              In Target
+            </p>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-xl font-bold font-display text-theme-text tabular-nums">
+                {targetStats.percent !== null ? `${targetStats.percent}%` : "—"}
               </span>
-            </p>
+              <span className="text-xs text-theme-text-sec font-medium">
+                {targetStats.count}/{stats.count}
+              </span>
+            </div>
           </div>
+
           <div>
-            <p className="text-[10px] font-bold text-theme-text-sec ">
-              Readings
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-theme-text-sec">
+              Total Logs
             </p>
-            <p className="text-xl font-bold text-theme-text">{stats.count}</p>
+            <div className="flex items-baseline gap-1 mt-0.5">
+              <span className="text-xl font-bold font-display text-theme-text tabular-nums">
+                {stats.count}
+              </span>
+              <span className="text-xs text-theme-text-sec font-medium">
+                entries
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -1475,21 +1525,6 @@ export default function GlucoseTab() {
             )}
           </div>
         )}
-      </div>
-
-      {/* Clinical Safety & Medical Disclaimer Footnote */}
-      <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-theme-text-sec text-center sm:text-left">
-        <span className="flex items-center gap-1.5">
-          <Info size={15} className="shrink-0 text-amber-500" />
-          Glucose logs and trends are for informational tracking only. Never adjust medication or insulin dosages without consulting your doctor.
-        </span>
-        <button
-          type="button"
-          onClick={() => setOpenLegalDoc("medical")}
-          className="text-theme-accent font-semibold hover:underline shrink-0 cursor-pointer"
-        >
-          Medical Disclaimer &rarr;
-        </button>
       </div>
 
       {showAddModal && (
@@ -1963,42 +1998,48 @@ export default function GlucoseTab() {
           </div>
         </div>
       )}
-
-      {openLegalDoc && (
-        <LegalDocsModal
-          isOpen={true}
-          onClose={() => setOpenLegalDoc(null)}
-          defaultTab={openLegalDoc}
-        />
-      )}
     </div>
   );
 }
 
 export { AddGlucoseModal };
 
-const CustomTooltip = ({ active, payload, label, chartColor, unit }: any) => {
+const CustomTooltip = ({ active, payload, label, chartColor, unit, idealRange }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const isNormal =
+      idealRange && data.value >= idealRange.min && data.value <= idealRange.max;
+
     return (
-      <div className="bg-theme-card/90 backdrop-blur-md border border-theme-border p-3 rounded-2xl shadow-xl min-w-30">
-        <p className="text-xs font-bold text-theme-text-sec mb-1">
-          {safeFormat(data.date, "MMM d, yyyy")}
-        </p>
+      <div className="bg-theme-card/95 backdrop-blur-md border border-theme-border/70 p-3 rounded-2xl shadow-xl min-w-32 z-50">
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <p className="text-xs font-semibold text-theme-text-sec">
+            {safeFormat(data.date, "MMM d, yyyy")}
+          </p>
+          {idealRange && (
+            <span
+              className={cn(
+                "text-[10px] font-bold",
+                isNormal ? "text-theme-success" : "text-amber-500",
+              )}
+            >
+              {isNormal ? "Target" : "Elevated"}
+            </span>
+          )}
+        </div>
         <div className="flex items-baseline gap-1.5">
           <span
-            className="text-2xl font-black tracking-tight"
+            className="text-2xl font-black tracking-tight font-display tabular-nums"
             style={{ color: chartColor }}
           >
             {data.value}
           </span>
           <span className="text-xs font-bold text-theme-text-sec">{unit}</span>
         </div>
-        {data.time && (
-          <p className="text-[10px] text-theme-text-sec mt-1 font-bold ">
-            {data.time}
-          </p>
-        )}
+        <div className="flex items-center justify-between text-[11px] text-theme-text-sec mt-1.5 pt-1.5 border-t border-theme-border/40 font-medium">
+          <span>{data.timing}</span>
+          {data.time && <span>{data.time}</span>}
+        </div>
       </div>
     );
   }
@@ -2017,35 +2058,28 @@ const CustomDot = (props: any) => {
   const showStatus = timeFilter <= 90;
 
   return (
-    <svg
-      x={cx - 10}
-      y={cy - 10}
-      width={20}
-      height={20}
-      className="overflow-visible"
-    >
+    <g className="overflow-visible pointer-events-none">
       <circle
-        cx={10}
-        cy={10}
-        r={4}
+        cx={cx}
+        cy={cy}
+        r={3.5}
         fill="var(--color-theme-card)"
         stroke={chartColor}
         strokeWidth={2}
       />
 
-      {showStatus && isNormal && (
-        <svg x={12} y={-4} width={14} height={14} viewBox="0 0 24 24">
-          <path
-            d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"
-            fill="#3A7D44"
-          />
-        </svg>
-      )}
       {showStatus && isOutside && (
-        <text x={10} y={0} dy={2} dx={8} textAnchor="middle" fontSize={12}>
-          ⚠️
-        </text>
+        <g transform={`translate(${cx + 4}, ${cy - 12})`}>
+          <circle cx="5" cy="5" r="5" fill="#f59e0b" />
+          <path
+            d="M5 2.6v3M5 7.4v.01"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </g>
       )}
-    </svg>
+    </g>
   );
 };
