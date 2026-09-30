@@ -6,13 +6,13 @@ import {
   sendWhatsAppOtp,
   createWhatsAppLinkCode,
   unlinkWhatsAppAccount,
-  processIncomingWhatsAppMessage,
   verifyMetaSignature,
   sendWhatsAppMainMenu,
   normalizePhone,
   maskPhone,
   getPhoneNumberId,
 } from "../services/whatsappService";
+import { routeMessage } from "../services/wa-bot/handlers/messageRouter";
 import { getAdminFirestore, getAdminAuth } from "../firebase";
 import { FieldValue } from "firebase-admin/firestore";
 import { generateNumericCode, hashOtp, verifyOtpHash } from "../services/whatsapp/utils";
@@ -178,7 +178,7 @@ router.post(
           }
 
           for (const message of change.value?.messages || []) {
-            processIncomingWhatsAppMessage(message).catch((err) => {
+            routeMessage(message as any).catch((err) => {
               console.error("[WhatsApp] Unhandled error processing message:", err);
             });
           }
