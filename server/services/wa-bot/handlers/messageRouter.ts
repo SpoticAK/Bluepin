@@ -1,6 +1,7 @@
 import type { WAMessage } from "../types";
 import { handleGlucoseText, handleGlucoseTimingReply, extractGlucoseValue } from "./glucoseHandler";
 import { handleGlucometerImage } from "./imageHandler";
+import { handleMedicalDocUpload } from "./documentHandler";
 import {
   sendTextMessage,
   sendHelpMessage,
@@ -60,14 +61,10 @@ export async function routeMessage(message: WAMessage): Promise<void> {
     return handleGlucometerImage(from, message.image.id);
   }
 
-  // --- Document (medical records) ---
+  // --- Document (medical reports) ---
   if (type === "document") {
-    // TODO: return documentHandler.handleMedicalDoc(from, message.document);
-    await sendTextMessage(
-      from,
-      "📄 Got your document! Medical record upload is coming soon.",
-    );
-    return;
+    const { id, filename, mime_type, file_size } = message.document;
+    return handleMedicalDocUpload(from, id, filename ?? "Lab_Report.pdf", file_size, mime_type);
   }
 }
 
