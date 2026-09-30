@@ -20,25 +20,42 @@ import type { TimingLabel } from "../types";
 const GLUCOSE_MIN = 1;
 const GLUCOSE_MAX = 800;
 
-const VALID_TIMING_IDS = new Set<string>(["fasting", "random", "post-prandial"]);
+const VALID_TIMING_IDS = new Set<string>([
+  "fasting",
+  "random",
+  "post-prandial",
+]);
 
 /**
  * Smartly extracts a probable glucose reading from free-form text.
- * 1. Bare number:         "126"
- * 2. Number + unit:       "126 mg/dl", "6.2 mmol/l"
- * 3. Conversational:      "my glucose is 126", "reading: 126"
+ * Handles integers (126), decimals (5.4), mg/dL, mmol/L, and conversational text.
  */
+// export function extractGlucoseValue(text: string): number | null {
+//   // Strip out meaningless punctuation from the end (like trailing periods or commas)
+//   const cleanText = text.replace(/[.,!?]+$/, "").trim();
+
+//   // 1. Bare number (with optional decimal): "126", "10.5", "126 mg/dl", "6.2 mmol/l"
+//   let m = cleanText.match(/^(\d{1,3}(?:\.\d{1,2})?)\s*(?:mg\/?dl|mmol\/?l)?$/i);
+//   if (m && m[1]) return parseFloat(m[1]);
+
+//   // 2. Number + unit explicitly embedded anywhere: "I got 126 mg/dl today"
+//   m = cleanText.match(/\b(\d{1,3}(?:\.\d{1,2})?)\s*(?:mg\/?dl|mmol\/?l)\b/i);
+//   if (m && m[1]) return parseFloat(m[1]);
+
+//   // 3. Conversational trigger: "my glucose is 126", "reading: 10.5"
+//   m = cleanText.match(/\b(?:glucose|sugar|reading|level)\s*(?:is\s*|=|:)?\s*(\d{1,3}(?:\.\d{1,2})?)\b/i);
+//   if (m && m[1]) return parseFloat(m[1]);
+
+//   return null;
+// }
+
 export function extractGlucoseValue(text: string): number | null {
-  let m = text.match(/^\s*(\d{1,3})\s*(?:mg\/?dl)?\s*$/i);
-  if (m && m[1]) return parseInt(m[1], 10);
+  const regex = /\d+(?:\.\d+)?/;
 
-  m = text.match(/\b(\d{1,3})\s*mg\/?dl\b/i);
-  if (m && m[1]) return parseInt(m[1], 10);
+  const m = text.match(regex); // first number (no g flag needed)
+  if (!m) return null;
 
-  m = text.match(/\b(?:glucose|sugar|reading|level)\s*(?:is\s*|=|:)?\s*(\d{1,3})\b/i);
-  if (m && m[1]) return parseInt(m[1], 10);
-
-  return null;
+  return parseFloat(m[0]);
 }
 
 /**

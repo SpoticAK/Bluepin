@@ -36,11 +36,9 @@ export async function uploadReportToStorage(
   buffer: Buffer,
   mimeType: string,
   originalFileName: string,
-): Promise<UploadedReport | null> {
+  limitCheck: Awaited<ReturnType<typeof checkReportLimits>>,
+): Promise<UploadedReport> {
   const now = new Date();
-  const limitCheck = await checkReportLimits(uid, now);
-
-  if (!limitCheck.allowed) return null;
 
   const reportId = crypto.randomUUID();
   const { dateStr: reportDate } = getFormattedUserTime(senderPhone, now);
