@@ -16,3 +16,7 @@ export {
   sendReportAcceptedCta,
   sendInvalidReportMessage,
 } from "./messages/reports";
+export {
+  sendReminderSetupPrompt,
+  sendReminderConfirmation,
+} from "./messages/reminders";

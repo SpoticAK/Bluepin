@@ -2,6 +2,7 @@ import type { WAMessage } from "../types";
 import { handleGlucoseText, handleGlucoseTimingReply, extractGlucoseValue } from "./glucoseHandler";
 import { handleGlucometerImage } from "./imageHandler";
 import { handleMedicalDocUpload } from "./documentHandler";
+import { handleReminderPrompt, handleReminderSelection } from "./reminderHandler";
 import {
   sendTextMessage,
   sendHelpMessage,
@@ -43,8 +44,13 @@ export async function routeMessage(message: WAMessage): Promise<void> {
   if (type === "interactive") {
     // Glucose timing buttons (Fasting / Random / Post meal)
     const buttonId = message.interactive.button_reply?.id;
-    if (buttonId && GLUCOSE_TIMING_IDS.has(buttonId)) {
-      return handleGlucoseTimingReply(from, buttonId);
+    if (buttonId) {
+      if (GLUCOSE_TIMING_IDS.has(buttonId)) {
+        return handleGlucoseTimingReply(from, buttonId);
+      }
+      if (buttonId.startsWith("remind_")) {
+        return handleReminderSelection(from, buttonId);
+      }
     }
 
     // Main menu list selections
@@ -85,8 +91,7 @@ async function handleMenuSelection(from: string, listId: string): Promise<void> 
       await sendTextMessage(from, "📄 Send me your health report as a PDF and I will add it to your profile.");
       break;
     case "set_reminder":
-      // TODO: reminderHandler.startFlow(from);
-      await sendTextMessage(from, "⏰ Reminder setup is coming soon! Stay tuned.");
+      await handleReminderPrompt(from);
       break;
     case "view_profile":
       await sendViewHealthProfileCta(from);
