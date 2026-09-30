@@ -1,23 +1,16 @@
 import { downloadWhatsAppMedia } from "../../whatsapp/client";
 import { getUidByPhone } from "../services/glucoseService";
-import { uploadReportToStorage, extractAndSaveReport } from "../services/reportService";
+import {
+  uploadReportToStorage,
+  extractAndSaveReport,
+} from "../services/reportService";
 import { sendTextMessage } from "../wa-client";
+import { checkReportLimits } from "../../whatsapp/utils";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 /**
  * Handles an incoming PDF or image medical report sent via WhatsApp.
- *
- * Deliberately split into two phases so the user gets an immediate response:
- *
- * Phase 1 (sync, ~3-5s total):
- *   uid check → file size check → download from Meta → upload to Firebase Storage
- *   → respond to user ✅
- *
- * Phase 2 (fire-and-forget, 15-30s):
- *   Gemini AI extraction → Firestore write → completion CTA sent to user
- *
- * The user is never blocked waiting for AI.
  */
 export async function handleMedicalDocUpload(
   sender: string,
@@ -32,7 +25,7 @@ export async function handleMedicalDocUpload(
     await sendTextMessage(
       sender,
       "📄 I received your document, but your WhatsApp is not linked to a Bluepin account yet.\n\n" +
-      "Open the Bluepin app to link your number, then try again.",
+        "Open the Bluepin app to link your number, then try again.",
     );
     return;
   }
@@ -46,11 +39,30 @@ export async function handleMedicalDocUpload(
     return;
   }
 
-  // ── Phase 1a: Download from Meta ───────────────────────────────────────────
+  // ── Guard: check daily/monthly limits (super fast, 1 DB read) ──────────────
+  const limitCheck = await checkReportLimits(uid, new Date());
+  if (!limitCheck.allowed) {
+    await sendTextMessage(
+      sender,
+      "⚠️ You have reached the maximum allowed limit for medical reports.",
+    );
+    return;
+  }
+
+  // ── Respond immediately — before any slow network calls! ───────────────────
+  // By sending this now, the user gets a reply in < 1 second.
+  await sendTextMessage(
+    sender,
+    "I am analyzing it in the background⌛. I will send you a notification once it is ready — " +
+      "this usually takes 15–30 seconds.",
+  );
+
+  // ── Download from Meta (can take 2-5 seconds for a 5MB PDF) ────────────────
   let buffer: Buffer;
   let resolvedMimeType: string;
   try {
-    ({ buffer, mimeType: resolvedMimeType } = await downloadWhatsAppMedia(mediaId));
+    ({ buffer, mimeType: resolvedMimeType } =
+      await downloadWhatsAppMedia(mediaId));
   } catch (err) {
     console.error("[documentHandler] Download failed:", err);
     await sendTextMessage(
@@ -60,30 +72,17 @@ export async function handleMedicalDocUpload(
     return;
   }
 
-  // ── Phase 1b: Upload to Firebase Storage + check limits ───────────────────
-  const uploaded = await uploadReportToStorage(uid, sender, buffer, resolvedMimeType, fileName);
-
-  if (!uploaded) {
-    // Daily/total report limit reached
-    await sendTextMessage(
-      sender,
-      "⚠️ You have reached the maximum allowed limit for medical reports.",
-    );
-    return;
-  }
-
-  // ── Respond immediately — user does NOT wait for AI ────────────────────────
-  // ↓ EDIT THIS MESSAGE to change what the user sees right after sending the PDF
-  await sendTextMessage(
+  // ── Upload to Firebase Storage ─────────────────────────────────────────────
+  const uploaded = await uploadReportToStorage(
+    uid,
     sender,
-    "📄 Got it! Your health report has been received.\n\n" +
-    "I am analyzing it in the background. I will send you a notification once it is ready — " +
-    "this usually takes 15–30 seconds.",
+    buffer,
+    resolvedMimeType,
+    fileName,
+    limitCheck,
   );
 
-  // ── Phase 2: AI extraction + Firestore write + completion CTA (background) ─
-  // No await — returns immediately. User already has their confirmation above.
-  // The completion message (sent when AI finishes) is in reportService.ts → extractAndSaveReport
+  // ── AI extraction + Firestore write + completion CTA (background) ──────────
   extractAndSaveReport(uid, sender, uploaded).catch((err) => {
     console.error("[documentHandler] Background extraction error:", err);
   });
