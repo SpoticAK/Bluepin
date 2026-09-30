@@ -1,5 +1,8 @@
 import type { WAMessage } from "../types";
 import { handleGlucoseText, handleGlucoseTimingReply, extractGlucoseValue } from "./glucoseHandler";
+import { handleGlucometerImage } from "./imageHandler";
+import { handleMedicalDocUpload } from "./documentHandler";
+import { handleReminderPrompt, handleReminderSelection } from "./reminderHandler";
 import {
   sendTextMessage,
   sendHelpMessage,
@@ -41,8 +44,13 @@ export async function routeMessage(message: WAMessage): Promise<void> {
   if (type === "interactive") {
     // Glucose timing buttons (Fasting / Random / Post meal)
     const buttonId = message.interactive.button_reply?.id;
-    if (buttonId && GLUCOSE_TIMING_IDS.has(buttonId)) {
-      return handleGlucoseTimingReply(from, buttonId);
+    if (buttonId) {
+      if (GLUCOSE_TIMING_IDS.has(buttonId)) {
+        return handleGlucoseTimingReply(from, buttonId);
+      }
+      if (buttonId.startsWith("remind_")) {
+        return handleReminderSelection(from, buttonId);
+      }
     }
 
     // Main menu list selections
@@ -56,22 +64,13 @@ export async function routeMessage(message: WAMessage): Promise<void> {
 
   // --- Image (glucometer photo) ---
   if (type === "image") {
-    // TODO: return imageHandler.handleGlucometerImage(from, message.image.id);
-    await sendTextMessage(
-      from,
-      "📸 Got your photo! Glucometer reading extraction is coming soon.",
-    );
-    return;
+    return handleGlucometerImage(from, message.image.id);
   }
 
-  // --- Document (medical records) ---
+  // --- Document (medical reports) ---
   if (type === "document") {
-    // TODO: return documentHandler.handleMedicalDoc(from, message.document);
-    await sendTextMessage(
-      from,
-      "📄 Got your document! Medical record upload is coming soon.",
-    );
-    return;
+    const { id, filename, mime_type, file_size } = message.document;
+    return handleMedicalDocUpload(from, id, filename ?? "Lab_Report.pdf", file_size, mime_type);
   }
 }
 
@@ -92,8 +91,7 @@ async function handleMenuSelection(from: string, listId: string): Promise<void> 
       await sendTextMessage(from, "📄 Send me your health report as a PDF and I will add it to your profile.");
       break;
     case "set_reminder":
-      // TODO: reminderHandler.startFlow(from);
-      await sendTextMessage(from, "⏰ Reminder setup is coming soon! Stay tuned.");
+      await handleReminderPrompt(from);
       break;
     case "view_profile":
       await sendViewHealthProfileCta(from);

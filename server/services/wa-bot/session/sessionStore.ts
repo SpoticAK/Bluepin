@@ -1,45 +1,53 @@
 /**
  * In-memory session store for pending conversation state.
  *
- * ponytail: plain Map is fine for single-instance dev.
- * TODO(prod): replace with Redis so state survives restarts and scales horizontally.
+ * A plain Map is fine here — pending state is short-lived (10 min window).
+ * If the server restarts, the user just sends their number again. That is
+ * a much better tradeoff than writing incomplete data to the health DB.
+ *
+ * TODO(prod): If you scale to multiple server instances, replace with Redis.
  */
 
 const PENDING_GLUCOSE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-type PendingGlucoseEntry = {
-  glucoseValue: number;
+export type PendingGlucoseEntry = {
+  value: number;
+  uid: string | null; // null = phone not linked to a Bluepin account
   expiresAt: number;
 };
 
 const pendingGlucose = new Map<string, PendingGlucoseEntry>();
 
-export function setPendingGlucose(userId: string, value: number): void {
-  pendingGlucose.set(userId, {
-    glucoseValue: value,
+export function setPendingGlucose(
+  phone: string,
+  value: number,
+  uid: string | null,
+): void {
+  pendingGlucose.set(phone, {
+    value,
+    uid,
     expiresAt: Date.now() + PENDING_GLUCOSE_TTL_MS,
   });
 
-  // Active memory cleanup: delete the key after 10 mins so we don't leak memory
-  // if the user never taps a button.
+  // Active cleanup: evict the key after TTL so abandoned sessions don't leak RAM
   setTimeout(() => {
-    const entry = pendingGlucose.get(userId);
+    const entry = pendingGlucose.get(phone);
     if (entry && Date.now() >= entry.expiresAt) {
-      pendingGlucose.delete(userId);
+      pendingGlucose.delete(phone);
     }
   }, PENDING_GLUCOSE_TTL_MS);
 }
 
-export function getPendingGlucose(userId: string): number | null {
-  const entry = pendingGlucose.get(userId);
+export function getPendingGlucose(phone: string): PendingGlucoseEntry | null {
+  const entry = pendingGlucose.get(phone);
   if (!entry) return null;
   if (Date.now() > entry.expiresAt) {
-    pendingGlucose.delete(userId);
+    pendingGlucose.delete(phone);
     return null;
   }
-  return entry.glucoseValue;
+  return entry;
 }
 
-export function clearPendingGlucose(userId: string): void {
-  pendingGlucose.delete(userId);
+export function clearPendingGlucose(phone: string): void {
+  pendingGlucose.delete(phone);
 }

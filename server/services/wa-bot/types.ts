@@ -33,7 +33,13 @@ export type WADocumentMessage = {
   id: string;
   from: string;
   type: "document";
-  document: { id: string; filename: string; mime_type: string; sha256: string };
+  document: {
+    id: string;
+    filename: string;
+    mime_type: string;
+    sha256: string;
+    file_size?: number; // bytes — present in most Meta payloads
+  };
 };
 
 export type WAMessage =
