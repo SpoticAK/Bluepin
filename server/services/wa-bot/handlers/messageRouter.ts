@@ -1,5 +1,6 @@
 import type { WAMessage } from "../types";
 import { handleGlucoseText, handleGlucoseTimingReply, extractGlucoseValue } from "./glucoseHandler";
+import { handleGlucometerImage } from "./imageHandler";
 import {
   sendTextMessage,
   sendHelpMessage,
@@ -56,12 +57,7 @@ export async function routeMessage(message: WAMessage): Promise<void> {
 
   // --- Image (glucometer photo) ---
   if (type === "image") {
-    // TODO: return imageHandler.handleGlucometerImage(from, message.image.id);
-    await sendTextMessage(
-      from,
-      "📸 Got your photo! Glucometer reading extraction is coming soon.",
-    );
-    return;
+    return handleGlucometerImage(from, message.image.id);
   }
 
   // --- Document (medical records) ---
