@@ -12,3 +12,7 @@ export {
   sendUnknownInputMessage,
   sendViewHealthProfileCta,
 } from "./messages/default";
+export {
+  sendReportAcceptedCta,
+  sendInvalidReportMessage,
+} from "./messages/reports";

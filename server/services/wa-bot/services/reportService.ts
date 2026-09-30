@@ -8,9 +8,9 @@ import {
 } from "../../whatsapp/utils";
 import { extractLabReportFromUrl } from "../../labReportServiceDirect";
 import {
-  sendWhatsAppCtaUrl,
-  sendWhatsAppMessage,
-} from "../../whatsapp/client";
+  sendReportAcceptedCta,
+  sendInvalidReportMessage,
+} from "../wa-client";
 import { createWhatsAppMagicLoginUrl } from "../../whatsapp/auth";
 
 export type UploadedReport = {
@@ -87,11 +87,7 @@ export async function extractAndSaveReport(
     const result = await extractLabReportFromUrl(fileUrl, resolvedMimeType);
 
     if (!result.success || !Array.isArray(result.biomarkers) || result.biomarkers.length === 0) {
-      await sendWhatsAppMessage(
-        senderPhone,
-        "🤔 I could not extract biomarkers from that document.\n" +
-        "Make sure it is a clear medical lab report PDF and try again.",
-      );
+      await sendInvalidReportMessage(senderPhone);
       return;
     }
 
@@ -130,20 +126,10 @@ export async function extractAndSaveReport(
     await batch.commit();
 
     // Completion CTA — this is the message the user sees when processing is done
-    // ↓ EDIT THIS MESSAGE to change the "report done" notification
     const magicUrl = await createWhatsAppMagicLoginUrl(uid);
-    await sendWhatsAppCtaUrl(
-      senderPhone,
-      "✅ *Your health report is ready.*\n\n" +
-      "I have added it to your health profile with all extracted biomarkers.",
-      "View health profile",
-      magicUrl,
-    );
+    await sendReportAcceptedCta(senderPhone, magicUrl);
   } catch (err) {
     console.error("[reportService] Background extraction failed:", err);
-    await sendWhatsAppMessage(
-      senderPhone,
-      "⚠️ Something went wrong while processing your report. Please try sending it again.",
-    ).catch(() => {});
+    await sendInvalidReportMessage(senderPhone).catch(() => {});
   }
 }
