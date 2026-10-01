@@ -7,7 +7,7 @@ import {
   sendReportAcceptedCta,
   sendInvalidReportMessage,
 } from "../wa-client";
-import { createWhatsAppMagicLoginUrl } from "../../whatsapp/auth";
+import { createWhatsAppMagicLoginUrl } from "./magicLink";
 
 const DAILY_REPORT_LIMIT = 3;
 

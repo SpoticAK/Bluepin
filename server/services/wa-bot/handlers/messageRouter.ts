@@ -11,6 +11,7 @@ import {
   handleReminderSelection,
 } from "./reminderHandler";
 import { getUidByPhone } from "../services/glucoseService";
+import { claimMessageId, releaseMessageId } from "../services/idempotency";
 import {
   sendTextMessage,
   sendInitialGreeting,
@@ -22,10 +23,29 @@ import {
 const GLUCOSE_TIMING_IDS = new Set(["fasting", "random", "post-prandial"]);
 
 /**
+ * Entry point for every inbound message. Claims the message id up front so a
+ * Meta redelivery cannot write the same reading twice.
+ */
+export async function routeMessage(message: WAMessage): Promise<void> {
+  if (message.id && !(await claimMessageId(message.id))) {
+    console.log(`[router] Dropping duplicate delivery of ${message.id}`);
+    return;
+  }
+
+  try {
+    await dispatch(message);
+  } catch (err) {
+    // Release the claim so Meta's retry gets a chance to reprocess.
+    if (message.id) await releaseMessageId(message.id);
+    throw err;
+  }
+}
+
+/**
  * Routes an incoming WhatsApp message to the correct feature handler.
  * Add new features here — don't touch index.ts.
  */
-export async function routeMessage(message: WAMessage): Promise<void> {
+async function dispatch(message: WAMessage): Promise<void> {
   const { from, type } = message;
 
   // --- Text messages ---
@@ -69,6 +89,11 @@ export async function routeMessage(message: WAMessage): Promise<void> {
       return handleMenuSelection(from, listId);
     }
 
+    // A button we do not recognise, or a Flow completion. Logged so an
+    // unhandled reply is visible instead of vanishing.
+    console.warn(
+      `[router] Unhandled interactive reply type '${message.interactive.type}' from ${from}`,
+    );
     return;
   }
 

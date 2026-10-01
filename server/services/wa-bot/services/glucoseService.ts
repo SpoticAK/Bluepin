@@ -2,9 +2,9 @@ import crypto from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "../../../firebase";
 import {
-  getFormattedUserTime,
   checkGlucoseDailyLimit,
-} from "../../whatsapp/utils";
+  getFormattedUserTime,
+} from "./limits";
 import type { TimingLabel } from "../types";
 
 const db = () => getAdminFirestore();

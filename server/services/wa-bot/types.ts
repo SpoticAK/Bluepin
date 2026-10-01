@@ -11,14 +11,25 @@ export type WATextMessage = {
   text: { body: string };
 };
 
+export type WAInteractiveReply = {
+  id: string;
+  title: string;
+};
+
 export type WAInteractiveMessage = {
   id: string;
   from: string;
   type: "interactive";
   interactive: {
-    type: "button_reply" | "list_reply";
-    button_reply?: { id: string; title: string };
-    list_reply?: { id: string; title: string };
+    /**
+     * "flow" arrives when a user completes a WhatsApp Flow. Nothing consumes it
+     * yet — Flows also need a separate webhook field and an approved template,
+     * so widen this union rather than treating an unrecognised reply as a
+     * button.
+     */
+    type: "button_reply" | "list_reply" | "flow";
+    button_reply?: WAInteractiveReply;
+    list_reply?: WAInteractiveReply;
   };
 };
 

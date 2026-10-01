@@ -1,7 +1,10 @@
-import { downloadWhatsAppMedia } from "../../whatsapp/client";
 import { extractGlucoseFromBase64 } from "../../glucoseService";
 import { handleGlucoseText } from "./glucoseHandler";
-import { sendInvalidGlucoseResponse, sendTextMessage } from "../wa-client";
+import {
+  downloadMediaFromMeta,
+  sendInvalidGlucoseResponse,
+  sendTextMessage,
+} from "../wa-client";
 
 /**
  * Handles an incoming glucometer image.
@@ -21,7 +24,7 @@ export async function handleGlucometerImage(
   let mimeType: string;
 
   try {
-    ({ buffer, mimeType } = await downloadWhatsAppMedia(mediaId));
+    ({ buffer, mimeType } = await downloadMediaFromMeta(mediaId));
   } catch (err) {
     console.error("[imageHandler] Failed to download media:", err);
     await sendTextMessage(
