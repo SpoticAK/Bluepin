@@ -1,6 +1,6 @@
 import { getStorage } from "firebase-admin/storage";
 
-const STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "";
+const STORAGE_BUCKET = process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET || "myhealthyfam-28c2c.firebasestorage.app";
 
 /**
  * Uploads a Buffer to Firebase Storage and returns a permanent public download URL.
