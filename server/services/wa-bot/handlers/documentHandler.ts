@@ -1,4 +1,8 @@
-import { downloadMediaFromMeta, MAX_FILE_BYTES } from "../wa-client/media";
+import {
+  downloadMediaFromMeta,
+  MAX_FILE_BYTES,
+  type MediaHint,
+} from "../wa-client/media";
 import { getUidByPhone } from "../services/glucoseService";
 import {
   checkDailyReportLimit,
@@ -20,6 +24,7 @@ export async function handleMedicalDocUpload(
   fileSize: number | undefined,
   mimeType: string,
   messageId: string,
+  mediaHint?: MediaHint,
 ): Promise<void> {
   // ── Guard: linked Bluepin account ───────────────────────────────────────────
   const uid = await getUidByPhone(sender);
@@ -61,12 +66,13 @@ export async function handleMedicalDocUpload(
   let resolvedMimeType: string;
   try {
     ({ buffer, mimeType: resolvedMimeType } =
-      await downloadMediaFromMeta(mediaId));
+      await downloadMediaFromMeta(mediaId, mediaHint));
   } catch (err) {
     console.error("[documentHandler] Download failed:", err);
     await sendTextMessage(
       sender,
-      "I could not download your file. Please try sending it again.",
+      "Something went wrong on our side while fetching your file, so I could not read it yet. " +
+        "Please send it again in a minute — if it keeps happening, contact support.",
     );
     return;
   }
