@@ -70,7 +70,7 @@ export async function routeMessage(message: WAMessage): Promise<void> {
   // --- Document (medical reports) ---
   if (type === "document") {
     const { id, filename, mime_type, file_size } = message.document;
-    return handleMedicalDocUpload(from, id, filename ?? "Lab_Report.pdf", file_size, mime_type);
+    return handleMedicalDocUpload(from, id, filename ?? "Lab_Report.pdf", file_size, mime_type, message.id);
   }
 }
 

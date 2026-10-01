@@ -4,8 +4,8 @@ import { postMessage } from "../sender";
  * Sent when a medical report is successfully extracted and saved.
  * Displays a CTA button linking to the user's dashboard.
  */
-export async function sendReportAcceptedCta(to: string, magicUrl: string): Promise<Response> {
-  return postMessage({
+export async function sendReportAcceptedCta(to: string, magicUrl: string, replyToMessageId?: string): Promise<Response> {
+  const payload: any = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to,
@@ -28,14 +28,20 @@ export async function sendReportAcceptedCta(to: string, magicUrl: string): Promi
       },
       footer: { text: "Type help if you need anything." },
     },
-  });
+  };
+
+  if (replyToMessageId) {
+    payload.context = { message_id: replyToMessageId };
+  }
+
+  return postMessage(payload);
 }
 
 /**
  * Sent when the AI cannot extract valid biomarkers from the uploaded document.
  */
-export async function sendInvalidReportMessage(to: string): Promise<Response> {
-  return postMessage({
+export async function sendInvalidReportMessage(to: string, replyToMessageId?: string): Promise<Response> {
+  const payload: any = {
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to,
@@ -43,5 +49,11 @@ export async function sendInvalidReportMessage(to: string): Promise<Response> {
     text: {
       body: "*Invalid Health Report*\nI could not process that report. 🤔\nSend me a PDF health report under 5 MB and I will take it from there.\n\nType help if you need anything."
     }
-  });
+  };
+
+  if (replyToMessageId) {
+    payload.context = { message_id: replyToMessageId };
+  }
+
+  return postMessage(payload);
 }
