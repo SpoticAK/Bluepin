@@ -10,6 +10,7 @@ import {
   handleReminderPrompt,
   handleReminderSelection,
 } from "./reminderHandler";
+import { getUidByPhone } from "../services/glucoseService";
 import {
   sendTextMessage,
   sendInitialGreeting,
@@ -41,15 +42,14 @@ export async function routeMessage(message: WAMessage): Promise<void> {
       return void (await sendHelpMessage(from));
     }
 
-    if (["hi", "hello", "hey", "start", "menu"].includes(text)) {
+    // Unrecognized text (including "hi", "menu", etc.)
+    // Check if they are an existing linked user
+    const uid = await getUidByPhone(from);
+    if (uid) {
+      return void (await sendUnknownInputMessage(from));
+    } else {
       return void (await sendInitialGreeting(from));
     }
-
-    // TODO: if (text === "login") return authHandler.startOtp(from);
-    // TODO: if (text.startsWith("remind")) return reminderHandler.startFlow(from, text);
-
-    // Any other text — show the default menu
-    return void (await sendUnknownInputMessage(from));
   }
 
   // --- Interactive replies ---
