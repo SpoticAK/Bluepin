@@ -1,4 +1,4 @@
-import { downloadMediaFromMeta } from "../wa-client/media";
+import { downloadMediaFromMeta, MAX_FILE_BYTES } from "../wa-client/media";
 import { getUidByPhone } from "../services/glucoseService";
 import {
   checkDailyReportLimit,
@@ -6,8 +6,6 @@ import {
   extractAndSaveReport,
 } from "../services/reportService";
 import { sendTextMessage, sendInvalidReportMessage } from "../wa-client";
-
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 /**
  * Handles an incoming PDF or image medical report sent via WhatsApp.
@@ -35,7 +33,7 @@ export async function handleMedicalDocUpload(
   }
 
   // ── Guard: file size ─────────────────────────────────────────────────────────
-  if (fileSize && fileSize > MAX_FILE_SIZE_BYTES) {
+  if (fileSize && fileSize > MAX_FILE_BYTES) {
     await sendInvalidReportMessage(sender, messageId);
     return;
   }

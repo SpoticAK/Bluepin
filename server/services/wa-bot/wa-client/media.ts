@@ -1,8 +1,64 @@
 const META_BASE_URL =
   process.env.META_BASE_URL || "https://graph.facebook.com/v26.0";
 const TOKEN = process.env.WHATSAPP_TOKEN || "";
-const DOWNLOAD_TIMEOUT_MS = 30_000;
-const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+/**
+ * Metadata is a small JSON lookup and normally answers in under 300ms, so it
+ * gets a tight budget. The binary body gets a much larger one because the
+ * caller has already acknowledged the user before downloading — nothing is
+ * blocked waiting on us, so there is no cost to being generous.
+ */
+const METADATA_TIMEOUT_MS =
+  Number(process.env.WHATSAPP_MEDIA_METADATA_TIMEOUT_MS) || 5_000;
+const DOWNLOAD_TIMEOUT_MS =
+  Number(process.env.WHATSAPP_MEDIA_DOWNLOAD_TIMEOUT_MS) || 60_000;
+
+/** Transient timeouts and connection resets are common; retry before bothering the user. */
+const MAX_ATTEMPTS = Number(process.env.WHATSAPP_MEDIA_DOWNLOAD_ATTEMPTS) || 3;
+const RETRY_BASE_DELAY_MS = 500;
+
+/** Hard cap on a single download. Shared with the handler's pre-flight check. */
+export const MAX_FILE_BYTES =
+  Number(process.env.WHATSAPP_MEDIA_MAX_BYTES) || 5 * 1024 * 1024;
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Runs a GET with a fresh timeout per attempt and exponential backoff.
+ *
+ * Only network failures and timeouts are retried. Callers keep their own
+ * validation outside this helper so a rejected response is never retried.
+ */
+async function fetchWithRetry(
+  url: string,
+  timeoutMs: number,
+  label: string,
+): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fetch(url, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      lastError = err;
+      const isLast = attempt === MAX_ATTEMPTS;
+      console.warn(
+        `[media] ${label} attempt ${attempt}/${MAX_ATTEMPTS} failed: ${err}`,
+      );
+      if (isLast) break;
+
+      // Jittered backoff so several concurrent uploads do not retry in lockstep.
+      const delay = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+      await sleep(delay + Math.floor(Math.random() * 250));
+    }
+  }
+
+  throw lastError;
+}
 
 /**
  * Given a WhatsApp media ID, fetches its temporary download URL from the
@@ -21,10 +77,11 @@ export async function downloadMediaFromMeta(
   // ── Step 1: Get the temporary download URL ──────────────────────────────────
   let metaData: { url: string; mime_type?: string; file_size?: number };
   try {
-    const res = await fetch(`${META_BASE_URL}/${mediaId}`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-    });
+    const res = await fetchWithRetry(
+      `${META_BASE_URL}/${mediaId}`,
+      METADATA_TIMEOUT_MS,
+      "metadata fetch",
+    );
 
     if (!res.ok) {
       const text = await res.text();
@@ -43,14 +100,18 @@ export async function downloadMediaFromMeta(
   // ── Step 2: Download the binary ─────────────────────────────────────────────
   let fileRes: Response;
   try {
-    fileRes = await fetch(metaData.url, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-    });
+    fileRes = await fetchWithRetry(
+      metaData.url,
+      DOWNLOAD_TIMEOUT_MS,
+      "binary download",
+    );
 
     if (!fileRes.ok) {
-      const text = await fileRes.text();
-      console.error(`[media] Binary download failed (${fileRes.status}):`, text.slice(0, 300));
+      const text = await fileRes.text().catch(() => "");
+      console.error(
+        `[media] Binary download failed (${fileRes.status}):`,
+        text.slice(0, 300),
+      );
       throw new Error(`Media binary download failed: ${fileRes.status}`);
     }
   } catch (err) {
@@ -61,7 +122,7 @@ export async function downloadMediaFromMeta(
   const declaredSize = Number(fileRes.headers.get("content-length") || "0");
   if (declaredSize > MAX_FILE_BYTES) {
     throw new Error(
-      `File is ${(declaredSize / 1024 / 1024).toFixed(1)} MB, over the 5 MB limit.`,
+      `File is ${(declaredSize / 1024 / 1024).toFixed(1)} MB, over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit.`,
     );
   }
 
@@ -70,7 +131,7 @@ export async function downloadMediaFromMeta(
 
   if (buffer.length > MAX_FILE_BYTES) {
     throw new Error(
-      `File is ${(buffer.length / 1024 / 1024).toFixed(1)} MB, over the 5 MB limit.`,
+      `File is ${(buffer.length / 1024 / 1024).toFixed(1)} MB, over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit.`,
     );
   }
 
