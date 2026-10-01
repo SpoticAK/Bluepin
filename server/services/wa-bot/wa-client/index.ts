@@ -1,5 +1,6 @@
 // Re-export everything handlers need — handlers import from "wa-client", not from deep paths.
 export { sendTextMessage } from "./messages/common";
+export { downloadMediaFromMeta } from "./media";
 export {
   sendGlucoseTimingPrompt,
   sendGlucoseLogConfirmation,

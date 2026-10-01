@@ -16,11 +16,25 @@ import { routeMessage } from "../services/wa-bot/handlers/messageRouter";
 import { getAdminFirestore, getAdminAuth } from "../firebase";
 import { FieldValue } from "firebase-admin/firestore";
 import { generateNumericCode, hashOtp, verifyOtpHash } from "../services/whatsapp/utils";
-import { MAGIC_TOKEN_PATTERN } from "../services/whatsapp/auth";
+import { MAGIC_TOKEN_PATTERN } from "../services/wa-bot/services/magicLink";
 import { MetaWebhookBody } from "../services/whatsapp/types";
 
 const router = Router();
 
+// --- OTP delivery: production blocker -----------------------------------------
+// OTPs currently go out as a plain service message, because no AUTHENTICATION
+// template is submitted and WHATSAPP_OTP_TEMPLATE_NAME is unset. Meta only
+// delivers free-form messages inside an open 24-hour customer service window,
+// so a brand-new number that has never messaged the bot will not receive a
+// code — and the failure is invisible on our side.
+//
+// Fix by submitting an AUTHENTICATION template in WhatsApp Manager, then
+// setting WHATSAPP_OTP_TEMPLATE_NAME (and WHATSAPP_TEMPLATE_LANG to match the
+// template's language, e.g. en_US). sendWhatsAppOtp already prefers the
+// template and falls back to text only when it is absent.
+//
+// Blocked until the phone number is verified and registered on a real number,
+// and Meta Business Verification is complete.
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_TTL_SECONDS = 5 * 60;
 const OTP_RESEND_COOLDOWN_SECONDS = 30;
@@ -165,7 +179,16 @@ router.post(
 
       for (const entry of body.entry || []) {
         for (const change of entry.changes || []) {
-          if (change.field !== "messages") continue;
+          if (change.field !== "messages") {
+            // Flows arrive on their own field and are not handled yet. Logged
+            // rather than skipped silently so a misconfigured subscription or
+            // an unhandled event type is visible in the logs.
+            console.warn(
+              `[WhatsApp Webhook] Ignoring unsupported field '${change.field}'.`,
+              { expected: "messages" },
+            );
+            continue;
+          }
 
           // Ignore traffic addressed to a different WhatsApp Business number
           // sharing this webhook.

@@ -1,4 +1,7 @@
-const GRAPH_API = `https://graph.facebook.com/v26.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+const META_BASE_URL =
+  process.env.META_BASE_URL || "https://graph.facebook.com/v26.0";
+
+const GRAPH_API = `${META_BASE_URL}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
 
 const AUTH_HEADER = {
   "Content-Type": "application/json",
