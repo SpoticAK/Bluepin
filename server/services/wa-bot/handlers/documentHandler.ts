@@ -29,7 +29,7 @@ export async function handleMedicalDocUpload(
     await sendTextMessage(
       sender,
       "I received your document, but your WhatsApp is not linked to a Bluepin account yet.\n\n" +
-        "Open the Bluepin app to link your number, then try again."
+        "Open the Bluepin app to link your number, then try again.",
     );
     return;
   }
@@ -45,7 +45,7 @@ export async function handleMedicalDocUpload(
   if (!allowed) {
     await sendTextMessage(
       sender,
-      "You have reached the maximum allowed limit for medical report uploads today."
+      "You have reached the maximum allowed limit for medical report uploads today.",
     );
     return;
   }
@@ -55,7 +55,7 @@ export async function handleMedicalDocUpload(
     sender,
     "Got it! Your health report has been received.\n\n" +
       "I am analyzing it in the background. I will send you a notification once it is ready — " +
-      "this usually takes 15–30 seconds."
+      "this usually takes 2-3 minutes.",
   );
 
   // ── Phase 1: Download from Meta (uses new wa-client/media.ts) ────────────────
@@ -68,7 +68,7 @@ export async function handleMedicalDocUpload(
     console.error("[documentHandler] Download failed:", err);
     await sendTextMessage(
       sender,
-      "I could not download your file. Please try sending it again."
+      "I could not download your file. Please try sending it again.",
     );
     return;
   }
