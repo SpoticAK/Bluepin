@@ -1,11 +1,7 @@
 import crypto from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "../../../firebase";
-import {
-  getStorageBucket,
-  getFormattedUserTime,
-  checkReportLimits,
-} from "../../whatsapp/utils";
+import { uploadBufferToStorage } from "./storageService";
 import { extractLabReportFromUrl } from "../../labReportServiceDirect";
 import {
   sendReportAcceptedCta,
@@ -13,87 +9,107 @@ import {
 } from "../wa-client";
 import { createWhatsAppMagicLoginUrl } from "../../whatsapp/auth";
 
+const DAILY_REPORT_LIMIT = 3;
+
+// ── Limit checking (self-contained, no old wa-bot deps) ─────────────────────
+
+async function getTodayDateStr(): Promise<string> {
+  return new Date().toISOString().split("T")[0];
+}
+
+/**
+ * Checks if the user is still under their daily report upload limit.
+ * Uses a simple counter document under the user's Firestore profile.
+ */
+export async function checkDailyReportLimit(uid: string): Promise<boolean> {
+  const db = getAdminFirestore();
+  const today = await getTodayDateStr();
+  const snap = await db.doc(`users/${uid}/botLimits/reports`).get();
+
+  if (!snap.exists) return true;
+
+  const data = snap.data()!;
+  if (data.date !== today) return true; // New day, counter reset
+
+  return (data.count ?? 0) < DAILY_REPORT_LIMIT;
+}
+
+/**
+ * Increments the daily report counter. Called ONLY after successful AI extraction.
+ */
+async function incrementReportCount(uid: string): Promise<void> {
+  const db = getAdminFirestore();
+  const today = await getTodayDateStr();
+  const ref = db.doc(`users/${uid}/botLimits/reports`);
+  const snap = await ref.get();
+
+  if (!snap.exists || snap.data()?.date !== today) {
+    await ref.set({ date: today, count: 1 });
+  } else {
+    await ref.update({ count: FieldValue.increment(1) });
+  }
+}
+
+// ── Phase 1: Upload ─────────────────────────────────────────────────────────
+
 export type UploadedReport = {
   reportId: string;
   fileUrl: string;
   reportName: string;
   reportDate: string;
   resolvedMimeType: string;
-  limitCheck: Awaited<ReturnType<typeof checkReportLimits>>;
 };
 
 /**
- * Phase 1 — Fast path (~1-2s after download).
- *
- * Checks limits, uploads the raw buffer to Firebase Storage, and returns
- * the metadata needed for Phase 2. Does NOT call any AI.
- *
- * Returns null if the report limit has been reached (caller should notify user).
+ * Phase 1 — Fast path.
+ * Saves the raw PDF Buffer to Firebase Storage and returns the metadata
+ * needed for Phase 2. Does NOT call any AI.
  */
 export async function uploadReportToStorage(
   uid: string,
-  senderPhone: string,
   buffer: Buffer,
   mimeType: string,
   originalFileName: string,
-  limitCheck: Awaited<ReturnType<typeof checkReportLimits>>,
 ): Promise<UploadedReport> {
-  const now = new Date();
-
   const reportId = crypto.randomUUID();
-  const { dateStr: reportDate } = getFormattedUserTime(senderPhone, now);
+  const reportDate = new Date().toISOString().split("T")[0];
   const reportName = originalFileName.replace(/\.[^/.]+$/, "") || "Lab Report";
 
-  const bucket = getStorageBucket();
-  const downloadToken = crypto.randomUUID();
-  const ext = mimeType.includes("pdf") ? "pdf" : "jpg";
-  const safeName = reportName.replace(/[^a-zA-Z0-9]/g, "_");
-  const storagePath = `users/${uid}/labReports/${reportId}_${safeName}.${ext}`;
-  const storageFile = bucket.file(storagePath);
+  const fileUrl = await uploadBufferToStorage(uid, buffer, reportName, mimeType, reportId);
 
-  await storageFile.save(buffer, {
-    metadata: {
-      contentType: mimeType,
-      metadata: { firebaseStorageDownloadTokens: downloadToken },
-    },
-  });
-
-  const fileUrl =
-    `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
-    `${encodeURIComponent(storageFile.name)}?alt=media&token=${downloadToken}`;
-
-  return { reportId, fileUrl, reportName, reportDate, resolvedMimeType: mimeType, limitCheck };
+  return { reportId, fileUrl, reportName, reportDate, resolvedMimeType: mimeType };
 }
 
+// ── Phase 2: AI Extract + Save ──────────────────────────────────────────────
+
 /**
- * Phase 2 — Background (15-30s, fire-and-forget).
- *
- * Calls Gemini to extract biomarkers from the already-uploaded file URL,
- * writes everything to Firestore in a batch, then sends a CTA completion message.
- *
- * Intentionally standalone — no await needed from the caller.
+ * Phase 2 — Background async.
+ * Sends the Firebase Storage URL to Gemini, extracts biomarkers, saves to Firestore,
+ * increments the daily limit, and notifies the user.
  */
 export async function extractAndSaveReport(
   uid: string,
   senderPhone: string,
   uploaded: UploadedReport,
+  messageId?: string,
 ): Promise<void> {
-  const { reportId, fileUrl, reportName, reportDate, resolvedMimeType, limitCheck } = uploaded;
+  const { reportId, fileUrl, reportName, reportDate, resolvedMimeType } = uploaded;
   const db = getAdminFirestore();
 
   try {
+    console.log(`[reportService] Starting AI extraction for report ${reportId}`);
     const result = await extractLabReportFromUrl(fileUrl, resolvedMimeType);
 
     if (!result.success || !Array.isArray(result.biomarkers) || result.biomarkers.length === 0) {
-      await sendInvalidReportMessage(senderPhone);
+      console.warn(`[reportService] AI extraction returned no biomarkers for ${reportId}`);
+      await sendInvalidReportMessage(senderPhone, messageId);
       return;
     }
 
+    console.log(`[reportService] AI extracted ${result.biomarkers.length} biomarkers for ${reportId}. Writing to Firestore...`);
     const batch = db.batch();
 
-    // Commit the daily limit counter now that extraction succeeded
-    batch.set(limitCheck.limitsRef, limitCheck.limitUpdate, { merge: true });
-
+    // Commit report doc
     const reportRef = db.doc(`users/${uid}/labReports/${reportId}`);
     batch.set(reportRef, {
       id: reportId,
@@ -108,6 +124,7 @@ export async function extractAndSaveReport(
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    // Commit individual biomarker docs
     for (const bm of result.biomarkers) {
       const safeId = (bm.name as string).replace(/[^a-zA-Z0-9]/g, "");
       batch.set(db.doc(`users/${uid}/biomarkers/${reportId}_${safeId}`), {
@@ -123,11 +140,16 @@ export async function extractAndSaveReport(
 
     await batch.commit();
 
-    // Completion CTA — this is the message the user sees when processing is done
+    // Increment daily limit counter ONLY after successful save
+    await incrementReportCount(uid);
+
+    // Send success CTA to user
     const magicUrl = await createWhatsAppMagicLoginUrl(uid);
-    await sendReportAcceptedCta(senderPhone, magicUrl);
+    await sendReportAcceptedCta(senderPhone, magicUrl, messageId);
+
+    console.log(`[reportService] Report ${reportId} saved and user notified.`);
   } catch (err) {
-    console.error("[reportService] Background extraction failed:", err);
-    await sendInvalidReportMessage(senderPhone).catch(() => {});
+    console.error(`[reportService] Background extraction failed for ${reportId}:`, err);
+    await sendInvalidReportMessage(senderPhone, messageId).catch(() => {});
   }
 }

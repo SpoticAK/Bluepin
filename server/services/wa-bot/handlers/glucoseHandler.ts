@@ -82,7 +82,7 @@ export async function handleGlucoseText(
     if (!allowed) {
       await sendTextMessage(
         sender,
-        "⚠️ You have reached the daily limit of 10 glucose readings for today.",
+        "You have reached the daily limit of 10 glucose readings for today.",
       );
       return;
     }
@@ -128,7 +128,7 @@ export async function handleGlucoseTimingReply(
       // Daily limit hit between step 1 and step 2 (e.g. logged via app in between)
       await sendTextMessage(
         sender,
-        "⚠️ You have reached the daily limit of 10 glucose readings for today.",
+        "You have reached the daily limit of 10 glucose readings for today.",
       );
       return;
     }

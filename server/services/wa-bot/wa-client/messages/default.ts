@@ -5,72 +5,61 @@ type MenuVariant = "standard" | "help";
 
 const MENU_BUTTON_TEXT = "See options"; // max 20 chars
 
-// Bullet list shown inline in the body so the user can read without tapping "See options"
-const MENU_BULLETS =
-  "\n\n• Log glucose\n• Upload health report\n• Set a reminder\n• View health profile";
-
 const APP_URL =
   "https://bluepin-app-preview--myhealthyfam-28c2c.asia-southeast1.hosted.app";
 
-// Publicly hosted header image for the health profile CTA.
-// Recommended: 800×418 px JPEG/PNG, hosted on CDN / Firebase Storage / S3.
-// See the comment on sendViewHealthProfileCta() below for image guidance.
-// ponytail: env var so swapping the image never requires a code change.
 const HEALTH_PROFILE_HEADER_IMAGE =
   process.env.HEALTH_PROFILE_HEADER_IMAGE_URL ??
   "https://placehold.co/800x418/0D9488/ffffff?text=Your+Health+Profile";
 
-function buildMenuRows(variant: MenuVariant) {
-  return [
-    {
-      id: "log_glucose",
-      title: "Log glucose",
-      description: "Send me a reading or a photo of your glucometer.",
-    },
-    {
-      id: "upload_report",
-      title: "Upload health report",
-      description:
-        variant === "help"
-          ? "Send me a PDF health report under 5 MB."
-          : "Send me your health reports and I will add them to your health profile.",
-    },
-    {
-      id: "set_reminder",
-      title: "Set a reminder",
-      description:
-        "Choose when you would like me to remind you to log your glucose.",
-    },
-    {
-      id: "view_profile",
-      title: "View health profile",
-      description: "See your health history, trends and personalised insights.",
-    },
-  ];
+function getMenuBullets(variant: MenuVariant = "standard") {
+  const reportDesc =
+    variant === "help"
+      ? "Send me a PDF health report under 5 MB."
+      : "Send me your health reports and I will add them to your health profile.";
+
+  return (
+    "\n\n• *Log glucose*: Send me a reading or a photo of your glucometer." +
+    `\n• *Upload health report*: ${reportDesc}` +
+    "\n• *Set a reminder*: Choose when you would like me to remind you to log your glucose." +
+    "\n• *View health profile*: See your health history, trends and personalised insights."
+  );
 }
+
+const MENU_ROWS = [
+  {
+    id: "log_glucose",
+    title: "Log glucose",
+  },
+  {
+    id: "upload_report",
+    title: "Upload health report",
+  },
+  {
+    id: "set_reminder",
+    title: "Set a reminder",
+  },
+  {
+    id: "view_profile",
+    title: "View health profile",
+  },
+];
 
 type ListMessageOptions = {
   to: string;
   header?: string;
   body: string;
   footer: string;
-  variant: MenuVariant;
 };
 
-function buildListPayload({
-  to,
-  header,
-  body,
-  footer,
-  variant,
-}: ListMessageOptions) {
+function buildListPayload({ to, header, body, footer }: ListMessageOptions) {
   const interactive: Record<string, unknown> = {
     type: "list",
     body: { text: body },
     footer: { text: footer },
     action: {
       button: MENU_BUTTON_TEXT,
-      sections: [{ rows: buildMenuRows(variant) }],
+      sections: [{ rows: MENU_ROWS }],
     },
   };
 
@@ -97,9 +86,8 @@ export async function sendInitialGreeting(to: string): Promise<Response> {
     body:
       "I will be your WhatsApp companion for managing your diabetes, right here every day.\n\n" +
       "Here is what I can help you with:" +
-      MENU_BULLETS,
+      getMenuBullets("standard"),
     footer: "Type help if you need anything.",
-    variant: "standard",
   });
 }
 
@@ -112,10 +100,9 @@ export async function sendHelpMessage(to: string): Promise<Response> {
     to,
     body:
       "Of course. Here is what I can help you with:" +
-      MENU_BULLETS +
+      getMenuBullets("help") +
       "\n\nNeed to speak to someone?\nEmail sparsh@bluepin.in and we will get back to you within 24 hours.",
     footer: "Type help if you need anything.",
-    variant: "help",
   });
 }
 
@@ -128,9 +115,8 @@ export async function sendUnknownInputMessage(to: string): Promise<Response> {
     body:
       "Hi, I am Aarika from Bluepin.\n\n" +
       "Here is what I can help you with:" +
-      MENU_BULLETS,
+      getMenuBullets("standard"),
     footer: "Type help if you need anything.",
-    variant: "standard",
   });
 }
 
@@ -166,7 +152,7 @@ export async function sendViewHealthProfileCta(to: string): Promise<Response> {
       //     image: { link: HEALTH_PROFILE_HEADER_IMAGE },
       //   },
       body: {
-        text: "Your health history, trends and personalised insights are ready to view. 📊",
+        text: "Your health history, trends and personalised insights are ready to view.",
       },
       action: {
         name: "cta_url",
