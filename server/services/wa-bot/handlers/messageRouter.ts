@@ -12,6 +12,7 @@ import {
 } from "./reminderHandler";
 import {
   sendTextMessage,
+  sendInitialGreeting,
   sendHelpMessage,
   sendUnknownInputMessage,
   sendViewHealthProfileCta,
@@ -38,6 +39,10 @@ export async function routeMessage(message: WAMessage): Promise<void> {
 
     if (text === "help") {
       return void (await sendHelpMessage(from));
+    }
+
+    if (["hi", "hello", "hey", "start", "menu"].includes(text)) {
+      return void (await sendInitialGreeting(from));
     }
 
     // TODO: if (text === "login") return authHandler.startOtp(from);

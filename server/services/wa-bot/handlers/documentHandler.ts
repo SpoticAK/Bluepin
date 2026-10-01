@@ -5,7 +5,7 @@ import {
   uploadReportToStorage,
   extractAndSaveReport,
 } from "../services/reportService";
-import { sendTextMessage } from "../wa-client";
+import { sendTextMessage, sendInvalidReportMessage } from "../wa-client";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -29,20 +29,14 @@ export async function handleMedicalDocUpload(
     await sendTextMessage(
       sender,
       "I received your document, but your WhatsApp is not linked to a Bluepin account yet.\n\n" +
-        "Open the Bluepin app to link your number, then try again.",
+        "Open the Bluepin app to link your number, then try again."
     );
     return;
   }
 
   // ── Guard: file size ─────────────────────────────────────────────────────────
   if (fileSize && fileSize > MAX_FILE_SIZE_BYTES) {
-    await sendTextMessage(
-      sender,
-      "*Invalid Health Report*\n" +
-        "I could not process that report. 🤔\n" +
-        "Send me a PDF health report under 5 MB and I will take it from there\n\n" +
-        "Type help if you need anything.",
-    );
+    await sendInvalidReportMessage(sender, messageId);
     return;
   }
 
@@ -51,7 +45,7 @@ export async function handleMedicalDocUpload(
   if (!allowed) {
     await sendTextMessage(
       sender,
-      "You have reached the maximum allowed limit for medical report uploads today.",
+      "You have reached the maximum allowed limit for medical report uploads today."
     );
     return;
   }
@@ -61,7 +55,7 @@ export async function handleMedicalDocUpload(
     sender,
     "Got it! Your health report has been received.\n\n" +
       "I am analyzing it in the background. I will send you a notification once it is ready — " +
-      "this usually takes 15–30 seconds.",
+      "this usually takes 15–30 seconds."
   );
 
   // ── Phase 1: Download from Meta (uses new wa-client/media.ts) ────────────────
@@ -74,7 +68,7 @@ export async function handleMedicalDocUpload(
     console.error("[documentHandler] Download failed:", err);
     await sendTextMessage(
       sender,
-      "I could not download your file. Please try sending it again.",
+      "I could not download your file. Please try sending it again."
     );
     return;
   }
