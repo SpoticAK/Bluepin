@@ -7,11 +7,11 @@ import {
   createWhatsAppLinkCode,
   unlinkWhatsAppAccount,
   verifyMetaSignature,
-  sendWhatsAppMainMenu,
   normalizePhone,
   maskPhone,
   getPhoneNumberId,
 } from "../services/whatsappService";
+import { sendInitialGreeting } from "../services/wa-bot/wa-client";
 import { routeMessage } from "../services/wa-bot/handlers/messageRouter";
 import { getAdminFirestore, getAdminAuth } from "../firebase";
 import { FieldValue } from "firebase-admin/firestore";
@@ -403,7 +403,7 @@ router.post("/whatsapp/link/verify-otp", requireAuth, async (req: any, res) => {
       // Ignored when the phone is already claimed on another auth record.
     }
 
-    sendWhatsAppMainMenu(canonicalPhone, "welcome").catch(() => {});
+    sendInitialGreeting(canonicalPhone).catch(() => {});
 
     return res.json({
       success: true,
