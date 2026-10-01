@@ -3,7 +3,9 @@ import { handleGlucoseText } from "./glucoseHandler";
 import {
   downloadMediaFromMeta,
   sendInvalidGlucoseResponse,
+  sendOversizedImageResponse,
   sendTextMessage,
+  MediaTooLargeError,
   type MediaHint,
 } from "../wa-client";
 
@@ -29,6 +31,10 @@ export async function handleGlucometerImage(
     ({ buffer, mimeType } = await downloadMediaFromMeta(mediaId, mediaHint));
   } catch (err) {
     console.error("[imageHandler] Failed to download media:", err);
+    if (err instanceof MediaTooLargeError) {
+      await sendOversizedImageResponse(sender);
+      return;
+    }
     await sendTextMessage(
       sender,
       "I could not download your photo. Please try sending it again.",

@@ -96,6 +96,22 @@ export async function sendInvalidGlucoseResponse(
 }
 
 /**
+ * Sent when an uploaded photo is over the size limit. Mirrors the PDF oversize
+ * reply so both media types give the same shape of guidance.
+ */
+export async function sendOversizedImageResponse(to: string): Promise<Response> {
+  return postMessage({
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to,
+    type: "text",
+    text: {
+      body: `*Photo Too Large*\n\nI could not read that photo. 🤔\nSend me a photo of your glucometer under 5 MB and I will take it from there.\n\n_${footerText}_`,
+    },
+  });
+}
+
+/**
  * Sent when the user taps a timing button but the session has expired or they double-tapped.
  */
 export async function sendNoPendingReadingResponse(

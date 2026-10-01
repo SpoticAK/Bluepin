@@ -1,10 +1,15 @@
 // Re-export everything handlers need — handlers import from "wa-client", not from deep paths.
 export { sendTextMessage } from "./messages/common";
-export { downloadMediaFromMeta, type MediaHint } from "./media";
+export {
+  downloadMediaFromMeta,
+  MediaTooLargeError,
+  type MediaHint,
+} from "./media";
 export {
   sendGlucoseTimingPrompt,
   sendGlucoseLogConfirmation,
   sendInvalidGlucoseResponse,
+  sendOversizedImageResponse,
   sendNoPendingReadingResponse,
 } from "./messages/glucose";
 export {

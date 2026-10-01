@@ -14,7 +14,7 @@ const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || "";
 const METADATA_TIMEOUT_MS =
   Number(process.env.WHATSAPP_MEDIA_METADATA_TIMEOUT_MS) || 30_000;
 const DOWNLOAD_TIMEOUT_MS =
-  Number(process.env.WHATSAPP_MEDIA_DOWNLOAD_TIMEOUT_MS) || 60_000;
+  Number(process.env.WHATSAPP_MEDIA_DOWNLOAD_TIMEOUT_MS) || 120_000;
 
 /** Transient timeouts and connection resets are common; retry before bothering the user. */
 const MAX_ATTEMPTS = Number(process.env.WHATSAPP_MEDIA_DOWNLOAD_ATTEMPTS) || 3;
@@ -23,6 +23,21 @@ const RETRY_BASE_DELAY_MS = 500;
 /** Hard cap on a single download. Shared with the handler's pre-flight check. */
 export const MAX_FILE_BYTES =
   Number(process.env.WHATSAPP_MEDIA_MAX_BYTES) || 5 * 1024 * 1024;
+
+/**
+ * Signals that a file exceeded MAX_FILE_BYTES, as opposed to a transport
+ * failure. Meta omits `file_size` on document webhooks, so this is usually the
+ * first place an oversized file is detectable — handlers need to tell the two
+ * apart to reply with the right guidance.
+ */
+export class MediaTooLargeError extends Error {
+  constructor(readonly sizeBytes: number) {
+    super(
+      `File is ${(sizeBytes / 1024 / 1024).toFixed(1)} MB, over the ${(MAX_FILE_BYTES / 1024 / 1024).toFixed(0)} MB limit.`,
+    );
+    this.name = "MediaTooLargeError";
+  }
+}
 
 /**
  * Media fields Meta may hand us directly on the inbound webhook. Meta's Media
@@ -68,17 +83,22 @@ async function fetchWithRetry(
   url: string,
   timeoutMs: number,
   label: string,
+  outerSignal?: AbortSignal,
 ): Promise<Response> {
   let lastError: Error = new Error(`[media] ${label} never ran`);
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const t0 = Date.now();
+    const perAttempt = AbortSignal.timeout(timeoutMs);
+    const signal = outerSignal
+      ? AbortSignal.any([perAttempt, outerSignal])
+      : perAttempt;
 
     let res: Response;
     try {
       res = await fetch(url, {
         headers: { Authorization: `Bearer ${TOKEN}` },
-        signal: AbortSignal.timeout(timeoutMs),
+        signal,
       });
     } catch (err) {
       // Connect failure, DNS failure, or abort — all safely retriable.
@@ -186,31 +206,53 @@ function sha256Matches(buf: Buffer, expected: string): boolean {
 }
 
 /**
- * Downloads a media URL into a Buffer, enforcing the size cap against both the
- * declared content-length and the bytes actually received.
+ * Downloads a media URL into a Buffer under one overall deadline, enforcing the
+ * size cap against both the declared content-length and the bytes received.
+ *
+ * `AbortSignal.timeout` only bounds the header phase: once `fetch` resolves,
+ * `res.arrayBuffer()` runs outside its coverage, so a body that stalls
+ * mid-transfer hangs with no timeout at all. This controller is deliberately kept
+ * alive across both — the timer is cleared only in `finally`.
  */
 async function fetchBinary(
   url: string,
   label: string,
 ): Promise<{ buffer: Buffer; contentType: string | null }> {
-  const res = await fetchWithRetry(url, DOWNLOAD_TIMEOUT_MS, label);
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new Error(`[media] ${label} timed out`)),
+    DOWNLOAD_TIMEOUT_MS,
+  );
 
-  const declaredSize = Number(res.headers.get("content-length") || "0");
-  if (declaredSize > MAX_FILE_BYTES) {
-    throw new Error(
-      `File is ${(declaredSize / 1024 / 1024).toFixed(1)} MB, over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit.`,
+  try {
+    const res = await fetchWithRetry(
+      url,
+      DOWNLOAD_TIMEOUT_MS,
+      label,
+      controller.signal,
     );
-  }
 
-  const buffer = Buffer.from(await res.arrayBuffer());
+    const declaredSize = Number(res.headers.get("content-length") || "0");
+    if (declaredSize > MAX_FILE_BYTES) {
+      throw new MediaTooLargeError(declaredSize);
+    }
 
-  if (buffer.length > MAX_FILE_BYTES) {
-    throw new Error(
-      `File is ${(buffer.length / 1024 / 1024).toFixed(1)} MB, over the ${MAX_FILE_BYTES / 1024 / 1024} MB limit.`,
+    const bodyStart = Date.now();
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const bodyMs = Date.now() - bodyStart;
+    console.log(
+      `[media] body received: ${buffer.length} bytes in ${bodyMs}ms ` +
+        `(${Math.round((buffer.length / 1024 / Math.max(1, bodyMs)) * 1000)} KB/s).`,
     );
-  }
 
-  return { buffer, contentType: res.headers.get("content-type") };
+    if (buffer.length > MAX_FILE_BYTES) {
+      throw new MediaTooLargeError(buffer.length);
+    }
+
+    return { buffer, contentType: res.headers.get("content-type") };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
