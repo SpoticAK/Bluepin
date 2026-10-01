@@ -51,18 +51,16 @@ export async function routeMessage(message: WAMessage): Promise<void> {
   if (type === "interactive") {
     // Glucose timing buttons (Fasting / Random / Post meal)
     const buttonId = message.interactive.button_reply?.id;
-    if (buttonId) {
-      if (GLUCOSE_TIMING_IDS.has(buttonId)) {
-        return handleGlucoseTimingReply(from, buttonId);
-      }
-      if (buttonId.startsWith("remind_")) {
-        return handleReminderSelection(from, buttonId);
-      }
+    if (buttonId && GLUCOSE_TIMING_IDS.has(buttonId)) {
+      return handleGlucoseTimingReply(from, buttonId);
     }
 
-    // Main menu list selections
+    // List selections — main menu AND reminder time picker
     const listId = message.interactive.list_reply?.id;
     if (listId) {
+      if (listId.startsWith("remind_")) {
+        return handleReminderSelection(from, listId);
+      }
       return handleMenuSelection(from, listId);
     }
 
