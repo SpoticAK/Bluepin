@@ -4,6 +4,7 @@ import {
   downloadMediaFromMeta,
   sendInvalidGlucoseResponse,
   sendTextMessage,
+  type MediaHint,
 } from "../wa-client";
 
 /**
@@ -19,17 +20,19 @@ import {
 export async function handleGlucometerImage(
   sender: string,
   mediaId: string,
+  mediaHint?: MediaHint,
 ): Promise<void> {
   let buffer: Buffer;
   let mimeType: string;
 
   try {
-    ({ buffer, mimeType } = await downloadMediaFromMeta(mediaId));
+    ({ buffer, mimeType } = await downloadMediaFromMeta(mediaId, mediaHint));
   } catch (err) {
     console.error("[imageHandler] Failed to download media:", err);
     await sendTextMessage(
       sender,
-      "⚠️ I could not download your photo. Please try sending it again.",
+      "Something went wrong on our side while fetching your photo. " +
+        "Please send it again in a minute, or type your reading instead.",
     );
     return;
   }

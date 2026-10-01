@@ -23,6 +23,22 @@ import {
 const GLUCOSE_TIMING_IDS = new Set(["fasting", "random", "post-prandial"]);
 
 /**
+ * Logs the inbound media object once per message.
+ *
+ * Meta's Media guide says webhook media carries `url`; its Messages webhook
+ * field reference does not list it. Logging the raw object settles which one is
+ * true for this app from real traffic, and shows up in logs either way.
+ */
+function logIncomingMedia(
+  kind: "image" | "document",
+  media: Record<string, unknown>,
+): void {
+  console.log(
+    `[router] inbound ${kind} media payload: ${JSON.stringify(media)}`,
+  );
+}
+
+/**
  * Entry point for every inbound message. Claims the message id up front so a
  * Meta redelivery cannot write the same reading twice.
  */
@@ -99,12 +115,18 @@ async function dispatch(message: WAMessage): Promise<void> {
 
   // --- Image (glucometer photo) ---
   if (type === "image") {
-    return handleGlucometerImage(from, message.image.id);
+    logIncomingMedia("image", message.image);
+    return handleGlucometerImage(from, message.image.id, {
+      url: message.image.url,
+      mimeType: message.image.mime_type,
+      sha256: message.image.sha256,
+    });
   }
 
   // --- Document (medical reports) ---
   if (type === "document") {
     const { id, filename, mime_type, file_size } = message.document;
+    logIncomingMedia("document", message.document);
     return handleMedicalDocUpload(
       from,
       id,
@@ -112,6 +134,11 @@ async function dispatch(message: WAMessage): Promise<void> {
       file_size,
       mime_type,
       message.id,
+      {
+        url: message.document.url,
+        mimeType: mime_type,
+        sha256: message.document.sha256,
+      },
     );
   }
 }

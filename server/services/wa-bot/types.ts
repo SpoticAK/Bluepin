@@ -37,7 +37,18 @@ export type WAImageMessage = {
   id: string;
   from: string;
   type: "image";
-  image: { id: string; mime_type: string; sha256: string };
+  image: {
+    id: string;
+    mime_type: string;
+    sha256: string;
+    /**
+     * Meta's Media guide states inbound media webhooks carry the download URL
+     * here; its Messages webhook field reference omits it. Optional so we fall
+     * back to GET /{media_id} rather than assuming either way.
+     */
+    url?: string;
+    caption?: string;
+  };
 };
 
 export type WADocumentMessage = {
@@ -50,6 +61,9 @@ export type WADocumentMessage = {
     mime_type: string;
     sha256: string;
     file_size?: number; // bytes — present in most Meta payloads
+    /** See WAImageMessage.image.url — same caveat, same optionality. */
+    url?: string;
+    caption?: string;
   };
 };
 
