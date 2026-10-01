@@ -1,8 +1,15 @@
 import type { WAMessage } from "../types";
-import { handleGlucoseText, handleGlucoseTimingReply, extractGlucoseValue } from "./glucoseHandler";
+import {
+  handleGlucoseText,
+  handleGlucoseTimingReply,
+  extractGlucoseValue,
+} from "./glucoseHandler";
 import { handleGlucometerImage } from "./imageHandler";
 import { handleMedicalDocUpload } from "./documentHandler";
-import { handleReminderPrompt, handleReminderSelection } from "./reminderHandler";
+import {
+  handleReminderPrompt,
+  handleReminderSelection,
+} from "./reminderHandler";
 import {
   sendTextMessage,
   sendHelpMessage,
@@ -70,7 +77,14 @@ export async function routeMessage(message: WAMessage): Promise<void> {
   // --- Document (medical reports) ---
   if (type === "document") {
     const { id, filename, mime_type, file_size } = message.document;
-    return handleMedicalDocUpload(from, id, filename ?? "Lab_Report.pdf", file_size, mime_type, message.id);
+    return handleMedicalDocUpload(
+      from,
+      id,
+      filename ?? "Lab_Report.pdf",
+      file_size,
+      mime_type,
+      message.id,
+    );
   }
 }
 
@@ -78,17 +92,22 @@ export async function routeMessage(message: WAMessage): Promise<void> {
  * Handles a selection from the interactive list menu.
  * Each id maps to a feature entry point.
  */
-async function handleMenuSelection(from: string, listId: string): Promise<void> {
+async function handleMenuSelection(
+  from: string,
+  listId: string,
+): Promise<void> {
   switch (listId) {
     case "log_glucose":
       await sendTextMessage(
         from,
-        "Sure! Send me your glucose reading as a number (e.g. 126) or a photo of your glucometer. 📲",
+        "Sure! Send me your glucose reading as a number (e.g. 126) or a photo of your glucometer.",
       );
       break;
     case "upload_report":
-      // TODO: documentHandler.promptUpload(from);
-      await sendTextMessage(from, "📄 Send me your health report as a PDF and I will add it to your profile.");
+      await sendTextMessage(
+        from,
+        "Send me your health report as a PDF and I will add it to your profile.",
+      );
       break;
     case "set_reminder":
       await handleReminderPrompt(from);
@@ -97,6 +116,9 @@ async function handleMenuSelection(from: string, listId: string): Promise<void> 
       await sendViewHealthProfileCta(from);
       break;
     default:
-      await sendTextMessage(from, "Sorry, I didn't recognise that option. Type *help* to see the menu.");
+      await sendTextMessage(
+        from,
+        "Sorry, I didn't recognise that option. Type *help* to see the menu.",
+      );
   }
 }

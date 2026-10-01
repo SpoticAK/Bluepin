@@ -23,8 +23,8 @@ export async function handleReminderPrompt(sender: string): Promise<void> {
   if (!uid) {
     await sendTextMessage(
       sender,
-      "⏰ To set a reminder, your WhatsApp must be linked to a Bluepin account.\n\n" +
-      "Open the Bluepin app to link your number, then try again.",
+      "To set a reminder, your WhatsApp must be linked to a Bluepin account.\n\n" +
+        "Open the Bluepin app to link your number, then try again.",
     );
     return;
   }

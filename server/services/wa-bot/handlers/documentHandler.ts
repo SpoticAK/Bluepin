@@ -28,7 +28,7 @@ export async function handleMedicalDocUpload(
   if (!uid) {
     await sendTextMessage(
       sender,
-      "📄 I received your document, but your WhatsApp is not linked to a Bluepin account yet.\n\n" +
+      "I received your document, but your WhatsApp is not linked to a Bluepin account yet.\n\n" +
         "Open the Bluepin app to link your number, then try again.",
     );
     return;

@@ -35,7 +35,10 @@ export async function sendGlucoseTimingPrompt(
         buttons: [
           { type: "reply", reply: { id: "fasting", title: "Fasting (>8h)" } },
           { type: "reply", reply: { id: "random", title: "Random (2–8h)" } },
-          { type: "reply", reply: { id: "post-prandial", title: "Post meal (<2h)" } },
+          {
+            type: "reply",
+            reply: { id: "post-prandial", title: "Post meal (<2h)" },
+          },
         ],
       },
     },
@@ -59,7 +62,7 @@ export async function sendGlucoseLogConfirmation(
     type: "interactive",
     interactive: {
       type: "cta_url",
-      header: { type: "text", text: "Glucose Successfully Logged ✅" },
+      header: { type: "text", text: "Glucose Successfully Logged" },
       body: {
         text: `Got it. I have logged *${glucoseValue} mg/dL* as a *${timingLabel}* reading.\n\nYour health profile is up to date.`,
       },
@@ -78,7 +81,9 @@ export async function sendGlucoseLogConfirmation(
 /**
  * Sent when the user's text is not a valid glucose number (out of range or non-numeric).
  */
-export async function sendInvalidGlucoseResponse(to: string): Promise<Response> {
+export async function sendInvalidGlucoseResponse(
+  to: string,
+): Promise<Response> {
   return postMessage({
     messaging_product: "whatsapp",
     recipient_type: "individual",
@@ -93,14 +98,16 @@ export async function sendInvalidGlucoseResponse(to: string): Promise<Response> 
 /**
  * Sent when the user taps a timing button but the session has expired or they double-tapped.
  */
-export async function sendNoPendingReadingResponse(to: string): Promise<Response> {
+export async function sendNoPendingReadingResponse(
+  to: string,
+): Promise<Response> {
   return postMessage({
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to,
     type: "text",
     text: {
-      body: `This reading has already been logged or timed out. ✅\n\nTo log a new reading, simply send me the number again.`,
+      body: `This reading has already been logged or timed out. \n\nTo log a new reading, simply send me the number again.`,
     },
   });
 }
