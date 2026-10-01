@@ -1,6 +1,7 @@
 import {
   downloadMediaFromMeta,
   MAX_FILE_BYTES,
+  MediaTooLargeError,
   type MediaHint,
 } from "../wa-client/media";
 import { getUidByPhone } from "../services/glucoseService";
@@ -69,6 +70,10 @@ export async function handleMedicalDocUpload(
       await downloadMediaFromMeta(mediaId, mediaHint));
   } catch (err) {
     console.error("[documentHandler] Download failed:", err);
+    if (err instanceof MediaTooLargeError) {
+      await sendInvalidReportMessage(sender, messageId);
+      return;
+    }
     await sendTextMessage(
       sender,
       "I could not download your file. Please try sending it again.",
