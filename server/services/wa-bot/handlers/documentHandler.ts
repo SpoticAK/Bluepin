@@ -71,8 +71,7 @@ export async function handleMedicalDocUpload(
     console.error("[documentHandler] Download failed:", err);
     await sendTextMessage(
       sender,
-      "Something went wrong on our side while fetching your file, so I could not read it yet. " +
-        "Please send it again in a minute — if it keeps happening, contact support.",
+      "I could not download your file. Please try sending it again.",
     );
     return;
   }

@@ -174,6 +174,18 @@ async function resolveMetadata(
 }
 
 /**
+ * Meta is not consistent about sha256 encoding: inbound webhooks deliver it
+ * base64-encoded (e.g. "Yo7NZBUN8AJ8V5l1...="), while GET /{media_id} documents
+ * it only as "<SHA_256_HASH>". Accept either rather than hard-fail on format.
+ */
+function sha256Matches(buf: Buffer, expected: string): boolean {
+  const trimmed = expected.trim();
+  const hex = createHash("sha256").update(buf).digest("hex");
+  if (hex === trimmed.toLowerCase()) return true;
+  return createHash("sha256").update(buf).digest("base64") === trimmed;
+}
+
+/**
  * Downloads a media URL into a Buffer, enforcing the size cap against both the
  * declared content-length and the bytes actually received.
  */
@@ -246,29 +258,26 @@ export async function downloadMediaFromMeta(
 
   // Both the webhook and GET /{media_id} supply sha256. A truncated body is the
   // realistic cause of a mismatch, so re-fetch once before failing outright.
-  const expectedSha = meta.sha256?.trim().toLowerCase();
+  const expectedSha = meta.sha256?.trim();
   if (expectedSha) {
-    const sha256Of = (b: Buffer) => createHash("sha256").update(b).digest("hex");
-    const actualSha = sha256Of(buffer);
-    if (actualSha !== expectedSha) {
+    if (sha256Matches(buffer, expectedSha)) {
+      console.log(`[media] SHA-256 verified for ${mediaId}.`);
+    } else {
       console.warn(
-        `[media] SHA-256 mismatch (got ${actualSha}); re-fetching once in case the body was truncated.`,
+        `[media] SHA-256 mismatch on first attempt; re-fetching once in case the body was truncated.`,
       );
       const retry = await fetchBinary(
         meta.url,
         "binary download (sha retry)",
       );
-      const retrySha = sha256Of(retry.buffer);
-      if (retrySha !== expectedSha) {
+      if (!sha256Matches(retry.buffer, expectedSha)) {
         throw new Error(
-          `Downloaded file failed its SHA-256 check twice (expected ${expectedSha}, got ${retrySha}).`,
+          `[media] Downloaded file failed its SHA-256 check twice — refusing to parse a possibly corrupt file.`,
         );
       }
       buffer = retry.buffer;
       contentType = retry.contentType;
       console.log(`[media] SHA-256 verified for ${mediaId} after re-fetch.`);
-    } else {
-      console.log(`[media] SHA-256 verified for ${mediaId}.`);
     }
   }
 

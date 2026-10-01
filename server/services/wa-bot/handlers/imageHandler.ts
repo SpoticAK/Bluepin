@@ -31,8 +31,7 @@ export async function handleGlucometerImage(
     console.error("[imageHandler] Failed to download media:", err);
     await sendTextMessage(
       sender,
-      "Something went wrong on our side while fetching your photo. " +
-        "Please send it again in a minute, or type your reading instead.",
+      "I could not download your photo. Please try sending it again.",
     );
     return;
   }
