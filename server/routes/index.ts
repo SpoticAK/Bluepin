@@ -6,6 +6,7 @@ import feedbackRouter from "./feedback";
 import whatsappRouter from "./whatsapp";
 import authRouter from "./auth";
 import cronRouter from "./cron";
+import remindersRouter from "./reminders";
 
 const apiRouter = Router();
 
@@ -18,6 +19,7 @@ apiRouter.use(globalIpLimiter);
 apiRouter.use(whatsappRouter);
 apiRouter.use(authRouter);
 apiRouter.use(cronRouter);
+apiRouter.use(remindersRouter);
 
 // Mount feature routes
 apiRouter.use(uploadRouter);

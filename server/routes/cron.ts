@@ -51,6 +51,10 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
       const { uid, phone } = doc.data();
       if (!uid || !phone) continue;
 
+      // `enabled` is absent on documents written before the flag existed, so
+      // only an explicit false opts the user out.
+      if (doc.data().enabled === false) continue;
+
       const readingsSnap = await db
         .collection(`users/${uid}/glucoseReadings`)
         .where("date", "==", todayDateStr)
@@ -89,15 +93,21 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
         const { uid, phone } = doc.data();
         if (!uid || !phone) continue;
 
-        // Skip if they explicitly scheduled an 8PM reminder (they already got Guideline 9 above)
-        const has8pmReminderSnap = await db
+        // This sweep walks whatsapp_users rather than whatsapp_reminders, so a
+        // user who stopped their reminder would otherwise keep getting the 8 PM
+        // message. Read their reminder doc and honour an explicit opt-out.
+        const ownReminderSnap = await db
           .collection("whatsapp_reminders")
           .doc(phone)
           .get();
-        if (
-          has8pmReminderSnap.exists &&
-          has8pmReminderSnap.data()?.reminderHour === END_OF_DAY_HOUR
-        ) {
+        const ownReminder = ownReminderSnap.exists
+          ? ownReminderSnap.data()
+          : undefined;
+
+        if (ownReminder?.enabled === false) continue;
+
+        // Skip if they explicitly scheduled an 8PM reminder (they already got Guideline 9 above)
+        if (ownReminder?.reminderHour === END_OF_DAY_HOUR) {
           continue;
         }
 

@@ -1,24 +1,11 @@
 import { getAdminFirestore } from "../../../firebase";
 import { getUidByPhone } from "../services/glucoseService";
+import { getSlotByRowId } from "../services/reminderSlots";
 import {
   sendReminderSetupPrompt,
   sendReminderConfirmation,
 } from "../wa-client";
 import { sendTextMessage } from "../wa-client";
-
-// 10 reminder time slots — must match the list row IDs in reminders.ts
-const REMINDER_OPTIONS: Record<string, { hour: number; display: string }> = {
-  remind_6:  { hour: 6,  display: "6:00 AM"  },
-  remind_7:  { hour: 7,  display: "7:00 AM"  },
-  remind_8:  { hour: 8,  display: "8:00 AM"  },
-  remind_9:  { hour: 9,  display: "9:00 AM"  },
-  remind_12: { hour: 12, display: "12:00 PM" },
-  remind_13: { hour: 13, display: "1:00 PM"  },
-  remind_18: { hour: 18, display: "6:00 PM"  },
-  remind_19: { hour: 19, display: "7:00 PM"  },
-  remind_20: { hour: 20, display: "8:00 PM"  },
-  remind_21: { hour: 21, display: "9:00 PM"  },
-};
 
 /**
  * Step 1: Shows the reminder time picker list.
@@ -46,7 +33,7 @@ export async function handleReminderSelection(
   sender: string,
   listId: string,
 ): Promise<void> {
-  const option = REMINDER_OPTIONS[listId];
+  const option = getSlotByRowId(listId);
   if (!option) return; // Not a reminder list item
 
   const uid = await getUidByPhone(sender);
@@ -57,12 +44,15 @@ export async function handleReminderSelection(
 
   const db = getAdminFirestore();
 
-  // Save to the exact collection expected by Bluepin's existing cron route
+  // Save to the exact collection expected by Bluepin's existing cron route.
+  // Selecting a time is an explicit opt-in, so it also re-enables a reminder
+  // the user previously stopped from the app.
   await db.doc(`whatsapp_reminders/${sender}`).set({
     uid,
     phone: sender,
     reminderHour: option.hour,
     displayTime: option.display,
+    enabled: true,
     updatedAt: new Date(),
   });
 

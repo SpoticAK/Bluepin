@@ -1,18 +1,12 @@
 import { postMessage } from "../sender";
+import { REMINDER_SLOTS } from "../../services/reminderSlots";
 
-// 10 common reminder time slots
-const REMINDER_ROWS = [
-  { id: "remind_6",  title: "6:00 AM",  },
-  { id: "remind_7",  title: "7:00 AM",  },
-  { id: "remind_8",  title: "8:00 AM",  },
-  { id: "remind_9",  title: "9:00 AM",  },
-  { id: "remind_12", title: "12:00 PM", },
-  { id: "remind_13", title: "1:00 PM",  },
-  { id: "remind_18", title: "6:00 PM",  },
-  { id: "remind_19", title: "7:00 PM",  },
-  { id: "remind_20", title: "8:00 PM",  },
-  { id: "remind_21", title: "9:00 PM",  },
-];
+// 10 common reminder time slots, row ids sourced from the canonical table so
+// the picker can never drift from the hours reminderHandler actually stores.
+const REMINDER_ROWS = REMINDER_SLOTS.map((slot) => ({
+  id: slot.rowId,
+  title: slot.display,
+}));
 
 /**
  * Sends an interactive list asking the user to pick a daily reminder time.
