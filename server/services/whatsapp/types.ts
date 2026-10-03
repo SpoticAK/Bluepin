@@ -28,7 +28,8 @@ export interface ExtractedReportResult {
 
 export interface LinkAccountResult {
   success: boolean;
-  message: string;
+  /** Only set on failure — success is confirmed by the caller sending a greeting. */
+  message?: string;
   uid?: string;
 }
 

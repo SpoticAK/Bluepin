@@ -230,12 +230,6 @@ export async function linkWhatsAppAccount(
   return {
     success: true,
     uid,
-    message:
-      "🎉 *Account successfully linked!*\n\nWelcome to Bluepin WhatsApp Sync. You can now:\n" +
-      "• 🩸 *Log glucose:* Reply with readings like `115 Fasting`, `140 PP`, or `95`\n" +
-      "• 📸 *Glucometer photo:* Send a photo of your meter screen to log automatically\n" +
-      "• 📄 *Medical reports:* Send PDF or image lab reports to analyze biomarkers\n\n" +
-      "Send *HELP* anytime for quick commands.",
   };
 }
 
