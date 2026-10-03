@@ -7,6 +7,7 @@ import whatsappRouter from "./whatsapp";
 import authRouter from "./auth";
 import cronRouter from "./cron";
 import remindersRouter from "./reminders";
+import notificationsRouter from "./notifications";
 
 const apiRouter = Router();
 
@@ -20,6 +21,7 @@ apiRouter.use(whatsappRouter);
 apiRouter.use(authRouter);
 apiRouter.use(cronRouter);
 apiRouter.use(remindersRouter);
+apiRouter.use(notificationsRouter);
 
 // Mount feature routes
 apiRouter.use(uploadRouter);

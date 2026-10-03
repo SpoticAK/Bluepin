@@ -170,11 +170,15 @@ router.post("/reminders/stop", requireAuth, async (req: any, res) => {
       return res.json({ success: true, changed: false, reminder: previous });
     }
 
+    // Push shares this reminder's hour, so stopping it has to silence both
+    // channels — otherwise the user taps Stop in the WhatsApp modal and still
+    // receives a browser notification at the same hour.
     await ref.set(
       {
         uid,
         phone,
         enabled: false,
+        pushEnabled: false,
         updatedAt: new Date(),
       },
       { merge: true },

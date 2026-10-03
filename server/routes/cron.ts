@@ -5,6 +5,7 @@ import {
   getTemplateLang,
   maskPhone,
 } from "../services/whatsapp/client";
+import { sendGlucosePushNudges } from "../services/notifications";
 
 const router = express.Router();
 
@@ -46,13 +47,17 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
       .get();
 
     let sentScheduledCount = 0;
+    // Users who opted into push and have not logged yet, collected during the
+    // loop below so the "already logged" check is not repeated for the push send.
+    const pushCandidates: Array<{ uid: string }> = [];
 
     for (const doc of remindersSnap.docs) {
       const { uid, phone } = doc.data();
-      if (!uid || !phone) continue;
+      if (!uid) continue;
 
       // `enabled` is absent on documents written before the flag existed, so
-      // only an explicit false opts the user out.
+      // only an explicit false opts the user out. It governs the WhatsApp
+      // channel; push has its own `pushEnabled` flag.
       if (doc.data().enabled === false) continue;
 
       const readingsSnap = await db
@@ -64,6 +69,14 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
       if (!readingsSnap.empty) {
         continue;
       }
+
+      if (doc.data().pushEnabled === true) {
+        pushCandidates.push({ uid });
+      }
+
+      // No linked number means there is nothing to send over WhatsApp, but a
+      // push-only user still needs their reminder.
+      if (!phone) continue;
 
       try {
         // Template for Guideline 9
@@ -78,6 +91,21 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
           `[Cron] Failed to send scheduled reminder to ${maskPhone(phone)}:`,
           err,
         );
+      }
+    }
+
+    // --- 1b. Scheduled Push Notifications ---
+    // Sent after the WhatsApp loop so both channels reuse the single readings
+    // query above. Failures here must never affect WhatsApp delivery counts.
+    let pushResult = { delivered: 0, prunedTokens: 0, errors: 0 };
+    if (pushCandidates.length > 0) {
+      try {
+        pushResult = await sendGlucosePushNudges(pushCandidates);
+        console.log(
+          `[Cron] Push nudge delivered to ${pushResult.delivered} device(s), pruned ${pushResult.prunedTokens} stale token(s).`,
+        );
+      } catch (err: any) {
+        console.error("[Cron] Push nudge stage failed:", err?.message || err);
       }
     }
 
@@ -142,6 +170,9 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
       success: true,
       scheduledSent: sentScheduledCount,
       sweepSent: sentSweepCount,
+      pushDelivered: pushResult.delivered,
+      pushPrunedTokens: pushResult.prunedTokens,
+      pushErrors: pushResult.errors,
     });
   } catch (err: any) {
     console.error("[Cron] Error running whatsapp reminders:", err);

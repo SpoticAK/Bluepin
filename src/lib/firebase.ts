@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getMessaging, isSupported } from 'firebase/messaging';
 import defaultConfig from '../../firebase-applet-config.json';
 
 const cleanEnv = (val?: string) => val ? val.trim().replace(/^["']|["']$/g, '') : undefined;
@@ -26,6 +27,15 @@ export const db = initializeFirestore(app, {}, firebaseConfig.firestoreDatabaseI
 export const auth = getAuth(app);
 auth.useDeviceLanguage();
 export const storage = getStorage(app);
+
+// FCM is used for browser push notifications. `getMessaging` throws in browsers
+// without push support (older Safari, some in-app webviews), so it is resolved
+// lazily via `getPushMessaging` rather than at module load — otherwise importing
+// anything from this file would break those browsers entirely.
+export async function getPushMessaging() {
+  if (!(await isSupported())) return null;
+  return getMessaging(app);
+}
 
 export enum OperationType {
   CREATE = 'create',
