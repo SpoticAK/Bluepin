@@ -9,7 +9,7 @@ import getCareReminders from '../careReminderRules';
 import { useAppStore } from '../store';
 import { Pin, Target, Hexagon, Circle, X, FileText, ChevronRight, ChevronDown, Droplet, Plus, ArrowUp, ArrowDown, Users, Check, Activity, HeartPulse, User, Flame } from 'lucide-react';
 import { parseISO, isAfter, subDays } from 'date-fns';
-import { cn, safeFormat } from '../lib/utils';
+import { cn, istToday, safeFormat } from '../lib/utils';
 import { TIER_1, calculateStatus, isCoreBiomarkerPresent, getCoreBiomarkersByCategory, hydrateBiomarker } from '../lib/biomarkerUtils';
 import { getHydratedBiomarkers, getDashboardMetrics, sortLabReports, getCanvasHealthScore } from '../lib/derivedMetrics';
 import { auth } from '../lib/firebase';
@@ -148,7 +148,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
   }, [glucoseReadings]);
 
   const todayUniqueReadings = useMemo(() => {
-    const todayStr = safeFormat(new Date(), 'yyyy-MM-dd');
+    const todayStr = istToday();
     return uniqueGlucoseReadings.filter(r => r.date === todayStr);
   }, [uniqueGlucoseReadings]);
 

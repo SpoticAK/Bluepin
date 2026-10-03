@@ -6,6 +6,7 @@ import {
 } from "./glucoseHandler";
 import { handleGlucometerImage } from "./imageHandler";
 import { handleMedicalDocUpload } from "./documentHandler";
+import { handleLinkCode } from "./linkHandler";
 import {
   handleReminderPrompt,
   handleReminderSelection,
@@ -67,6 +68,15 @@ async function dispatch(message: WAMessage): Promise<void> {
   // --- Text messages ---
   if (type === "text") {
     const text = message.text.body.trim().toLowerCase();
+
+    // Link codes are matched before any glucose extraction. A six-digit code is
+    // far above the 800 glucose ceiling, so it can never be a reading — but the
+    // extractor grabs the first digits it finds anywhere in the string, which
+    // would otherwise turn "LINK 482913" into an invalid-glucose reply.
+    const linkCode = text.match(/^(?:link(?:ing)?\s*)?(\d{6})$/);
+    if (linkCode) {
+      return handleLinkCode(from, linkCode[1]);
+    }
 
     // Check if the user's text contains a likely glucose number
     const extractedNum = extractGlucoseValue(text);
