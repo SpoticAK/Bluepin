@@ -8,9 +8,6 @@ import {
   CheckCircle2,
   Unlink,
   AlertCircle,
-  Sparkles,
-  FileText,
-  Droplet,
   ArrowLeft,
   Loader2,
   RotateCw,
@@ -707,69 +704,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                 </div>
               </div>
 
-              {/* How it works */}
-              <div className="flex flex-col gap-2.5">
-                <h4 className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
-                  How to log with WhatsApp
-                </h4>
-
-                <div className="bg-neutral-50 rounded-2xl p-3 border border-neutral-100 flex items-start gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <Droplet size={14} className="fill-red-600" />
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-semibold text-neutral-900">
-                      Text Your Glucose
-                    </p>
-                    <p className="text-neutral-500 mt-0.5">
-                      Send messages like{" "}
-                      <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-800 font-mono">
-                        115 Fasting
-                      </code>
-                      ,{" "}
-                      <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-800 font-mono">
-                        140 PP
-                      </code>
-                      , or just{" "}
-                      <code className="bg-white px-1.5 py-0.5 rounded border border-neutral-200 text-neutral-800 font-mono">
-                        98
-                      </code>
-                      .
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-neutral-50 rounded-2xl p-3 border border-neutral-100 flex items-start gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <Sparkles size={14} />
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-semibold text-neutral-900">
-                      Send Glucometer Photos
-                    </p>
-                    <p className="text-neutral-500 mt-0.5">
-                      Take a picture of your glucometer display. Bluepin's AI
-                      will automatically parse the reading and unit.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-neutral-50 rounded-2xl p-3 border border-neutral-100 flex items-start gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <FileText size={14} />
-                  </div>
-                  <div className="text-xs">
-                    <p className="font-semibold text-neutral-900">
-                      Upload Medical Reports
-                    </p>
-                    <p className="text-neutral-500 mt-0.5">
-                      Send a PDF lab report or photo. Biomarkers (HbA1c, CBC,
-                      Lipids) will be extracted and saved to your dashboard.
-                    </p>
-                  </div>
-                </div>
               </div>
-            </div>
           ) : (
             /* Unconnected State: In-App OTP Flow */
             <div className="flex flex-col gap-4">

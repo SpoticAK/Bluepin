@@ -227,12 +227,15 @@ export async function processIncomingWhatsAppMessage(
           const magicUrl = await createWhatsAppMagicLoginUrl(result.uid);
           await sendWhatsAppCtaUrl(
             senderPhone,
-            result.message,
+            result.message ?? "Your WhatsApp is now linked to Bluepin.",
             "Open Dashboard",
             magicUrl,
           );
         } else {
-          await sendWhatsAppMessage(senderPhone, result.message);
+          await sendWhatsAppMessage(
+            senderPhone,
+            result.message ?? "Sorry, we could not link your WhatsApp.",
+          );
         }
         return;
       }
