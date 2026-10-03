@@ -17,15 +17,25 @@ import {
   ShieldCheck,
   ChevronDown,
   ChevronUp,
+  Bell,
+  BellOff,
+  Clock,
 } from "lucide-react";
 import { auth } from "../lib/firebase";
 import { useAppStore } from "../store";
 import { cn } from "../lib/utils";
 import { WhatsAppIcon } from "./CustomEmojis";
+import type { Reminder, ReminderSlot } from "../types";
 
 interface WhatsAppModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface RemindersResponse {
+  linked: boolean;
+  reminder: Reminder | null;
+  slots: ReminderSlot[];
 }
 
 export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
@@ -61,12 +71,49 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
   const [botPhone, setBotPhone] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Daily glucose reminder. Lives in whatsapp_reminders/{phone}, which the
+  // client SDK cannot reach, so all of it goes through /api/reminders.
+  const [slots, setSlots] = useState<ReminderSlot[]>([]);
+  const [reminder, setReminder] = useState<Reminder | null>(null);
+  const [pendingHour, setPendingHour] = useState<number | null>(null);
+  const [reminderLoading, setReminderLoading] = useState(false);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+
   // Sync state if profile updates
   useEffect(() => {
     if (profile.whatsappPhone) {
       setLinkedPhone(profile.whatsappPhone);
     }
   }, [profile.whatsappPhone]);
+
+  /**
+   * Loads the reminder state whenever the modal opens, so the picker always
+   * reflects the current stored value — including one last set from WhatsApp.
+   */
+  const fetchReminder = async () => {
+    setReminderLoading(true);
+    setReminderError(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+
+      const res = await fetch("/api/reminders", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+
+      const data: RemindersResponse = await res.json();
+      setSlots(Array.isArray(data.slots) ? data.slots : []);
+      setReminder(data.reminder ?? null);
+      setPendingHour(null);
+    } catch (err: any) {
+      setReminderError(
+        err?.message || "Could not load your reminder settings.",
+      );
+    } finally {
+      setReminderLoading(false);
+    }
+  };
 
   // Check linking status on open
   const checkStatus = async () => {
@@ -99,6 +146,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
   useEffect(() => {
     if (isOpen) {
       checkStatus();
+      fetchReminder();
       setError(null);
       setStep("phone");
       setOtpDigits(["", "", "", "", "", ""]);
@@ -328,12 +376,71 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
         setCode(null);
         setStep("phone");
         setPhoneNumber("");
+        // Unlinking deletes the reminder server-side, so clear local state too.
+        setReminder(null);
+        setPendingHour(null);
         updateProfile({ whatsappPhone: undefined });
       }
     } catch (err: any) {
       setError(err.message || "Failed to unlink account.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ─── 3b. Daily Reminder: Save / Stop ──────────────────────────────────────────
+  const handleSaveReminder = async () => {
+    if (pendingHour === null) return;
+    setReminderLoading(true);
+    setReminderError(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("You must be signed in.");
+
+      const res = await fetch("/api/reminders", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ hour: pendingHour }),
+      });
+
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data.error || "Failed to save your reminder.");
+
+      setReminder(data.reminder ?? null);
+      setPendingHour(null);
+    } catch (err: any) {
+      setReminderError(err.message || "Failed to save your reminder.");
+    } finally {
+      setReminderLoading(false);
+    }
+  };
+
+  const handleStopReminder = async () => {
+    setReminderLoading(true);
+    setReminderError(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("You must be signed in.");
+
+      const res = await fetch("/api/reminders/stop", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data.error || "Failed to stop your reminder.");
+
+      setReminder(data.reminder ?? null);
+      setPendingHour(null);
+    } catch (err: any) {
+      setReminderError(err.message || "Failed to stop your reminder.");
+    } finally {
+      setReminderLoading(false);
     }
   };
 
@@ -376,7 +483,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+      className="fixed inset-0 z-110 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -416,6 +523,13 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
             </div>
           )}
 
+          {reminderError && (
+            <div className="bg-red-50 text-red-600 text-xs p-3 rounded-xl flex items-center gap-2 border border-red-100">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{reminderError}</span>
+            </div>
+          )}
+
           {linkedPhone ? (
             /* Connected State */
             <div className="flex flex-col gap-4">
@@ -441,6 +555,150 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                   <Unlink size={13} />
                   Disconnect
                 </button>
+              </div>
+
+              {/* Daily Reminder */}
+              <div className="bg-theme-card border border-theme-border/60 rounded-2xl p-4 flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div
+                      className={cn(
+                        "w-9 h-9 rounded-full border flex items-center justify-center shrink-0 shadow-sm",
+                        reminder?.enabled
+                          ? "bg-theme-accent/10 border-theme-accent/25 text-theme-accent"
+                          : "bg-theme-card-sec border-theme-border text-theme-text-sec",
+                      )}
+                    >
+                      {reminder?.enabled ? (
+                        <Bell size={17} />
+                      ) : (
+                        <BellOff size={17} />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-[13px] font-bold text-theme-text leading-tight">
+                        Daily Glucose Reminder
+                      </h4>
+                      <p className="text-[11px] text-theme-text-sec leading-snug mt-0.5">
+                        {reminderLoading && !reminder ? (
+                          "Loading reminder..."
+                        ) : reminder?.enabled ? (
+                          <>
+                            On — we&apos;ll nudge you at{" "}
+                            <span className="font-semibold text-theme-text">
+                              {reminder.displayTime}
+                            </span>{" "}
+                            if you haven&apos;t logged.
+                          </>
+                        ) : (
+                          "Off — pick a time below to switch it on."
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {slots.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-1.5 text-theme-text-sec">
+                      <Clock size={12} />
+                      <span className="text-[11px] font-semibold">
+                        Reminder time — IST (India)
+                      </span>
+                    </div>
+
+                    {/* A select rather than 19 chips: a wrapping grid spent
+                        ~145px giving every hour equal weight, and a horizontal
+                        rail hid most options behind a swipe. This stays one
+                        line tall, exposes the whole range on tap, and inherits
+                        native keyboard and screen-reader behaviour. */}
+                    <div className="relative">
+                      <select
+                        value={pendingHour ?? (reminder?.enabled ? reminder.hour : "")}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          if (next === "") return;
+                          setPendingHour(Number(next));
+                        }}
+                        disabled={reminderLoading}
+                        aria-label="Reminder time in IST"
+                        className={cn(
+                          "w-full appearance-none bg-theme-card text-[12px] font-semibold py-2.5 pl-3 pr-9 rounded-xl border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                          pendingHour !== null && pendingHour !== reminder?.hour
+                            ? "border-theme-accent ring-1 ring-theme-accent"
+                            : "border-theme-border",
+                          "text-theme-text focus:outline-none focus:ring-1 focus:ring-theme-accent",
+                        )}
+                      >
+                        <option value="" className="bg-theme-card text-theme-text-sec">
+                          Choose a time…
+                        </option>
+                        {slots.map((slot) => (
+                          <option
+                            key={slot.hour}
+                            value={slot.hour}
+                            className="bg-theme-card text-theme-text"
+                          >
+                            {slot.display}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        size={15}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-theme-text-sec"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="flex items-center gap-2 pt-0.5">
+                  {pendingHour !== null && (
+                    <button
+                      onClick={handleSaveReminder}
+                      disabled={reminderLoading}
+                      className="flex-1 py-2.5 px-4 rounded-xl bg-theme-accent hover:bg-theme-accent/90 text-white text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {reminderLoading ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bell size={13} />
+                          <span>Save reminder</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {reminder && (
+                    <button
+                      onClick={
+                        reminder.enabled ? handleStopReminder : undefined
+                      }
+                      disabled={reminderLoading || !reminder.enabled}
+                      title={
+                        reminder.enabled
+                          ? "Stop this reminder"
+                          : "Pick a time above to turn it back on"
+                      }
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 rounded-xl text-[12px] font-semibold transition-all border disabled:cursor-not-allowed",
+                        reminder.enabled
+                          ? "py-2.5 px-4 border-theme-border bg-theme-card-sec text-theme-text-sec hover:text-theme-critical hover:border-theme-critical/40 hover:bg-theme-critical/10"
+                          : "py-2.5 px-4 border-theme-border bg-theme-card-sec text-theme-text-sec/50",
+                      )}
+                    >
+                      {reminderLoading && reminder.enabled ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <BellOff size={13} />
+                      )}
+                      <span>Stop</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* How it works */}

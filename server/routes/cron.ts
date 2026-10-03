@@ -5,6 +5,7 @@ import {
   getTemplateLang,
   maskPhone,
 } from "../services/whatsapp/client";
+import { sendGlucosePushNudges } from "../services/notifications";
 
 const router = express.Router();
 
@@ -46,10 +47,18 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
       .get();
 
     let sentScheduledCount = 0;
+    // Users who opted into push and have not logged yet, collected during the
+    // loop below so the "already logged" check is not repeated for the push send.
+    const pushCandidates: Array<{ uid: string }> = [];
 
     for (const doc of remindersSnap.docs) {
       const { uid, phone } = doc.data();
-      if (!uid || !phone) continue;
+      if (!uid) continue;
+
+      // `enabled` is absent on documents written before the flag existed, so
+      // only an explicit false opts the user out. It governs the WhatsApp
+      // channel; push has its own `pushEnabled` flag.
+      if (doc.data().enabled === false) continue;
 
       const readingsSnap = await db
         .collection(`users/${uid}/glucoseReadings`)
@@ -60,6 +69,14 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
       if (!readingsSnap.empty) {
         continue;
       }
+
+      if (doc.data().pushEnabled === true) {
+        pushCandidates.push({ uid });
+      }
+
+      // No linked number means there is nothing to send over WhatsApp, but a
+      // push-only user still needs their reminder.
+      if (!phone) continue;
 
       try {
         // Template for Guideline 9
@@ -77,6 +94,21 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
       }
     }
 
+    // --- 1b. Scheduled Push Notifications ---
+    // Sent after the WhatsApp loop so both channels reuse the single readings
+    // query above. Failures here must never affect WhatsApp delivery counts.
+    let pushResult = { delivered: 0, prunedTokens: 0, errors: 0 };
+    if (pushCandidates.length > 0) {
+      try {
+        pushResult = await sendGlucosePushNudges(pushCandidates);
+        console.log(
+          `[Cron] Push nudge delivered to ${pushResult.delivered} device(s), pruned ${pushResult.prunedTokens} stale token(s).`,
+        );
+      } catch (err: any) {
+        console.error("[Cron] Push nudge stage failed:", err?.message || err);
+      }
+    }
+
     // --- 2. End-of-Day Sweep (Guideline 10) ---
     // If it is 8:00 PM IST (20), we sweep everyone who missed logging today.
     const END_OF_DAY_HOUR = 20;
@@ -89,15 +121,21 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
         const { uid, phone } = doc.data();
         if (!uid || !phone) continue;
 
-        // Skip if they explicitly scheduled an 8PM reminder (they already got Guideline 9 above)
-        const has8pmReminderSnap = await db
+        // This sweep walks whatsapp_users rather than whatsapp_reminders, so a
+        // user who stopped their reminder would otherwise keep getting the 8 PM
+        // message. Read their reminder doc and honour an explicit opt-out.
+        const ownReminderSnap = await db
           .collection("whatsapp_reminders")
           .doc(phone)
           .get();
-        if (
-          has8pmReminderSnap.exists &&
-          has8pmReminderSnap.data()?.reminderHour === END_OF_DAY_HOUR
-        ) {
+        const ownReminder = ownReminderSnap.exists
+          ? ownReminderSnap.data()
+          : undefined;
+
+        if (ownReminder?.enabled === false) continue;
+
+        // Skip if they explicitly scheduled an 8PM reminder (they already got Guideline 9 above)
+        if (ownReminder?.reminderHour === END_OF_DAY_HOUR) {
           continue;
         }
 
@@ -132,6 +170,9 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
       success: true,
       scheduledSent: sentScheduledCount,
       sweepSent: sentSweepCount,
+      pushDelivered: pushResult.delivered,
+      pushPrunedTokens: pushResult.prunedTokens,
+      pushErrors: pushResult.errors,
     });
   } catch (err: any) {
     console.error("[Cron] Error running whatsapp reminders:", err);

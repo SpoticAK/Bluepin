@@ -111,29 +111,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
     });
   }, [score, isGlucoseTracking, glucoseReadings, weightEntries, labReports]);
 
-  const remindersRef = React.useRef<HTMLElement>(null);
-  const [hasSeenReminders, setHasSeenReminders] = useState(false);
-  const [showNotifierReady, setShowNotifierReady] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowNotifierReady(true), 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!remindersRef.current || activeReminders.length === 0 || hasSeenReminders) return;
-    
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setHasSeenReminders(true);
-        observer.disconnect();
-      }
-    }, { threshold: 0.1 });
-
-    observer.observe(remindersRef.current);
-
-    return () => observer.disconnect();
-  }, [activeReminders.length, hasSeenReminders]);
+  
 
 
     
@@ -304,7 +282,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
 
   
   const careRemindersNode = (
-<section ref={remindersRef} className="mt-8 relative">
+<section className="mt-8 relative">
           <div className="flex items-center justify-between px-2 mb-3">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-400 dark:bg-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.6)]" style={{ animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />

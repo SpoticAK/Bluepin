@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet, Scale, MessageCircle, MessageSquare } from 'lucide-react';
+import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet, Scale, MessageCircle, MessageSquare, Bell } from 'lucide-react';
 import { useAppStore } from '../store';
 import { auth } from '../lib/firebase';
 import { deleteUser } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { LegalDocsModal } from './LegalDocsModal';
 import { WhatsAppModal } from './WhatsAppModal';
+import { NotificationsModal } from './NotificationsModal';
 import { FeedbackWidget } from './FeedbackWidget';
 import { LegalDocType } from '../lib/consentManager';
 
@@ -21,6 +22,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -271,6 +273,26 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
+            <div
+              onClick={() => setShowNotificationsModal(true)}
+              className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-2.5 text-neutral-900">
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Bell size={14} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[13px] font-medium leading-tight">Notifications</span>
+                  <span className="text-[10px] text-neutral-500">
+                    Browser nudge on this device
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <ChevronRight size={14} className="text-neutral-400" />
+              </div>
+            </div>
+
             <FeedbackWidget
               trigger={
                 <div className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]">
@@ -321,6 +343,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
       </div>
       <LegalDocsModal isOpen={!!openLegalDoc} onClose={() => setOpenLegalDoc(null)} defaultTab={openLegalDoc || 'terms'} />
       <WhatsAppModal isOpen={showWhatsAppModal} onClose={() => setShowWhatsAppModal(false)} />
+      <NotificationsModal isOpen={showNotificationsModal} onClose={() => setShowNotificationsModal(false)} />
     </div>
   );
 }

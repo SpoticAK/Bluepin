@@ -27,6 +27,9 @@ if (!getApps().length) {
 }
 
 export const getAdminAuth = () => getAuth();
+/** Exposed so FCM can be resolved lazily; `getMessaging` throws when the
+ *  project has no messaging service account configured. */
+export const getAdminApp = () => getApps()[0];
 const firestoreDatabaseId = process.env.VITE_FIREBASE_DATABASE_ID || (firebaseConfig as any).firestoreDatabaseId || '(default)';
 export const getAdminFirestore = () => getFirestore(firestoreDatabaseId);
 

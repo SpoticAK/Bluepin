@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bluepin-cache-v2';
+const CACHE_NAME = 'bluepin-cache-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -112,6 +112,61 @@ self.addEventListener('fetch', (event) => {
         });
 
       return cachedResponse || fetchPromise;
+    })
+  );
+});
+
+// ─── Push Notifications ────────────────────────────────────────────────────────
+// Delivered by Firebase Cloud Messaging. Payloads arrive as a JSON object; the
+// server controls the shape via server/routes/cron.ts.
+
+// Push Event - Show a system notification when a message arrives
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (err) {
+    // A malformed payload should not discard the notification entirely; fall
+    // back to the raw text so the user still sees something.
+    console.warn('[SW] Push payload was not JSON:', err);
+    payload = { notification: { body: event.data ? event.data.text() : '' } };
+  }
+
+  const notification = payload.notification || {};
+  const title = notification.title || 'Bluepin';
+  const options = {
+    body: notification.body || '',
+    icon: notification.icon || '/pwa-192x192.png',
+    badge: '/bluepin-96.webp',
+    // Tag collapses repeat nudges for the same reminder instead of stacking.
+    tag: payload.data?.tag || undefined,
+    data: payload.data || {},
+    vibrate: [100, 50, 100],
+    renotify: true,
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Notification Click - Focus an open tab, or open a fresh one
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Reuse an already-open tab so the user doesn't accumulate new ones.
+      for (const client of clientList) {
+        if ('focus' in client) {
+          if ('navigate' in client && client.url !== targetUrl) {
+            return client.navigate(targetUrl).then((navigated) => client.focus())
+              .catch(() => client.focus());
+          }
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(targetUrl);
     })
   );
 });
