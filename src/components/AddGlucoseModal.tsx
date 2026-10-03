@@ -10,7 +10,7 @@ import { useAppStore } from "../store";
 import { UploadCloud, Camera, Loader2, Info, X } from "lucide-react";
 import { GlucoseReading, MealTiming } from "../types";
 import { v4 as uuidv4 } from "uuid";
-import { cn, safeFormat, trackEvent } from "../lib/utils";
+import { cn, istTime, istToday, trackEvent } from "../lib/utils";
 import {
   ALLOWED_EXTENSIONS,
   CHUNK_SIZE,
@@ -476,7 +476,9 @@ export function AddGlucoseModal({ onClose, onAdd }: AddGlucoseModalProps) {
     }
 
     const timing = timingSelection;
-    const date = safeFormat(new Date(), "yyyy-MM-dd");
+    // IST, not the device's day — cron compares this `date` against the IST
+    // day it fires on, so the two must agree on which calendar day this is.
+    const date = istToday();
     const existingReading = glucoseReadings.find(
       (r) => r.date === date && r.timing === timing,
     );
@@ -491,7 +493,7 @@ export function AddGlucoseModal({ onClose, onAdd }: AddGlucoseModalProps) {
       source,
       imageUrl: imageUrlData,
       date,
-      time: safeFormat(new Date(), "HH:mm"),
+      time: istTime(),
       createdAt: existingReading ? existingReading.createdAt : Date.now(),
     };
 

@@ -27,6 +27,18 @@ const VALID_TIMING_IDS = new Set<string>([
 ]);
 
 /**
+ * Shown when a glucose reading arrives from a number with no linked account.
+ *
+ * An unlinked reading has nowhere to go, so the flow stops before the timing
+ * prompt. Previously it ran to completion and then sent the success
+ * confirmation anyway, telling the user their reading was saved when the
+ * write had been skipped.
+ */
+const LINK_REQUIRED_MESSAGE =
+  "To log a glucose reading, your WhatsApp must be linked to a Bluepin account.\n\n" +
+  "Open the Bluepin app to link your number, then try again.";
+
+/**
  * Smartly extracts a probable glucose reading from free-form text.
  * Handles integers (126), decimals (5.4), mg/dL, mmol/L, and conversational text.
  */
@@ -75,17 +87,23 @@ export async function handleGlucoseText(
   // Look up the linked Bluepin account
   const uid = await getUidByPhone(sender);
 
-  // If linked, do a cheap read-only limit check before asking for timing
-  // so we don't put the user through the timing flow only to reject at the end
-  if (uid) {
-    const allowed = await isGlucoseAllowed(uid);
-    if (!allowed) {
-      await sendTextMessage(
-        sender,
-        "You have reached the daily limit of 10 glucose readings for today.",
-      );
-      return;
-    }
+  // Refuse before the timing prompt rather than after it. Without a uid there
+  // is nowhere to write the reading, so asking the user to pick Fasting or
+  // Post-Prandial only sets up a confirmation for data we would discard.
+  if (!uid) {
+    await sendTextMessage(sender, LINK_REQUIRED_MESSAGE);
+    return;
+  }
+
+  // Cheap read-only limit check before asking for timing, so we don't put the
+  // user through the timing flow only to reject at the end
+  const allowed = await isGlucoseAllowed(uid);
+  if (!allowed) {
+    await sendTextMessage(
+      sender,
+      "You have reached the daily limit of 10 glucose readings for today.",
+    );
+    return;
   }
 
   // Store value + uid in session — nothing hits the DB yet
@@ -133,10 +151,14 @@ export async function handleGlucoseTimingReply(
       return;
     }
   } else {
-    // Unlinked phone — log it but skip DB write
+    // Unreachable now that step 1 refuses unlinked senders, but kept as a
+    // guard: a pending entry outlives the code change that produced it, and a
+    // success confirmation for an unwritten reading is worse than a refusal.
     console.log(
-      `[glucose] Unlinked phone ${sender} — value=${pending.value} timing=${timing} not persisted`,
+      `[glucose] Pending entry for unlinked phone ${sender} — value=${pending.value} timing=${timing} not persisted`,
     );
+    await sendTextMessage(sender, LINK_REQUIRED_MESSAGE);
+    return;
   }
 
   await sendGlucoseLogConfirmation(sender, pending.value, timing);

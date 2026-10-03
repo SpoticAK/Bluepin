@@ -56,6 +56,43 @@ export function safeFormat(dateStr: string | Date | undefined | null, formatStr:
   }
 }
 
+/**
+ * Asia/Kolkata is UTC+05:30 with no DST, so a fixed offset is exact — and it
+ * mirrors how server/routes/cron.ts derives the day it fires on. Keep the two
+ * expressed the same way.
+ */
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+function shiftedToIst(now: Date): Date {
+  return new Date(now.getTime() + IST_OFFSET_MS);
+}
+
+/**
+ * The current IST calendar day as YYYY-MM-DD.
+ *
+ * A glucose reading's `date` must be the IST day, not the browser's day.
+ * Cron answers "has this user logged today?" by comparing that stored `date`
+ * against the IST day it fires on, so a device set to another timezone would
+ * otherwise file a reading under a day cron never queries — and cron would
+ * re-nudge somebody who had already logged.
+ *
+ * Only use this for values cross-checked against cron. Goal logs are a
+ * different system keyed purely on the device's own day and must stay local.
+ */
+export function istToday(now: Date = new Date()): string {
+  return shiftedToIst(now).toISOString().slice(0, 10);
+}
+
+/**
+ * The current IST wall-clock time as HH:mm.
+ *
+ * Matches the server's writer, which formats the same field in en-GB with
+ * hour12: false.
+ */
+export function istTime(now: Date = new Date()): string {
+  return shiftedToIst(now).toISOString().slice(11, 16);
+}
+
 export const downloadFile = (fileUrl: string, date: string) => {
   try {
     if (fileUrl.startsWith('data:')) {

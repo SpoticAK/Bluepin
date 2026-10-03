@@ -19,22 +19,27 @@ function getUtcDay(d = new Date()) {
 }
 
 /**
- * Resolves the user's local date (YYYY-MM-DD) and time (HH:mm) from their phone
- * country code, so a reading logged at 11pm is filed under the right day.
+ * Resolves the local date (YYYY-MM-DD) and time (HH:mm) for a reading, so one
+ * logged at 11pm is filed under the right day.
  *
- * APP_TIMEZONE overrides the inferred zone when set.
+ * Bluepin is India-only, so this is always IST — and it has to stay in step
+ * with the IST assumption in server/routes/cron.ts. Cron compares this `date`
+ * against the day it fires in; if the two ever disagree on the calendar day,
+ * cron concludes a user who already logged has not, and re-nudges them.
+ *
+ * The zone is deliberately NOT inferred from the sender's country code. That
+ * mapped Meta's `1…` test number to America/New_York, which sits 10.5 hours
+ * behind IST, so readings were filed under a different day than cron checked
+ * whenever the IST clock was between midnight and 05:30.
+ *
+ * APP_TIMEZONE overrides the zone when set. `senderPhone` is retained so call
+ * sites keep reading naturally, but it no longer influences the result.
  */
 export function getFormattedUserTime(
-  senderPhone: string,
+  _senderPhone: string,
   dateObj = new Date(),
 ): { dateStr: string; timeStr: string } {
-  let timeZone = "Asia/Kolkata";
-  if (senderPhone.startsWith("1")) timeZone = "America/New_York";
-  else if (senderPhone.startsWith("44")) timeZone = "Europe/London";
-  else if (senderPhone.startsWith("971")) timeZone = "Asia/Dubai";
-  else if (senderPhone.startsWith("65")) timeZone = "Asia/Singapore";
-  else if (senderPhone.startsWith("61")) timeZone = "Australia/Sydney";
-  if (process.env.APP_TIMEZONE) timeZone = process.env.APP_TIMEZONE;
+  const timeZone = process.env.APP_TIMEZONE || "Asia/Kolkata";
 
   const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone }).format(
     dateObj,
