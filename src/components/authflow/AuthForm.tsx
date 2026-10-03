@@ -23,7 +23,7 @@ interface AuthFormProps {
 }
 
 export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
-  const [authMethod, setAuthMethod] = useState<"phone" | "email">("phone");
+  const [authMethod, setAuthMethod] = useState<"phone" | "email">("email");
   const [isLogin, setIsLogin] = useState(true);
   const [phoneStep, setPhoneStep] = useState<"phone" | "otp">("phone");
   const [rawPhone, setRawPhone] = useState("");
@@ -122,7 +122,7 @@ export default function AuthForm({ onOpenLegalDoc }: AuthFormProps) {
   return (
     <>
       {/* Auth Method Selector (Phone / Email) */}
-      <div className="flex bg-theme-card-sec p-1 rounded-xl mb-5 border border-theme-border">
+      <div className="hidden bg-theme-card-sec p-1 rounded-xl mb-5 border border-theme-border">
         <button
           type="button"
           onClick={() => handleMethodSwitch("phone")}

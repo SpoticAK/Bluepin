@@ -64,7 +64,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Fallback bot code states
-  const [showManualCode, setShowManualCode] = useState(false);
+  const [showManualCode, setShowManualCode] = useState(true);
   const [code, setCode] = useState<string | null>(null);
   const [expiresIn, setExpiresIn] = useState<number>(600);
   const [deepLink, setDeepLink] = useState<string | null>(null);
@@ -614,7 +614,10 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                         native keyboard and screen-reader behaviour. */}
                     <div className="relative">
                       <select
-                        value={pendingHour ?? (reminder?.enabled ? reminder.hour : "")}
+                        value={
+                          pendingHour ??
+                          (reminder?.enabled ? reminder.hour : "")
+                        }
                         onChange={(e) => {
                           const next = e.target.value;
                           if (next === "") return;
@@ -630,7 +633,10 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                           "text-theme-text focus:outline-none focus:ring-1 focus:ring-theme-accent",
                         )}
                       >
-                        <option value="" className="bg-theme-card text-theme-text-sec">
+                        <option
+                          value=""
+                          className="bg-theme-card text-theme-text-sec"
+                        >
                           Choose a time…
                         </option>
                         {slots.map((slot) => (
@@ -772,157 +778,162 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                 meter photos, and analyse lab reports instantly via WhatsApp.
               </div>
 
-              {step === "phone" ? (
-                /* Step 1: Enter Phone Number */
-                <form onSubmit={handleSendOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-neutral-800 mb-1.5">
-                      WhatsApp Mobile Number
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 px-3 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-neutral-800 text-sm font-semibold select-none">
-                        <span>🇮🇳</span>
-                        <span>{countryCode}</span>
-                      </div>
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        autoComplete="tel"
-                        required
-                        autoFocus
-                        placeholder="Enter 10-digit number"
-                        value={phoneNumber}
-                        onChange={(e) => {
-                          const cleaned = e.target.value
-                            .replace(/\D/g, "")
-                            .slice(0, 10);
-                          setPhoneNumber(cleaned);
-                        }}
-                        className="flex-1 px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1A73E8] text-neutral-900 placeholder:text-neutral-400 text-[15px]"
-                      />
-                    </div>
-                    <p className="text-[11px] text-neutral-500 mt-1.5 flex items-center gap-1.5 pl-2">
-                      <span>
-                        We'll send a 6-digit verification code to your WhatsApp.
-                      </span>
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={
-                      loading || phoneNumber.replace(/\D/g, "").length < 10
-                    }
-                    className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Sending code to WhatsApp...</span>
-                      </>
-                    ) : (
-                      <>
-                        <WhatsAppIcon className="size-5" />
-                        <span>Send WhatsApp Code</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-              ) : (
-                /* Step 2: Enter 6-digit OTP */
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between bg-neutral-50 border border-neutral-200 p-3 rounded-xl">
-                    <div className="flex items-center gap-2 text-xs">
-                      <ShieldCheck className="w-4 h-4 text-[#1A73E8] shrink-0" />
-                      <span className="text-neutral-600">
-                        Code sent to WhatsApp{" "}
-                        <span className="font-semibold text-neutral-900">
-                          {countryCode} {phoneNumber}
-                        </span>
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setStep("phone")}
-                      className="text-xs text-[#1A73E8] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-                    >
-                      <ArrowLeft className="w-3 h-3" /> Change
-                    </button>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-neutral-800 mb-2 text-center">
-                      Enter 6-Digit WhatsApp Code
-                    </label>
-                    <div className="flex justify-between gap-1.5 sm:gap-2">
-                      {otpDigits.map((digit, idx) => (
+              <div className="hidden">
+                {step === "phone" ? (
+                  /* Step 1: Enter Phone Number */
+                  <form onSubmit={handleSendOtp} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-800 mb-1.5">
+                        WhatsApp Mobile Number
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 px-3 py-3 bg-neutral-50 border border-neutral-200 rounded-xl text-neutral-800 text-sm font-semibold select-none">
+                          <span>🇮🇳</span>
+                          <span>{countryCode}</span>
+                        </div>
                         <input
-                          key={idx}
-                          ref={(el) => {
-                            otpInputRefs.current[idx] = el;
-                          }}
-                          type="text"
+                          type="tel"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          maxLength={1}
-                          value={digit}
-                          onChange={(e) => handleOtpChange(idx, e.target.value)}
-                          onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                          onPaste={handleOtpPaste}
-                          className="w-11 sm:w-12 h-13 text-center text-xl font-bold bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1A73E8] text-neutral-900 transition-all"
+                          autoComplete="tel"
+                          required
+                          autoFocus
+                          placeholder="Enter 10-digit number"
+                          value={phoneNumber}
+                          onChange={(e) => {
+                            const cleaned = e.target.value
+                              .replace(/\D/g, "")
+                              .slice(0, 10);
+                            setPhoneNumber(cleaned);
+                          }}
+                          className="flex-1 px-4 py-3 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1A73E8] text-neutral-900 placeholder:text-neutral-400 text-[15px]"
                         />
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleVerifyOtp()}
-                    disabled={
-                      loading || isResending || otpDigits.some((d) => !d)
-                    }
-                    className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    {loading && !isResending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Verifying...</span>
-                      </>
-                    ) : (
-                      <span>Verify & Connect WhatsApp</span>
-                    )}
-                  </button>
-
-                  <div className="text-center pt-1">
-                    {canResend ? (
-                      <button
-                        type="button"
-                        onClick={handleResend}
-                        disabled={loading || isResending}
-                        className="text-xs text-[#1A73E8] hover:underline font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        <RotateCw
-                          className={cn(
-                            "w-3.5 h-3.5",
-                            isResending && "animate-spin",
-                          )}
-                        />
+                      </div>
+                      <p className="text-[11px] text-neutral-500 mt-1.5 flex items-center gap-1.5 pl-2">
                         <span>
-                          {isResending ? "Resending code..." : "Resend Code"}
-                        </span>
-                      </button>
-                    ) : (
-                      <p className="text-xs text-neutral-500">
-                        Resend code in{" "}
-                        <span className="font-semibold text-neutral-800">
-                          {resendTimer}s
+                          We'll send a 6-digit verification code to your
+                          WhatsApp.
                         </span>
                       </p>
-                    )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={
+                        loading || phoneNumber.replace(/\D/g, "").length < 10
+                      }
+                      className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Sending code to WhatsApp...</span>
+                        </>
+                      ) : (
+                        <>
+                          <WhatsAppIcon className="size-5" />
+                          <span>Send WhatsApp Code</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                ) : (
+                  /* Step 2: Enter 6-digit OTP */
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between bg-neutral-50 border border-neutral-200 p-3 rounded-xl">
+                      <div className="flex items-center gap-2 text-xs">
+                        <ShieldCheck className="w-4 h-4 text-[#1A73E8] shrink-0" />
+                        <span className="text-neutral-600">
+                          Code sent to WhatsApp{" "}
+                          <span className="font-semibold text-neutral-900">
+                            {countryCode} {phoneNumber}
+                          </span>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setStep("phone")}
+                        className="text-xs text-[#1A73E8] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <ArrowLeft className="w-3 h-3" /> Change
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-800 mb-2 text-center">
+                        Enter 6-Digit WhatsApp Code
+                      </label>
+                      <div className="flex justify-between gap-1.5 sm:gap-2">
+                        {otpDigits.map((digit, idx) => (
+                          <input
+                            key={idx}
+                            ref={(el) => {
+                              otpInputRefs.current[idx] = el;
+                            }}
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={1}
+                            value={digit}
+                            onChange={(e) =>
+                              handleOtpChange(idx, e.target.value)
+                            }
+                            onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                            onPaste={handleOtpPaste}
+                            className="w-11 sm:w-12 h-13 text-center text-xl font-bold bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1A73E8] text-neutral-900 transition-all"
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleVerifyOtp()}
+                      disabled={
+                        loading || isResending || otpDigits.some((d) => !d)
+                      }
+                      className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-medium text-[15px] py-3.5 rounded-full shadow-[0_8px_20px_-6px_rgba(26,115,232,0.4)] hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-8px_rgba(26,115,232,0.6)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      {loading && !isResending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Verifying...</span>
+                        </>
+                      ) : (
+                        <span>Verify & Connect WhatsApp</span>
+                      )}
+                    </button>
+
+                    <div className="text-center pt-1">
+                      {canResend ? (
+                        <button
+                          type="button"
+                          onClick={handleResend}
+                          disabled={loading || isResending}
+                          className="text-xs text-[#1A73E8] hover:underline font-semibold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <RotateCw
+                            className={cn(
+                              "w-3.5 h-3.5",
+                              isResending && "animate-spin",
+                            )}
+                          />
+                          <span>
+                            {isResending ? "Resending code..." : "Resend Code"}
+                          </span>
+                        </button>
+                      ) : (
+                        <p className="text-xs text-neutral-500">
+                          Resend code in{" "}
+                          <span className="font-semibold text-neutral-800">
+                            {resendTimer}s
+                          </span>
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Collapsible Alternative: Bot Link Code */}
               <div className="pt-2 border-t border-neutral-100">
@@ -932,7 +943,7 @@ export function WhatsAppModal({ isOpen, onClose }: WhatsAppModalProps) {
                     setShowManualCode(!showManualCode);
                     if (!code && !showManualCode) generateLinkCode();
                   }}
-                  className="w-full flex items-center justify-between text-xs text-neutral-500 hover:text-neutral-800 py-1 transition-colors cursor-pointer"
+                  className="hidden w-full  items-center justify-between text-xs text-neutral-500 hover:text-neutral-800 py-1 transition-colors cursor-pointer"
                 >
                   <span>Prefer to message our bot directly?</span>
                   {showManualCode ? (
