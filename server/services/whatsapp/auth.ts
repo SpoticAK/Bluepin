@@ -4,12 +4,11 @@ import { getAdminFirestore, getAdminAuth } from "../../firebase";
 import { LinkAccountResult } from "./types";
 import { generateNumericCode } from "./utils";
 import { normalizePhone, maskPhone } from "./client";
+import { getDashboardUrl } from "../wa-bot/services/magicLink";
 
-export const getDashboardUrl = () =>
-  (process.env.APP_URL || process.env.FRONTEND_URL || "https://app.bluepin.in").replace(
-    /\/+$/,
-    "",
-  );
+// Re-exported so this module keeps its historical public surface. The
+// definition lives in wa-bot so every CTA the bot sends resolves the same host.
+export { getDashboardUrl };
 
 const MAGIC_TOKEN_TTL_MINUTES = Number(process.env.WHATSAPP_MAGIC_TOKEN_TTL_MINUTES) || 30;
 const MAGIC_TOKEN_HEX_BYTES = 24;

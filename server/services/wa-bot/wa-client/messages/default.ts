@@ -1,12 +1,10 @@
 import { postMessage } from "../sender";
+import { getDashboardUrl } from "../../services/magicLink";
 
 // Which description variant to use for "Upload health report"
 type MenuVariant = "standard" | "help";
 
 const MENU_BUTTON_TEXT = "See options"; // max 20 chars
-
-const APP_URL =
-  "https://bluepin-app-preview--myhealthyfam-28c2c.asia-southeast1.hosted.app";
 
 const HEALTH_PROFILE_HEADER_IMAGE =
   process.env.HEALTH_PROFILE_HEADER_IMAGE_URL ??
@@ -158,7 +156,7 @@ export async function sendViewHealthProfileCta(to: string): Promise<Response> {
         name: "cta_url",
         parameters: {
           display_text: "View health profile",
-          url: APP_URL,
+          url: getDashboardUrl(),
         },
       },
       footer: { text: "Type help if you need anything." },
