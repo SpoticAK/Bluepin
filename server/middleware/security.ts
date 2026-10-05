@@ -23,6 +23,9 @@ export const helmetConfig: HelmetOptions = {
         "https://*.bluepin.in",
         "https://*.gstatic.com", 
         "https://apis.google.com",
+        "https://www.google.com/recaptcha/",
+        "https://www.gstatic.com/recaptcha/",
+        "https://recaptcha.google.com/",
         "https://www.googletagmanager.com",
         "https://www.google-analytics.com",
         "https://*.clarity.ms"
@@ -37,6 +40,9 @@ export const helmetConfig: HelmetOptions = {
         "https://*.bluepin.in",
         "https://apis.google.com", 
         "https://accounts.google.com",
+        "https://www.google.com",
+        "https://www.google.com/recaptcha/",
+        "https://recaptcha.google.com/",
         "https://www.googletagmanager.com"
       ],
       objectSrc: ["'none'"]
@@ -47,8 +53,10 @@ export const helmetConfig: HelmetOptions = {
 export const globalIpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  // The Meta webhook is called from Meta's own infrastructure, not from users.
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === "/whatsapp/webhook" || req.path.startsWith("/whatsapp/webhook?"),
   message: { error: "Too many requests from this IP, please try again after 15 minutes" }
 });
 

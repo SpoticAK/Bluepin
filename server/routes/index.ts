@@ -3,11 +3,25 @@ import { globalIpLimiter } from "../middleware/security";
 import uploadRouter from "./upload";
 import insightsRouter from "./insights";
 import feedbackRouter from "./feedback";
+import whatsappRouter from "./whatsapp";
+import authRouter from "./auth";
+import cronRouter from "./cron";
+import remindersRouter from "./reminders";
+import notificationsRouter from "./notifications";
 
 const apiRouter = Router();
 
-// Apply global rate limiting to all /api routes
+// Apply the global IP limiter to every /api route first. Routes that need a
+// looser budget (the Meta webhook, which is called from Meta's IPs) install
+// their own limiter on the router itself.
 apiRouter.use(globalIpLimiter);
+
+// Mount WhatsApp webhook & integration routes
+apiRouter.use(whatsappRouter);
+apiRouter.use(authRouter);
+apiRouter.use(cronRouter);
+apiRouter.use(remindersRouter);
+apiRouter.use(notificationsRouter);
 
 // Mount feature routes
 apiRouter.use(uploadRouter);

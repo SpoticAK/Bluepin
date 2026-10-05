@@ -98,9 +98,28 @@ export interface UserProfile {
   bmi?: number;
   country?: string;
   photoUrl?: string;
+  phoneNumber?: string;
+  whatsappPhone?: string;
   profileColor?: string;
   familyId?: string | null;
   hasSeenDashboardTour?: boolean;
+}
+
+/**
+ * One hour offered by the app's reminder picker, in IST.
+ * No rowId: that belongs to the WhatsApp list only.
+ */
+export interface ReminderSlot {
+  hour: number;
+  display: string;
+}
+
+/** The user's daily glucose-logging reminder, delivered over WhatsApp. */
+export interface Reminder {
+  hour: number;
+  displayTime: string;
+  enabled: boolean;
+  updatedAt: number | null;
 }
 
 export interface Invitation {

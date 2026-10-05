@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet, Scale } from 'lucide-react';
+import { X, User, Trash2, Camera, ChevronLeft, LogOut, ChevronRight, FileText, Droplet, Scale, MessageCircle, MessageSquare, Bell } from 'lucide-react';
 import { useAppStore } from '../store';
 import { auth } from '../lib/firebase';
 import { deleteUser } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { LegalDocsModal } from './LegalDocsModal';
+import { WhatsAppModal } from './WhatsAppModal';
+import { NotificationsModal } from './NotificationsModal';
+import { FeedbackWidget } from './FeedbackWidget';
 import { LegalDocType } from '../lib/consentManager';
 
 export function ProfileModal({ onClose }: { onClose: () => void }) {
@@ -18,6 +21,8 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   const [deleteInput, setDeleteInput] = useState('');
   
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -32,6 +37,18 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     setIsDeleting(true);
     try {
       if (user) {
+        try {
+          const idToken = await user.getIdToken();
+          await fetch('/api/whatsapp/unlink', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`,
+            },
+          });
+        } catch (unlinkErr) {
+          console.warn("Could not unlink WhatsApp before account deletion:", unlinkErr);
+        }
         await deleteUser(user);
       }
     } catch (e: any) {
@@ -202,7 +219,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
               {profile.name || 'Anonymous User'}
             </h2>
             <p className="text-neutral-500 text-[11px] truncate max-w-[200px] mx-auto">
-              {user?.email || 'No email provided'}
+              {user?.email || user?.phoneNumber || profile?.phoneNumber || 'No contact provided'}
             </p>
           </div>
         </div>
@@ -233,6 +250,66 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
               </div>
             </div>
             
+            <div
+              onClick={() => setShowWhatsAppModal(true)}
+              className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-2.5 text-neutral-900">
+                <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <MessageCircle size={14} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[13px] font-medium leading-tight">WhatsApp Sync</span>
+                  <span className="text-[10px] text-neutral-500">
+                    {profile.whatsappPhone ? `Connected (${profile.whatsappPhone})` : 'Log glucose & reports via chat'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {profile.whatsappPhone ? (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                ) : null}
+                <ChevronRight size={14} className="text-neutral-400" />
+              </div>
+            </div>
+
+            <div
+              onClick={() => setShowNotificationsModal(true)}
+              className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-2.5 text-neutral-900">
+                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <Bell size={14} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[13px] font-medium leading-tight">Notifications</span>
+                  <span className="text-[10px] text-neutral-500">
+                    Browser nudge on this device
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <ChevronRight size={14} className="text-neutral-400" />
+              </div>
+            </div>
+
+            <FeedbackWidget
+              trigger={
+                <div className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]">
+                  <div className="flex items-center gap-2.5 text-neutral-900">
+                    <div className="w-7 h-7 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                      <MessageSquare size={14} />
+                    </div>
+                    <div className="flex flex-col text-left">
+                      <span className="text-[13px] font-medium leading-tight">Talk to Us</span>
+                      <span className="text-[10px] text-neutral-500">Feedback, feature ideas & help</span>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="text-neutral-400" />
+                </div>
+              }
+            />
+
             <div
               onClick={() => setOpenLegalDoc('terms')}
               className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-white rounded-xl transition-colors active:scale-[0.98]"
@@ -265,6 +342,8 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       <LegalDocsModal isOpen={!!openLegalDoc} onClose={() => setOpenLegalDoc(null)} defaultTab={openLegalDoc || 'terms'} />
+      <WhatsAppModal isOpen={showWhatsAppModal} onClose={() => setShowWhatsAppModal(false)} />
+      <NotificationsModal isOpen={showNotificationsModal} onClose={() => setShowNotificationsModal(false)} />
     </div>
   );
 }

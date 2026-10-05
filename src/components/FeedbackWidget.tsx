@@ -119,10 +119,10 @@ export function FeedbackWidget({ trigger }: { trigger?: React.ReactElement }) {
       {trigger ? (
         React.cloneElement(trigger, {
           onClick: (e: any) => {
-            if (trigger.props.onClick) trigger.props.onClick(e);
+            if ((trigger.props as any)?.onClick) (trigger.props as any).onClick(e);
             setIsOpen(true);
-          }
-        })
+          },
+        } as any)
       ) : (
         <button 
           onClick={() => setIsOpen(true)}
@@ -137,7 +137,7 @@ export function FeedbackWidget({ trigger }: { trigger?: React.ReactElement }) {
       )}
 
       {isOpen && (
-        <div className="fixed inset-0 z-[100] bg-theme-bg flex flex-col sm:max-w-md sm:mx-auto sm:border-x sm:border-theme-border sm:shadow-2xl animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-8 sm:fade-in duration-300 sm:rounded-t-3xl sm:mt-12 pb-safe">
+        <div className="fixed inset-0 z-[120] bg-theme-bg flex flex-col sm:max-w-md sm:mx-auto sm:border-x sm:border-theme-border sm:shadow-2xl animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-8 sm:fade-in duration-300 sm:rounded-t-3xl sm:mt-12 pb-safe">
           
           {/* Header */}
           <div className="flex items-center gap-3 p-4 border-b border-theme-border bg-theme-bg/80 backdrop-blur-md sticky top-0 z-10 sm:rounded-t-3xl">

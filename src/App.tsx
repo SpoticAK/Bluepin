@@ -20,7 +20,6 @@ import {
   Shield,
 } from "lucide-react";
 import { cn } from "./lib/utils";
-import { FeedbackWidget } from "./components/FeedbackWidget";
 import { AppProvider, useAppStore } from "./store";
 import { auth, db } from "./lib/firebase";
 import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
@@ -29,6 +28,7 @@ import { ThemeProvider, useTheme } from "./theme";
 import { LegalDocType } from "./lib/consentManager";
 import { InstallPWAPrompt } from "./components/InstallPWAPrompt";
 import AuthScreen from "./components/authflow/AuthScreen";
+import { WhatsAppIcon } from "./components/CustomEmojis";
 
 // Lazy-loaded heavy components (reduces initial JS bundle from ~2MB to <200KB)
 const Dashboard = React.lazy(() => import("./components/Dashboard"));
@@ -40,6 +40,11 @@ const AdminFeedbackView = React.lazy(
 const ProfileModal = React.lazy(() =>
   import("./components/ProfileModal").then((m) => ({
     default: m.ProfileModal,
+  })),
+);
+const WhatsAppModal = React.lazy(() =>
+  import("./components/WhatsAppModal").then((m) => ({
+    default: m.WhatsAppModal,
   })),
 );
 const OnboardingScreen = React.lazy(
@@ -58,19 +63,11 @@ function MainLayout() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
-  const [isWaving, setIsWaving] = useState(false);
+  const { profile } = useAppStore();
   const { theme, toggleTheme } = useTheme();
   const isAdmin = auth.currentUser?.email === "sparsh@bluepin.in";
-
-  useEffect(() => {
-    const showTimer = setTimeout(() => setIsWaving(true), 1500);
-    const hideTimer = setTimeout(() => setIsWaving(false), 6000);
-    return () => {
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
-    };
-  }, []);
 
   return (
     <div
@@ -202,37 +199,39 @@ function MainLayout() {
       {/* Main Content */}
       <main className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-8 overflow-y-auto relative">
         <div className="hidden md:flex absolute top-6 right-8 gap-3 z-30">
-          <FeedbackWidget
-            trigger={
-              <div className="relative group flex items-center">
-                <div
-                  className={cn(
-                    "absolute top-full right-0 mt-3 whitespace-nowrap bg-theme-bg border border-theme-border text-theme-text px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 pointer-events-none z-50",
-                    "opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0",
-                  )}
-                >
-                  Talk to the founder
-                  <div className="absolute -top-1.25 right-3.5 w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
-                </div>
-                <button
-                  id="talk-founder-desktop"
-                  data-tour="talk-founder-btn"
-                  className="w-10 h-10 bg-theme-card border border-theme-border rounded-full flex items-center justify-center text-theme-text hover:bg-theme-card-sec transition-colors shadow-sm"
-                >
-                  <div
-                    className={cn(
-                      "text-xl group-hover:scale-110 transition-transform duration-300 relative",
-                      isWaving
-                        ? "animate-[wave_2.5s_ease-in-out_infinite] origin-bottom-right"
-                        : "",
-                    )}
-                  >
-                    👋
-                  </div>
-                </button>
+          <div className="relative group flex items-center">
+            <div
+              className={cn(
+                "absolute top-full right-0 mt-3 whitespace-nowrap bg-theme-bg border border-theme-border text-theme-text px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 pointer-events-none z-50",
+                "opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0",
+              )}
+            >
+              {profile?.whatsappPhone
+                ? `WhatsApp Connected (${profile.whatsappPhone})`
+                : "Link WhatsApp"}
+              <div className="absolute -top-1.25 right-3.5 w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
+            </div>
+            <button
+              id="whatsapp-header-btn"
+              onClick={() => setShowWhatsAppModal(true)}
+              className="w-10 h-10 bg-theme-card border border-theme-border rounded-full flex items-center justify-center text-theme-text hover:bg-theme-card-sec transition-colors shadow-sm relative group"
+              aria-label="WhatsApp Sync"
+            >
+              <div className="relative flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <WhatsAppIcon
+                  size={19}
+                  className={
+                    profile?.whatsappPhone
+                      ? "text-emerald-500"
+                      : "text-emerald-600 dark:text-emerald-400"
+                  }
+                />
+                {profile?.whatsappPhone && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-theme-card animate-pulse" />
+                )}
               </div>
-            }
-          />
+            </button>
+          </div>
           <button
             id="profile-btn-desktop"
             data-tour="profile-btn"
@@ -269,37 +268,26 @@ function MainLayout() {
             </h1>
           </div>
           <div className="flex items-center gap-2 relative">
-            <FeedbackWidget
-              trigger={
-                <div className="relative group flex items-center">
-                  <div
-                    className={cn(
-                      "absolute top-full right-0 mt-2 whitespace-nowrap bg-theme-bg border border-theme-border text-theme-text px-3 py-1.5 rounded-xl shadow-lg text-xs font-medium transition-all duration-300 pointer-events-none z-50",
-                      "opacity-0 -translate-y-2 group-hover:opacity-100 group-hover:translate-y-0",
-                    )}
-                  >
-                    Talk to the founder
-                    <div className="absolute -top-1.25 right-3.5 w-2.5 h-2.5 bg-theme-bg border-l border-t border-theme-border transform rotate-45"></div>
-                  </div>
-                  <button
-                    id="talk-founder-mobile"
-                    data-tour="talk-founder-btn"
-                    className="text-theme-text-sec p-2"
-                  >
-                    <div
-                      className={cn(
-                        "text-xl hover:scale-110 transition-transform duration-300 relative",
-                        isWaving
-                          ? "animate-[wave_2.5s_ease-in-out_infinite] origin-bottom-right"
-                          : "",
-                      )}
-                    >
-                      👋
-                    </div>
-                  </button>
-                </div>
-              }
-            />
+            <button
+              id="whatsapp-mobile-btn"
+              onClick={() => setShowWhatsAppModal(true)}
+              className="text-theme-text-sec hover:text-emerald-500 p-2 group relative transition-colors"
+              aria-label="WhatsApp Sync"
+            >
+              <div className="relative flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                <WhatsAppIcon
+                  size={20}
+                  className={
+                    profile?.whatsappPhone
+                      ? "text-emerald-500"
+                      : "text-theme-text-sec group-hover:text-emerald-500"
+                  }
+                />
+                {profile?.whatsappPhone && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-theme-card animate-pulse" />
+                )}
+              </div>
+            </button>
             <button
               onClick={toggleTheme}
               className="text-theme-text-sec p-2 group"
@@ -357,6 +345,12 @@ function MainLayout() {
           {activeTab === "admin" && isAdmin && <AdminFeedbackView />}
           {showProfile && (
             <ProfileModal onClose={() => setShowProfile(false)} />
+          )}
+          {showWhatsAppModal && (
+            <WhatsAppModal
+              isOpen={showWhatsAppModal}
+              onClose={() => setShowWhatsAppModal(false)}
+            />
           )}
         </React.Suspense>
         <footer className="mt-12 pt-8 pb-4 border-t border-theme-border/50 text-center text-xs text-theme-text-sec flex flex-wrap justify-center gap-4">
@@ -556,6 +550,33 @@ function AppContent() {
   };
 
   useEffect(() => {
+    // Handle WhatsApp Magic Login Token (wa_t)
+    const urlParams = new URLSearchParams(window.location.search);
+    const waToken = urlParams.get("wa_t");
+    if (waToken) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("wa_t");
+      window.history.replaceState(
+        {},
+        document.title,
+        cleanUrl.pathname + (cleanUrl.search ? cleanUrl.search : ""),
+      );
+
+      fetch("/api/whatsapp/exchange-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: waToken }),
+      })
+        .then((res) => res.json())
+        .then(async (data) => {
+          if (data.success && data.customToken) {
+            const { signInWithCustomToken } = await import("firebase/auth");
+            await signInWithCustomToken(auth, data.customToken);
+          }
+        })
+        .catch((err) => console.error("WhatsApp magic login failed:", err));
+    }
+
     // Handle redirect sign-in results (e.g. mobile standalone PWA)
     getRedirectResult(auth).catch((err) => {
       if (err.code !== "auth/redirect-cancelled-by-user") {
@@ -577,13 +598,38 @@ function AppContent() {
           try {
             localStorage.setItem("bluepin_welcome_seen", "true");
           } catch {}
-          try {
-            const docRef = doc(db, "users", u.uid);
-            const docSnap = await getDoc(docRef);
-            setNeedsOnboarding(!docSnap.exists() || !docSnap.data()?.name);
-          } catch (e: any) {
-            console.error("Firestore user doc fetch error:", e);
-            setNeedsOnboarding(true);
+          let isOnboarded = false;
+          let fetchSuccess = false;
+
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const docRef = doc(db, "users", u.uid);
+              const docSnap = await getDoc(docRef);
+              if (docSnap.exists()) {
+                fetchSuccess = true;
+                const data = docSnap.data();
+                isOnboarded = Boolean(data?.name);
+                break;
+              } else {
+                fetchSuccess = true;
+                isOnboarded = false;
+                break;
+              }
+            } catch (e: any) {
+              console.warn(
+                `Firestore user doc fetch attempt ${attempt + 1} failed:`,
+                e?.message || e,
+              );
+              // Wait 250ms before retrying to allow auth token propagation to Firestore client
+              await new Promise((res) => setTimeout(res, 250));
+            }
+          }
+
+          if (fetchSuccess) {
+            setNeedsOnboarding(!isOnboarded);
+          } else {
+            // If all fetch attempts failed, do not trap an existing user in onboarding
+            setNeedsOnboarding(false);
           }
         }
         setSessionUser(u);

@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { MealTiming } from "../types";
 
-import { cn, safeFormat } from "../lib/utils";
+import { cn, istToday, safeFormat } from "../lib/utils";
 
 export default function GlucoseTab() {
   const {
@@ -755,7 +755,7 @@ export default function GlucoseTab() {
   }, [glucoseReadings, labReports]);
 
   const todayUniqueReadings = useMemo(() => {
-    const todayStr = safeFormat(new Date(), "yyyy-MM-dd");
+    const todayStr = istToday();
     return uniqueGlucoseReadings.filter((r) => r.date === todayStr);
   }, [uniqueGlucoseReadings]);
 
