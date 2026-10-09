@@ -1,5 +1,5 @@
 import { postMessage } from "../sender";
-import { getDashboardUrl } from "../../services/magicLink";
+import { getMagicLoginUrlForPhone } from "../../services/magicLink";
 import { footerText } from "./common";
 import type { TimingLabel } from "../../types";
 
@@ -53,6 +53,7 @@ export async function sendGlucoseLogConfirmation(
   timing: TimingLabel,
 ): Promise<Response> {
   const timingLabel = TIMING_DISPLAY_LABELS[timing];
+  const url = await getMagicLoginUrlForPhone(to);
   return postMessage({
     messaging_product: "whatsapp",
     recipient_type: "individual",
@@ -68,7 +69,7 @@ export async function sendGlucoseLogConfirmation(
         name: "cta_url",
         parameters: {
           display_text: "View health profile",
-          url: getDashboardUrl(),
+          url,
         },
       },
       footer: { text: footerText },

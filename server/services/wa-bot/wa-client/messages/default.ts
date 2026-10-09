@@ -1,5 +1,5 @@
 import { postMessage } from "../sender";
-import { getDashboardUrl } from "../../services/magicLink";
+import { getMagicLoginUrlForPhone } from "../../services/magicLink";
 
 // Which description variant to use for "Upload health report"
 type MenuVariant = "standard" | "help";
@@ -138,6 +138,7 @@ export async function sendUnknownInputMessage(to: string): Promise<Response> {
  *              as HEALTH_PROFILE_HEADER_IMAGE_URL in your .env
  */
 export async function sendViewHealthProfileCta(to: string): Promise<Response> {
+  const url = await getMagicLoginUrlForPhone(to);
   return postMessage({
     messaging_product: "whatsapp",
     recipient_type: "individual",
@@ -156,7 +157,7 @@ export async function sendViewHealthProfileCta(to: string): Promise<Response> {
         name: "cta_url",
         parameters: {
           display_text: "View health profile",
-          url: getDashboardUrl(),
+          url,
         },
       },
       footer: { text: "Type help if you need anything." },
