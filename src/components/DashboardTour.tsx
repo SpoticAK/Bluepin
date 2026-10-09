@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
-import { useJoyride, STATUS, ACTIONS } from "react-joyride";
-import type { Step, TourData } from "react-joyride";
+import { useJoyride, STATUS } from "react-joyride";
+import type { Step } from "react-joyride";
 import { useAppStore } from "../store";
 import { auth } from "../lib/firebase";
 import { useTheme } from "../theme";
@@ -57,8 +57,6 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
 
   const markTourDone = () => {
     setRun(false);
-    const closeBtn = document.getElementById("close-glucose-modal-btn");
-    if (closeBtn) closeBtn.click();
     if (uid) {
       try {
         localStorage.setItem(`bluepin_dashboard_tour_${uid}`, "true");
@@ -69,143 +67,46 @@ export function DashboardTour({ setActiveTab }: DashboardTourProps) {
 
   const steps: Step[] = useMemo(() => {
     const rawSteps: Step[] = [
-      // 1. Health Score (Dashboard)
+      // 1. Quick Add (+) button in Dashboard
       {
-        target: "#health-score-section",
-        title: "Your Health Score",
-        content: "View your health in one place after uploading reports",
-        placement: "bottom",
+        target: "#quick-add-button",
+        title: "Add Health Data",
+        content:
+          "Tap the + button to add health data from here — upload reports, log glucose or weight.",
+        placement: "top",
         skipBeacon: true,
         spotlightPadding: 6,
         spotlightRadius: 28,
-        before: async ({ action }: TourData): Promise<void> => {
-          if (action === ACTIONS.PREV && setActiveTab) {
+        before: async (): Promise<void> => {
+          if (setActiveTab) {
             setActiveTab("dashboard");
             await new Promise<void>((resolve) => setTimeout(resolve, 600));
           }
         },
       },
-      // 2. Add Glucose Reading Button (Glucose Tab)
+      // 2. WhatsApp icon in the header
       {
-        target: "#add-glucose-reading-button",
-        title: "Add Glucose Reading",
-        content: "Add daily glucose to track your blood sugar levels",
-        placement: "bottom-end",
-        skipBeacon: true,
-        spotlightPadding: 6,
-        spotlightRadius: 16,
-        before: async (): Promise<void> => {
-          const closeBtn = document.getElementById("close-glucose-modal-btn");
-          if (closeBtn) closeBtn.click();
-          if (setActiveTab) {
-            setActiveTab("glucose");
-            await new Promise<void>((resolve) => setTimeout(resolve, 600));
-          }
+        target: () => {
+          const isDesktop =
+            typeof window !== "undefined" && window.innerWidth >= 768;
+          const desktopBtn = document.getElementById("whatsapp-header-btn");
+          const mobileBtn = document.getElementById("whatsapp-mobile-btn");
+          if (isDesktop && desktopBtn) return desktopBtn;
+          if (!isDesktop && mobileBtn) return mobileBtn;
+          return (desktopBtn || mobileBtn || document.body) as HTMLElement;
         },
-      },
-      // 3. Add Glucose Reading Modal - Upload (Glucose Tab)
-      {
-        target: "#add-glucose-modal-content",
-        title: "Upload Reading",
-        content: "Click and upload a pic of your blood sugar reading.",
-        placement: "top",
-        skipBeacon: true,
-        spotlightPadding: 6,
-        spotlightRadius: 16,
-        before: async (): Promise<void> => {
-          if (setActiveTab) {
-            setActiveTab("glucose");
-          }
-          const modalContent = document.getElementById(
-            "add-glucose-modal-content",
-          );
-          if (!modalContent) {
-            const addBtn = document.getElementById(
-              "add-glucose-reading-button",
-            );
-            if (addBtn) addBtn.click();
-          }
-          await new Promise<void>((resolve) => setTimeout(resolve, 600));
-        },
-      },
-      // 4. Add Glucose Reading Modal - Manual (Glucose Tab)
-      {
-        target: "#add-glucose-manual-entry",
-        title: "Manual Entry",
-        content: "Or enter it manually here.",
-        placement: "bottom",
-        skipBeacon: true,
-        spotlightPadding: 6,
-        spotlightRadius: 16,
-        before: async (): Promise<void> => {
-          if (setActiveTab) {
-            setActiveTab("glucose");
-          }
-          const modalContent = document.getElementById(
-            "add-glucose-modal-content",
-          );
-          if (!modalContent) {
-            const addBtn = document.getElementById(
-              "add-glucose-reading-button",
-            );
-            if (addBtn) addBtn.click();
-          }
-          await new Promise<void>((resolve) => setTimeout(resolve, 600));
-        },
-      },
-      // 5. Sugar Health Button (Glucose Tab)
-      {
-        target: "#sugar-health-button",
-        title: "Sugar Health",
+        title: "Sync WhatsApp",
         content:
-          "BluePin AI analyses your sugar readings to give you insights. More readings will produce better insights.",
-        placement: "bottom-end",
-        skipBeacon: true,
-        spotlightPadding: 6,
-        spotlightRadius: 16,
-        before: async (): Promise<void> => {
-          const closeBtn = document.getElementById("close-glucose-modal-btn");
-          if (closeBtn) closeBtn.click();
-          if (setActiveTab) {
-            setActiveTab("glucose");
-          }
-          await new Promise<void>((resolve) => setTimeout(resolve, 600));
-        },
-      },
-      // 6. Upload Health Report Floating Button (Canvas Tab)
-      {
-        target: "#canvas-upload-report-button",
-        title: "Upload Reports",
-        content:
-          "Upload health lab reports in health canvas section. Uploading a few health reports from the past would be really useful.",
-        placement: "top",
-        skipBeacon: true,
-        spotlightPadding: 6,
-        spotlightRadius: 28,
-        before: async (): Promise<void> => {
-          if (setActiveTab) {
-            setActiveTab("biomarkers");
-          }
-          const dashBtn = document.getElementById("canvas-dashboard-tab");
-          if (dashBtn) dashBtn.click();
-          await new Promise<void>((resolve) => setTimeout(resolve, 600));
-        },
-      },
-      // 7. AI Highlights Button (Canvas Tab)
-      {
-        target: "#canvas-highlights-button",
-        title: "Highlights",
-        content:
-          "Get Insights about how your health has changed overtime and what needs Attention. Uploading reports from past helps us understand you better :)",
+          "Tap the WhatsApp icon to sync WhatsApp and get reminders and insights right in chat.",
         placement: "bottom-end",
         skipBeacon: true,
         spotlightPadding: 6,
         spotlightRadius: 20,
         before: async (): Promise<void> => {
           if (setActiveTab) {
-            setActiveTab("biomarkers");
+            setActiveTab("dashboard");
+            await new Promise<void>((resolve) => setTimeout(resolve, 400));
           }
-          await new Promise<void>((resolve) => setTimeout(resolve, 600));
         },
       },
     ];

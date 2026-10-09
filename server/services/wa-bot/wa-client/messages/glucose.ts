@@ -1,4 +1,5 @@
 import { postMessage } from "../sender";
+import { getDashboardUrl } from "../../services/magicLink";
 import { footerText } from "./common";
 import type { TimingLabel } from "../../types";
 
@@ -7,9 +8,6 @@ const TIMING_DISPLAY_LABELS: Record<TimingLabel, string> = {
   random: "random",
   "post-prandial": "post-meal",
 };
-
-const APP_URL =
-  "https://bluepin-app-preview--myhealthyfam-28c2c.asia-southeast1.hosted.app";
 
 /**
  * Sends the interactive button prompt asking when the glucose reading was taken.
@@ -70,7 +68,7 @@ export async function sendGlucoseLogConfirmation(
         name: "cta_url",
         parameters: {
           display_text: "View health profile",
-          url: APP_URL,
+          url: getDashboardUrl(),
         },
       },
       footer: { text: footerText },
