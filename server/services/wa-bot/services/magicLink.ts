@@ -22,11 +22,10 @@ export const MAGIC_TOKEN_PATTERN = new RegExp(
 /**
  * Single source of truth for the dashboard URL.
  *
- * Every CTA the bot sends points here — magic links after a report, and the
- * plain "View health profile" buttons. They previously disagreed: the two
- * message builders hardcoded a preview hostname while the magic-link builder
- * read the environment, so one conversation could hand the user two different
- * destinations under the same button label.
+ * Every CTA the bot sends is a magic login link built on top of this base.
+ * Never hand this plain URL to a user directly — use
+ * `createWhatsAppMagicLoginUrl(uid)` or `getMagicLoginUrlForPhone(phone)` so
+ * the tap auto-authenticates them.
  *
  * APP_URL must be set on the server. FRONTEND_URL is accepted as a fallback,
  * but APP_URL wins so there is one name to configure.
@@ -37,6 +36,32 @@ export const getDashboardUrl = () =>
     "",
   );
 
+/**
+ * Resolves a magic login link for a WhatsApp recipient phone number.
+ *
+ * Every CTA the bot sends must use this (not the plain dashboard URL) so the
+ * tap auto-authenticates the user. Falls back to the plain dashboard URL when
+ * the phone is not linked to any account or link creation fails — the CTA
+ * still lands on the right host, just without auto-login.
+ */
+export async function getMagicLoginUrlForPhone(
+  phone: string,
+): Promise<string> {
+  try {
+    const db = getAdminFirestore();
+    const snap = await db.doc(`whatsapp_users/${phone}`).get();
+    const uid = snap.data()?.uid as string | undefined;
+    if (!uid) return getDashboardUrl();
+    return createWhatsAppMagicLoginUrl(uid);
+  } catch (err) {
+    console.error(
+      "[wa-bot] Error resolving magic login url for phone, falling back to static dashboard url:",
+      err,
+    );
+    return getDashboardUrl();
+  }
+}
+ 
 /**
  * Generates a single-use magic login link for a user's dashboard.
  * When tapped, it automatically authenticates the user into Bluepin.
