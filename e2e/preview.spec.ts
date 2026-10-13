@@ -10,9 +10,9 @@ import { expect, test } from "@playwright/test";
 
 const EMAIL = process.env.E2E_TEST_EMAIL ?? "e2e-test@bluepin.in";
 const PASSWORD = process.env.E2E_TEST_PASSWORD ?? "";
-test.skip(!process.env.E2E_TEST_PASSWORD, "E2E_TEST_PASSWORD not set");
 
 test.beforeEach(async ({ page }) => {
+  test.skip(!PASSWORD, "E2E_TEST_PASSWORD not set");
   await page.goto("/");
   // Dismiss the PWA install prompt if it appears.
   const notNow = page.getByRole("button", { name: "Not Now" });

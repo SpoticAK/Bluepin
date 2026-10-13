@@ -156,4 +156,5 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-13 | 3 | API batch 2: sweep + insights + notifications + feedback — 145 tests green across 17 files. |
 | 2026-10-13 | 3 | Deleted manual harnesses + `test.pdf` + 4 deprecated modules (all zero-importer). Suite/build/lint green. |
 | 2026-10-13 | 3 | E2E slice: seeded preview user, 3 Playwright specs green. `@playwright/test` added. |
+| 2026-10-13 | 3 | E2E fix: vitest `exclude: e2e/**` (it was swallowing the Playwright spec); `test.skip` moved into `beforeEach`. Occasional cold-start flake on preview (minInstances 0) absorbed by `retries: 1`. |
 | 2026-10-13 | 4 | Lint fixed to green (Dashboard `isPinned` helper + dropped unused destructure). `ci.yml` added (verify on PR, preview identity smoke on main). Owner to wire: GitHub Environments + PREVIEW_URL + branch protection. |
