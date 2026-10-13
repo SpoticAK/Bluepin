@@ -70,8 +70,10 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.18",
     "@types/sharp": "^0.31.1",
+    "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^5.0.4",
     "esbuild-register": "^3.6.0",
+    "supertest": "^7.3.1",
     "vitest": "^5.0.4"
   }
 }

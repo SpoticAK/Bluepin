@@ -94,9 +94,19 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
   `src/lib/registry/biomarkerLookup.ts`, `src/careReminderRules.ts`, `src/lib/goalUtils.ts`,
   `server/utils/jsonparse.ts`, `server/utils/cache.ts`, `wa-bot/services/limits.ts`,
   `reminderSlots.ts`, `whatsapp/utils.ts`. Gemini fixtures: valid / truncated / garbage JSON.
-- [ ] API (supertest + mocked sender/Gemini + emulator): `routes/whatsapp.ts` (verify, signature reject,
+- [x] API (supertest + mocked sender/Gemini + emulator): `routes/whatsapp.ts` (verify, signature reject,
   idempotency), `routes/auth.ts` (OTP send/verify, cooldown, link), `routes/upload.ts`,
   `routes/reminders.ts`, `routes/cron.ts` (`CRON_SECRET`, IST hour, 20:00 sweep).
+  - DONE 2026-10-13 (42 API tests, all green): in-memory `FakeFirestore` (`server/test/`) instead of
+    the emulator — zero infra, runs in ~1.5s; fetch stubbed so no Meta/Gemini call can escape.
+    Covered: webhook verify/403-without-echo, signature reject, non-wa ack, phone-id gating,
+    dispatch + redelivery dedupe; OTP send/cooldown/HMAC-only storage/attempt lockout/expiry/
+    custom-token + auto-link; analyze idempotency + 20/100 limits + AI-failure 500; markdown
+    422; chunk validation/assembly; reminders CRUD + re-enable + soft-stop; cron auth + due-hour
+    send + logged-skip + push-only + push report. Lint still exactly the 11 pre-existing errors.
+  - NOT covered yet (deferred): 20:00 sweep branch (needs time-travel at 20:00 IST — same harness,
+    small follow-up), `routes/insights.ts` / `notifications.ts` / `feedback.ts`, Firestore rules
+    tests (need emulator + Java — CI job instead), Playwright E2E slice.
 - [ ] Rules tests: `firestore.rules`, `storage.rules` on emulator (`users/{uid}` isolation, `feedbacks` write).
 - [ ] E2E thin slice (Playwright vs preview + seeded user): login → add glucose → upload report → reminders toggle.
 - [ ] Delete manual `scripts/test_*` once automated equivalents land.
@@ -121,3 +131,4 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-13 | 2 | Branch deployed to preview backend. `/api/health` first read `production`/`live` (base yaml won); fixed via explicit console `ENV_NAME`/`WHATSAPP_MODE`, now `preview`/`test`. Lesson recorded in `docs/ENVIRONMENTS.md`. Webhook verification unblocked. |
 | 2026-10-13 | 2 | Preview webhook verified. |
 | 2026-10-13 | 3 | Unit tests batch 1+2: 9 files, 86 tests green; coverage gate passed (server/utils 94%, src/lib ~81%). |
+| 2026-10-13 | 3 | API tests: 5 route files, 42 tests green (128 total). FakeFirestore harness replaces emulator. |
