@@ -78,6 +78,69 @@ describe("POST /api/cron/whatsapp-reminders — auth", () => {
   });
 });
 
+describe("POST /api/cron/whatsapp-reminders — 20:00 IST sweep", () => {
+  // 20:00 IST == 14:30 UTC.
+  const SWEEP_TIME = new Date("2026-10-14T14:30:00.000Z");
+
+  it("sweeps unlogged users, honouring opt-outs, 20h reminders and logged days", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(SWEEP_TIME);
+    try {
+      fakeDb.seed({
+        // Missed everything → gets the sweep template.
+        "whatsapp_users/911111111111": { uid: "u1", phone: "911111111111" },
+        // Logged today → skipped.
+        "whatsapp_users/912222222222": { uid: "u2", phone: "912222222222" },
+        "users/u2/glucoseReadings/r1": { date: "2026-10-14" },
+        // Explicitly stopped → skipped.
+        "whatsapp_users/913333333333": { uid: "u3", phone: "913333333333" },
+        "whatsapp_reminders/913333333333": { enabled: false },
+        // Already has a 20:00 reminder (got Guideline 9) → skipped.
+        "whatsapp_users/914444444444": { uid: "u4", phone: "914444444444" },
+        "whatsapp_reminders/914444444444": { uid: "u4", phone: "914444444444", reminderHour: 20, enabled: true },
+      });
+
+      vi.spyOn(notifications, "sendGlucosePushNudges").mockResolvedValue({
+        delivered: 0,
+        prunedTokens: 0,
+        errors: 0,
+      });
+
+      const res = await postCron(`Bearer ${SECRET}`);
+      expect(res.status).toBe(200);
+      // u4's own 20:00 reminder fires as a scheduled send; the sweep skips them.
+      expect(res.body).toMatchObject({ scheduledSent: 1, sweepSent: 1 });
+
+      const sentTo = fetchCalls.map((c) => JSON.parse((c.init?.body as string) ?? "{}").to);
+      expect(sentTo).toContain("911111111111"); // sweep
+      expect(sentTo).toContain("914444444444"); // scheduled, not sweep
+      expect(sentTo).not.toContain("912222222222");
+      expect(sentTo).not.toContain("913333333333");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stays quiet at other hours", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-14T03:30:00.000Z")); // 09:00 IST
+    try {
+      fakeDb.seed({
+        "whatsapp_users/911111111111": { uid: "u1", phone: "911111111111" },
+      });
+      vi.spyOn(notifications, "sendGlucosePushNudges").mockResolvedValue({
+        delivered: 0,
+        prunedTokens: 0,
+        errors: 0,
+      });
+      const res = await postCron(`Bearer ${SECRET}`);
+      expect(res.body.sweepSent).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("POST /api/cron/whatsapp-reminders — scheduled hour", () => {
   // Freeze "now" so currentHourIST is deterministic: 09:00 IST == 03:30 UTC.
   const FROZEN = new Date("2026-10-14T03:30:00.000Z");

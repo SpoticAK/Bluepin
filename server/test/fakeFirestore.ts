@@ -26,6 +26,12 @@ class FakeQuerySnap {
   get empty() {
     return this.docs.length === 0;
   }
+  get size() {
+    return this.docs.length;
+  }
+  forEach(cb: (d: FakeDocSnap) => void) {
+    this.docs.forEach(cb);
+  }
 }
 
 export class FakeDocRef {
@@ -107,6 +113,11 @@ class FakeCollection {
   }
   doc(id: string) {
     return new FakeDocRef(this.store, `${this.path}/${id}`);
+  }
+  async add(data: DocData) {
+    const id = `auto-${Math.random().toString(36).slice(2, 12)}`;
+    this.store.set(`${this.path}/${id}`, { ...data });
+    return { id };
   }
 }
 
