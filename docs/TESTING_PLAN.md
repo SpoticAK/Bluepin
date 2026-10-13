@@ -125,6 +125,12 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
   `AuthScreen.tsx`, `WelcomeScreen.tsx`, `TestPage.tsx` (all zero importers, imports long since
   on live copies). `services/whatsapp/*` vs `wa-bot/*` coexistence remains — routes still import
   the legacy barrel; consolidation is a separate refactor behind the current suite.
+  - DONE 2026-10-13 (`chore/phase5-consolidation`, branched off merged `main`): deleted the orphaned
+    legacy inbound island — `dispatcher.ts` (381L) + `handlers/glucose.ts` (274L) +
+    `handlers/reports.ts` (152L). Only importer was the dispatcher itself; live path is
+    `wa-bot/messageRouter` (covered by webhook dispatch + dedupe tests). Barrel trimmed.
+    Kept: `client` (Meta send + signatures), `auth` (OTP/link codes), `utils`, `types` — still
+    imported by routes. 145/145 green, lint 0.
 - Gate: unit ≥70% on `src/lib` + `server/utils` + `wa-bot/services`; all 5 routes covered; E2E slice green.
 
 ## Phase 4 — CI/CD (GitHub Actions + Firebase preview channels)
