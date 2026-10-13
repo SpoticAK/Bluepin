@@ -21,7 +21,25 @@ test.beforeEach(async ({ page }) => {
   await page.locator('input[type="email"]').fill(EMAIL);
   await page.locator('input[type="password"]').fill(PASSWORD);
   await page.getByRole("button", { name: "Sign In" }).click();
-  await expect(page.getByRole("heading", { name: "Care Reminders" })).toBeVisible();
+
+  // Cold starts on preview can be slow; wait generously, but if login itself
+  // fails, surface the form's error text instead of a bare timeout so CI logs
+  // distinguish a bad credential from a hang.
+  try {
+    await expect(page.getByRole("heading", { name: "Care Reminders" })).toBeVisible({
+      timeout: 30_000,
+    });
+  } catch {
+    const errText = await page
+      .locator("p")
+      .filter({ hasText: /Incorrect email|Too many attempts|Something went wrong|Network error/i })
+      .first()
+      .textContent()
+      .catch(() => null);
+    throw new Error(
+      `E2E login failed${errText ? `: "${errText.trim()}"` : " (dashboard never appeared, no error banner)"}`,
+    );
+  }
 });
 
 test("logs a glucose reading and shows it in the timeline", async ({ page }) => {
