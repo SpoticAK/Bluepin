@@ -114,11 +114,17 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 
 ## Phase 4 — CI/CD (GitHub Actions + Firebase preview channels)
 
-- [ ] New `.github/workflows/ci.yml`: on PR → `lint` → `vitest --coverage` → `vite build + esbuild server`
-  → Hosting **preview channel** deploy + PR comment URL. On `main` push → same + prod deploy + Playwright smoke.
-- [ ] GitHub Environments `preview` / `production` with distinct secrets
-  (`GEMINI_API_KEY`, `WHATSAPP_*`, `SMTP_*`, `APP_URL`, `CRON_SECRET`, `FIREBASE_*`).
+- [x] New `.github/workflows/ci.yml` (verification only — see header comment for why deploys stay
+  out): on PR → `lint` → `vitest --coverage` → `vite build + esbuild server`.
+  On `main` push → same + `smoke-preview` job polling preview `/api/health` for `env=preview` /
+  `whatsappMode=test` (catches the base-yaml-wins misconfiguration).
+  Manual wiring for owner: `preview`/`production` GitHub Environments + `PREVIEW_URL` variable +
+  `main` branch protection on the `verify` job (steps in the yaml header).
+- [x] Lint fixed to green as a prerequisite: `Dashboard.tsx` had 11 pre-existing errors —
+  removed unused `familySummaries` destructure; added `isPinned()` helper because pin-gate
+  duplication narrows `pinnedSection` to a constant inside each gate (zero runtime change).
 - [ ] Add `GET /api/health` (version + env name, no secrets) for deploy verification.
+  DONE in Phase 2 (returns `{status, env, whatsappMode, now}`).
 
 ## Status log
 
@@ -132,3 +138,4 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-13 | 2 | Preview webhook verified. |
 | 2026-10-13 | 3 | Unit tests batch 1+2: 9 files, 86 tests green; coverage gate passed (server/utils 94%, src/lib ~81%). |
 | 2026-10-13 | 3 | API tests: 5 route files, 42 tests green (128 total). FakeFirestore harness replaces emulator. |
+| 2026-10-13 | 4 | Lint fixed to green (Dashboard `isPinned` helper + dropped unused destructure). `ci.yml` added (verify on PR, preview identity smoke on main). Owner to wire: GitHub Environments + PREVIEW_URL + branch protection. |
