@@ -111,7 +111,14 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
     `feedback` (validation/storage/email-forward, SMTP mocked). All 8 routes now have API tests.
 - [ ] Rules tests: `firestore.rules`, `storage.rules` on emulator (`users/{uid}` isolation, `feedbacks` write).
 - [ ] E2E thin slice (Playwright vs preview + seeded user): login → add glucose → upload report → reminders toggle.
-- [ ] Delete manual `scripts/test_*` once automated equivalents land.
+- [x] Delete manual `scripts/test_*` once automated equivalents land.
+  - DONE 2026-10-13: deleted `scripts/test_lab_report_tokens.ts`, `scripts/test_whatsapp.ts`,
+    `test.pdf` + `test:tokens`/`test:wa` scripts (webhook/OTP/analyze paths covered by API tests).
+    145/145 green, lint 0, build green after deletion.
+- [x] Deprecate-don't-delete (Phase 1) → deleted 2026-10-13: legacy `labReportService.ts`,
+  `AuthScreen.tsx`, `WelcomeScreen.tsx`, `TestPage.tsx` (all zero importers, imports long since
+  on live copies). `services/whatsapp/*` vs `wa-bot/*` coexistence remains — routes still import
+  the legacy barrel; consolidation is a separate refactor behind the current suite.
 - Gate: unit ≥70% on `src/lib` + `server/utils` + `wa-bot/services`; all 5 routes covered; E2E slice green.
 
 ## Phase 4 — CI/CD (GitHub Actions + Firebase preview channels)
@@ -141,4 +148,5 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-13 | 3 | Unit tests batch 1+2: 9 files, 86 tests green; coverage gate passed (server/utils 94%, src/lib ~81%). |
 | 2026-10-13 | 3 | API tests: 5 route files, 42 tests green (128 total). FakeFirestore harness replaces emulator. |
 | 2026-10-13 | 3 | API batch 2: sweep + insights + notifications + feedback — 145 tests green across 17 files. |
+| 2026-10-13 | 3 | Deleted manual harnesses + `test.pdf` + 4 deprecated modules (all zero-importer). Suite/build/lint green. |
 | 2026-10-13 | 4 | Lint fixed to green (Dashboard `isPinned` helper + dropped unused destructure). `ci.yml` added (verify on PR, preview identity smoke on main). Owner to wire: GitHub Environments + PREVIEW_URL + branch protection. |
