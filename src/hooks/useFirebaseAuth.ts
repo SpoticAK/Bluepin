@@ -11,6 +11,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { auth } from "../lib/firebase";
+import { getFriendlyAuthError } from "../lib/friendlyAuthError";
 
 interface UseFirebaseAuthResult {
   loading: boolean;
@@ -192,21 +193,15 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
 
 function mapFirebaseError(err: unknown): string {
   const code = (err as { code?: string })?.code ?? "";
-  const rawMsg = (err as { message?: string })?.message ?? "";
 
-  switch (code) {
-    case "auth/email-already-in-use":
-      return "An account with this email already exists.";
-    case "auth/invalid-credential":
-    case "auth/wrong-password":
-      return "Incorrect email or password.";
-    case "auth/user-not-found":
-      return "No account found with this email.";
-    case "auth/popup-closed-by-user":
-      return "Google sign-in was cancelled.";
-    default:
-      return import.meta.env.DEV && rawMsg
-        ? `${rawMsg} (${code || "unknown"})`
-        : "Something went wrong. Please try again.";
+  if (import.meta.env.DEV) {
+    console.error("[Firebase Auth]", code, err);
   }
+
+  // "No account found" needs a distinct message; everything else is shared
+  // so raw Firebase strings never reach the client.
+  if (code === "auth/user-not-found") {
+    return "No account found with this email.";
+  }
+  return getFriendlyAuthError(code);
 }

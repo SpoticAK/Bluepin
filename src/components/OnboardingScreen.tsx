@@ -106,7 +106,8 @@ export default function OnboardingScreen({
       trackEvent('onboarding_completed');
       onComplete();
     } catch (err: any) {
-      setError(err.message);
+      console.error("Onboarding save failed:", err);
+      setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   };

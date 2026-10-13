@@ -52,7 +52,8 @@ export default function AuthScreen() {
         }
       } catch (err: any) {
         if (err.code !== "auth/redirect-cancelled-by-user") {
-          setError(err.message || "An error occurred during authentication.");
+          console.error("Auth redirect failed:", err);
+          setError("Something went wrong. Please try again.");
         }
       }
     };
@@ -111,7 +112,8 @@ export default function AuthScreen() {
             "Popup blocked by browser. Please open the app in a new tab (using the button in the top right) to sign in with Google, or allow popups.",
           );
         } else {
-          setError(err.message || "An error occurred during authentication.");
+          console.error("Email auth failed:", err);
+          setError("Something went wrong. Please try again.");
         }
       }
     } finally {
@@ -170,7 +172,8 @@ export default function AuthScreen() {
           "Google Sign-In popup was closed or cancelled. If you are in the preview, try opening the app in a new tab (top right icon) to use Google Sign-In.",
         );
       } else {
-        setError(err.message || "An error occurred during authentication.");
+        console.error("Google auth failed:", err);
+        setError("Something went wrong. Please try again.");
       }
       setGoogleLoading(false);
     }
