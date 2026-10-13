@@ -1,0 +1,16 @@
+- generic [ref=e41]:
+  - button "Previous step" [ref=e112]
+  - generic [ref=e113]:
+    - generic [ref=e114]:
+      - heading "Let's get to know you" [level=1] [ref=e115]
+      - paragraph [ref=e116]: What should we call you?
+      - textbox "Your first name" [ref=e117]: E2E
+    - generic [ref=e118]:
+      - generic [ref=e119]:
+        - heading "Managing diabetes?" [level=2] [ref=e120]
+        - paragraph [ref=e121]: Select the option that best describes you.
+      - generic [ref=e122]:
+        - button "No" [active] [ref=e123]
+        - button "Pre diabetes" [ref=e127]
+        - button "Yes" [ref=e129]
+  - button "Continue" [ref=e109]

@@ -1,0 +1,131 @@
+- generic [ref=e1]:
+  - generic [ref=e147]:
+    - complementary [ref=e148]:
+      - button [ref=e149]
+      - generic [ref=e153]:
+        - img "Bluepin Logo" [ref=e154]
+        - heading "Bluepin." [level=1] [ref=e155]
+      - navigation [ref=e156]:
+        - button "Dashboard" [ref=e157]
+        - button "Glucose" [ref=e163]
+        - button "Health Canvas" [ref=e168]
+      - button "Dark Mode" [ref=e175]
+    - main [ref=e180]:
+      - generic [ref=e181]:
+        - generic [ref=e182]:
+          - generic: Link WhatsApp
+          - button "WhatsApp Sync" [ref=e183]
+        - button [ref=e189]
+      - generic [ref=e412]:
+        - generic [ref=e413]:
+          - heading "Glucose" [level=2] [ref=e414]
+          - generic [ref=e415]:
+            - button "Add Reading" [ref=e416]
+            - button "Sugar Health" [ref=e418]
+        - generic [ref=e421]:
+          - generic [ref=e426]:
+            - generic [ref=e428]:
+              - paragraph [ref=e429]: Today's Reading
+              - heading "Blood Glucose" [level=3] [ref=e430]
+            - generic [ref=e435]:
+              - generic [ref=e436]:
+                - generic [ref=e437]: "--"
+                - generic [ref=e438]: mg/dL
+              - generic [ref=e439]: No reading logged today
+          - generic [ref=e441]:
+            - generic [ref=e446]:
+              - generic [ref=e448]:
+                - paragraph [ref=e449]: Laboratory
+                - heading "Latest HbA1c" [level=3] [ref=e450]
+              - generic [ref=e455]:
+                - generic [ref=e456]: "--"
+                - generic [ref=e457]: "%"
+              - generic [ref=e458]: Upload a lab report to track HbA1c
+            - generic [ref=e461] [cursor=pointer]:
+              - generic [ref=e462]:
+                - heading "Expected HbA1c" [level=3] [ref=e463]
+                - button "Learn more" [ref=e464]
+              - paragraph [ref=e467]: Estimate from glucose readings
+        - generic [ref=e473]:
+          - generic [ref=e474]:
+            - generic [ref=e475]:
+              - generic [ref=e476]:
+                - generic [ref=e477]: Average
+                - generic [ref=e478]: · Target 70 - 99 mg/dL
+              - generic [ref=e479]:
+                - generic [ref=e480]: —
+                - generic [ref=e481]: mg/dL
+              - paragraph [ref=e482]: No readings in this period
+            - generic [ref=e483]:
+              - button "7D" [ref=e484]
+              - button "30D" [ref=e485]
+              - button "90D" [ref=e486]
+              - button "1Y" [ref=e487]
+              - button "All" [ref=e488]
+          - generic [ref=e489]:
+            - button "Fasting" [ref=e490]
+            - button "Post-Prandial" [ref=e491]
+            - button "Random" [ref=e492]
+            - button "HbA1c" [ref=e493]
+          - paragraph [ref=e498]: No readings for this period.
+          - generic [ref=e499]:
+            - generic [ref=e500]:
+              - paragraph [ref=e501]: Average
+              - generic [ref=e502]:
+                - generic [ref=e503]: "--"
+                - generic [ref=e504]: mg/dL
+            - generic [ref=e505]:
+              - paragraph [ref=e506]: Range
+              - generic [ref=e507]:
+                - generic [ref=e508]: —
+                - generic [ref=e509]: mg/dL
+            - generic [ref=e510]:
+              - paragraph [ref=e511]: In Target
+              - generic [ref=e512]:
+                - generic [ref=e513]: —
+                - generic [ref=e514]: 0/0
+            - generic [ref=e515]:
+              - paragraph [ref=e516]: Total Logs
+              - generic [ref=e517]:
+                - generic [ref=e518]: "0"
+                - generic [ref=e519]: entries
+        - generic [ref=e520]:
+          - heading "Reading Timeline" [level=3] [ref=e521]
+          - paragraph [ref=e522]: No readings logged yet.
+        - generic [ref=e525]:
+          - generic [ref=e526]:
+            - heading "Add Reading" [level=3] [ref=e527]
+            - button [ref=e528]
+          - generic [ref=e533]:
+            - generic [ref=e534] [cursor=pointer]: Upload Reading
+            - generic [ref=e539] [cursor=pointer]: Take Photo
+          - generic [ref=e544]: or manual entry
+          - generic [ref=e548]:
+            - generic [ref=e549]:
+              - generic [ref=e550]: Blood Glucose (mg/dL)
+              - spinbutton "0" [ref=e551]: "120"
+            - generic [ref=e552]:
+              - generic [ref=e553]:
+                - generic [ref=e554]: Meal Timing
+                - paragraph [ref=e555]: Relative to your most recent meal.
+              - generic [ref=e556]:
+                - generic [ref=e557] [cursor=pointer]:
+                  - radio "Less than 2 hours" [ref=e559]
+                  - generic [ref=e561]: Less than 2 hours
+                - generic [ref=e562] [cursor=pointer]:
+                  - radio "2–8 hours" [checked] [active] [ref=e564]
+                  - generic [ref=e566]: 2–8 hours
+                - generic [ref=e567] [cursor=pointer]:
+                  - radio "More than 8 hours" [ref=e569]
+                  - generic [ref=e571]: More than 8 hours
+            - generic [ref=e572]:
+              - button "Cancel" [ref=e573]
+              - button "Save" [ref=e574]
+      - generic [ref=e341]:
+        - button "Terms of Service" [ref=e342] [cursor=pointer]
+        - button "Privacy Policy" [ref=e343] [cursor=pointer]
+        - button "Cookie Policy" [ref=e344] [cursor=pointer]
+        - button "AI Disclaimer" [ref=e345] [cursor=pointer]
+        - button "Medical Disclaimer" [ref=e346] [cursor=pointer]
+        - button "Health Data Consent" [ref=e347] [cursor=pointer]
+  - generic [aria-hidden] [ref=e364]: Oct 13

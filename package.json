@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
     "start": "node dist/server.cjs"
   },
   "dependencies": {
@@ -62,6 +63,7 @@
     "uuid": "^11.1.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/typography": "^0.5.20",
     "@types/cors": "^2.8.19",
     "@types/nodemailer": "^8.0.1",

@@ -1,0 +1,116 @@
+- generic [ref=e1]:
+  - generic [ref=e147]:
+    - complementary [ref=e148]:
+      - button [ref=e149]
+      - generic [ref=e153]:
+        - img "Bluepin Logo" [ref=e154]
+        - heading "Bluepin." [level=1] [ref=e155]
+      - navigation [ref=e156]:
+        - button "Dashboard" [ref=e157]
+        - button "Glucose" [ref=e163]
+        - button "Health Canvas" [ref=e168]
+      - button "Dark Mode" [ref=e175]
+    - main [ref=e180]:
+      - generic [ref=e181]:
+        - generic [ref=e182]:
+          - generic: Link WhatsApp
+          - button "WhatsApp Sync" [ref=e183]
+        - button [ref=e189]
+      - generic [ref=e202]:
+        - generic [ref=e203]:
+          - heading "Good afternoon :)" [level=1] [ref=e204]
+          - paragraph [ref=e206]: Better does not have to mean perfect.
+        - generic [ref=e207] [cursor=pointer]:
+          - button "Pin to top" [ref=e208]
+          - generic [ref=e212]:
+            - img "Health Status Background" [ref=e214]
+            - generic [ref=e215]:
+              - generic [ref=e216]: Health Score
+              - generic [ref=e222]: No change
+          - paragraph [ref=e225]: Upload a lab report to generate your Health Score
+        - generic [ref=e226]:
+          - generic [ref=e227]:
+            - heading "Care Reminders" [level=2] [ref=e230]
+            - generic [ref=e231]: "4"
+          - generic [ref=e233]:
+            - generic [ref=e235] [cursor=pointer]:
+              - heading "Fasting glucose missed today" [level=3] [ref=e236]
+              - paragraph [ref=e237]: Remember to log it before breakfast tomorrow.
+            - generic [ref=e241] [cursor=pointer]:
+              - heading "Log your post-meal glucose" [level=3] [ref=e242]
+              - paragraph [ref=e243]: Log a reading after lunch or dinner.
+            - generic [ref=e247] [cursor=pointer]:
+              - heading "Start tracking your glucose" [level=3] [ref=e248]
+              - paragraph [ref=e249]: You have not logged a glucose reading yet.
+            - button "View all 4 reminders" [ref=e252]
+        - generic [ref=e253] [cursor=pointer]:
+          - generic [ref=e254]:
+            - heading "Glucose" [level=2] [ref=e255]
+            - button "Pin to top" [ref=e256]
+          - generic [ref=e259]:
+            - generic [ref=e260]:
+              - paragraph [ref=e265]: Today's Reading
+              - generic [ref=e269]:
+                - generic [ref=e270]:
+                  - generic [ref=e271]: "--"
+                  - generic [ref=e272]: mg/dL
+                - paragraph [ref=e273]: No readings today
+            - generic [ref=e275]:
+              - paragraph [ref=e280]: Latest HbA1c
+              - generic [ref=e284]:
+                - generic [ref=e285]:
+                  - generic [ref=e286]: "--"
+                  - generic [ref=e287]: "%"
+                - paragraph [ref=e288]: Upload a lab report
+        - generic [ref=e289]:
+          - generic [ref=e290]:
+            - heading "Weight" [level=2] [ref=e291]
+            - generic [ref=e292]:
+              - button "Pin to top" [ref=e293]
+              - button [ref=e296]
+          - generic [ref=e298]:
+            - generic [ref=e299]:
+              - generic [ref=e300]:
+                - generic [ref=e301]: Latest Weight
+                - generic [ref=e302]:
+                  - generic [ref=e303]: "70"
+                  - generic [ref=e304]: kg
+                - generic [ref=e305]: Logged Oct 13, 2026
+              - generic [ref=e306]:
+                - generic [ref=e307]: BMI
+                - generic [ref=e308]: "22.9"
+                - generic [ref=e309]: Normal weight
+            - generic [ref=e310]:
+              - button "30 Days" [ref=e311]
+              - button "90 Days" [ref=e312]
+              - button "Lifetime" [ref=e313]
+            - application [ref=e317]:
+              - generic [ref=e321]:
+                - generic [ref=e322]:
+                  - generic [ref=e323]: "65"
+                  - generic [ref=e325]: "68"
+                  - generic [ref=e327]: "71"
+                  - generic [ref=e329]: "75"
+                - generic [ref=e331]: Oct 13
+            - button "Recent Logs" [ref=e335]
+        - button [ref=e339]
+      - generic [ref=e341]:
+        - button "Terms of Service" [ref=e342] [cursor=pointer]
+        - button "Privacy Policy" [ref=e343] [cursor=pointer]
+        - button "Cookie Policy" [ref=e344] [cursor=pointer]
+        - button "AI Disclaimer" [ref=e345] [cursor=pointer]
+        - button "Medical Disclaimer" [ref=e346] [cursor=pointer]
+        - button "Health Data Consent" [ref=e347] [cursor=pointer]
+  - generic:
+    - generic [aria-hidden]:
+      - img:
+        - generic [ref=e348] [cursor=pointer]
+    - alertdialog [ref=e370]:
+      - generic [ref=e371]:
+        - heading "Sync WhatsApp" [level=4] [ref=e372]
+        - generic [ref=e373]: Tap the WhatsApp icon to sync WhatsApp and get reminders and insights right in chat.
+      - generic [ref=e374]:
+        - button "Previous" [ref=e375] [cursor=pointer]
+        - button "Let's Go! 🚀" [active] [ref=e376] [cursor=pointer]
+      - button "Close" [ref=e377] [cursor=pointer]
+  - generic [aria-hidden] [ref=e364]: Oct 13

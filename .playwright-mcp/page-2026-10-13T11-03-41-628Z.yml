@@ -1,0 +1,26 @@
+- generic [ref=e7]:
+  - generic [ref=e9]:
+    - img "Bluepin Logo" [ref=e10]
+    - heading "Bluepin." [level=1] [ref=e11]
+  - paragraph [ref=e13]: Managing diabetes just got simpler.
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]: Email
+      - textbox [ref=e17]
+    - generic [ref=e18]:
+      - generic [ref=e19]: Password
+      - textbox [ref=e20]
+    - button "Sign Up" [ref=e38] [cursor=pointer]
+  - paragraph [ref=e24]: or
+  - button "Continue with Google" [ref=e26]
+  - paragraph [ref=e32]:
+    - text: By continuing, you agree to our
+    - button "Terms of Service" [ref=e33] [cursor=pointer]
+    - text: ","
+    - button "Privacy Policy" [ref=e34] [cursor=pointer]
+    - text: ", and"
+    - button "Cookie Policy" [ref=e35] [cursor=pointer]
+    - text: .
+  - paragraph [ref=e36]:
+    - text: Already have an account?
+    - button "Sign In" [active] [ref=e39] [cursor=pointer]
