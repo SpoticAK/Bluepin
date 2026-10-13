@@ -1,6 +1,9 @@
 # Preview overrides — merged over apphosting.yaml at build time, this file wins.
 # Backend: bluepin-f8a09 (dev/preview project, isolated from prod myhealthyfam).
-# Uses the Meta TEST sender (WHATSAPP_MODE=test); test-sender secrets only.
+#
+# Same additive-only rule as the base file: console-managed secrets are NOT
+# redeclared here. Create the missing preview secrets in the console
+# (see docs/ENVIRONMENTS.md "preview gaps").
 
 runConfig:
   cpu: 1
@@ -15,52 +18,4 @@ env:
     availability: [BUILD, RUNTIME]
   - variable: WHATSAPP_MODE
     value: test
-    availability: [RUNTIME]
-
-  # TODO(preview-url): set once the preview backend exists (Firebase console
-  # shows its URL). Magic links + WhatsApp CTAs point here.
-  # - variable: APP_URL
-  #   value: https://YOUR-PREVIEW-BACKEND.web.app
-
-  # --- preview Firebase client config (bluepin-f8a09, public values) ---
-  - variable: VITE_FIREBASE_PROJECT_ID
-    value: bluepin-f8a09
-    availability: [BUILD, RUNTIME]
-  - variable: VITE_FIREBASE_APP_ID
-    value: 1:675508587647:web:0f22b7c547de223190834a
-    availability: [BUILD, RUNTIME]
-  - variable: VITE_FIREBASE_API_KEY
-    value: AIzaSyBkd9cTMNO9PjqeJk5-oYMiuVTXE1LgRtM
-    availability: [BUILD, RUNTIME]
-  - variable: VITE_FIREBASE_AUTH_DOMAIN
-    value: bluepin-f8a09.firebaseapp.com
-    availability: [BUILD, RUNTIME]
-  - variable: VITE_FIREBASE_STORAGE_BUCKET
-    value: bluepin-f8a09.firebasestorage.app
-    availability: [BUILD, RUNTIME]
-  - variable: VITE_FIREBASE_MESSAGING_SENDER_ID
-    value: "675508587647"
-    availability: [BUILD, RUNTIME]
-  - variable: VITE_FIREBASE_DATABASE_ID
-    value: (default)
-    availability: [BUILD, RUNTIME]
-
-  # --- preview secrets (Secret Manager refs, test-sender values only) ---
-  - variable: GEMINI_API_KEY
-    secret: gemini-api-key-preview
-    availability: [RUNTIME]
-  - variable: WHATSAPP_TOKEN
-    secret: whatsapp-token-preview
-    availability: [RUNTIME]
-  - variable: WHATSAPP_PHONE_NUMBER_ID
-    secret: whatsapp-phone-number-id-preview
-    availability: [RUNTIME]
-  - variable: WHATSAPP_APP_SECRET
-    secret: whatsapp-app-secret
-    availability: [RUNTIME]
-  - variable: WHATSAPP_VERIFY_TOKEN
-    secret: whatsapp-verify-token-preview
-    availability: [RUNTIME]
-  - variable: CRON_SECRET
-    secret: cron-secret-preview
     availability: [RUNTIME]

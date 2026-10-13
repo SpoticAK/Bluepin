@@ -107,4 +107,4 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-13 | 0 | Branch created; plan + env + decision docs added. Baseline survey recorded above. |
 | 2026-10-13 | 0 | npm standardized (`bun.lock` deleted). Lint RED (11 pre-existing `Dashboard.tsx` errors); build GREEN. |
 | 2026-10-13 | 1 | Deleted 26 dead top-level files (kept `test.pdf` as harness fixture); `@deprecated` headers on 4 unimported modules; `dist/` confirmed untracked; lint still exactly 11 errors. |
-| 2026-10-13 | 2 | Code side done: `server/config.ts`, `/api/health`, `WHATSAPP_MODE` guard, `apphosting.yaml` + `.preview.yaml`, `.env.example`. Verified boot + health + guard. Awaiting: Meta test-sender values, Secret Manager values, prod web-app pick (see TODOs in yaml). |
+| 2026-10-13 | 2 | Owner reported console keys for both projects. yamls rewritten additive-only (no `secret:` refs — console stays source of truth, rollout can't fail on missing secrets). Gaps documented in `docs/ENVIRONMENTS.md` (preview: verify token, app secret, cron secret, APP_URL, test-sender token swap). |

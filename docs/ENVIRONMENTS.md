@@ -62,3 +62,35 @@ Do NOT share your Meta password. I only need pasted values afterwards.
 `WHATSAPP_MEDIA_*`, `FIREBASE_PROJECT_ID`, `VITE_FIREBASE_DATABASE_ID`, `FIREBASE_STORAGE_BUCKET`,
 `CRON_SECRET`, `PDF_MARKDOWN_FUNCTION_URL`, `HEALTH_PROFILE_HEADER_IMAGE_URL`, `APP_TIMEZONE`, `NODE_ENV`
 plus files `firebase-adminsdk.json`, `firebase-applet-config.json`.
+
+## Console state (reported by owner, 2026-10-13 — normalized names)
+
+Prod (`myhealthyfam-28c2c`) HAS: `GEMINI_API_KEY`, `WHATSAPP_TOKEN`,
+`WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_BUSINESS_PHONE`,
+`META_BASE_URL`, `WHATSAPP_APP_SECRET`, `CRON_SECRET`, `VITE_FIREBASE_VAPID_KEY`,
+`APP_URL`, `WHATSAPP_TEMPLATE_LANG`, `WHATSAPP_MEDIA_DOWNLOAD_TIMEOUT_MS`,
+`WHATSAPP_MEDIA_METADATA_TIMEOUT_MS`, `WHATSAPP_MEDIA_DOWNLOAD_ATTEMPTS`,
+`WHATSAPP_MEDIA_MAX_BYTES`.
+Prod frontend otherwise falls back to `firebase-applet-config.json` (myhealthyfam values) — correct.
+
+Preview (`bluepin-f8a09`) HAS: `VITE_FIREBASE_PROJECT_ID/APP_ID/API_KEY/AUTH_DOMAIN/`
+`STORAGE_BUCKET/MESSAGING_SENDER_ID/DATABASE_ID`, `GEMINI_API_KEY`, `WHATSAPP_TOKEN`,
+`WHATSAPP_PHONE_NUMBER_ID`.
+
+## Gaps to close (console work, manual)
+
+Preview (`bluepin-f8a09`) — add:
+1. `WHATSAPP_VERIFY_TOKEN` = new preview-only string (do NOT reuse prod's).
+2. `WHATSAPP_APP_SECRET` = same Meta app secret as prod (shared app; needed for webhook signatures).
+3. `CRON_SECRET` = new random string, **different from prod's**.
+4. `APP_URL` = preview backend URL (after backend exists; magic links + WA CTAs point here).
+5. **Replace** `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` with test-sender values
+   once the Meta test number is revived (today they still equal prod's — the original Req. 3 complaint).
+
+Verify (both projects): `WHATSAPP_TEMPLATE_LANG` must be `en_US` (must match the approved
+template's language or Meta returns 132001). Local `.env` currently has `en` — do not copy that.
+
+Prod gaps (pre-existing, non-blocking, tracked): no `SMTP_*` (feedback emails only simulate —
+see `server/mailer.ts`); no `WHATSAPP_OTP_TEMPLATE_NAME` (OTP falls back to 24h-window text —
+known blocker noted in `server/routes/whatsapp.ts`); no `ENV_NAME`/`WHATSAPP_MODE` (now supplied
+by `apphosting.yaml`, no console change needed).
