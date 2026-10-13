@@ -8,9 +8,11 @@
 #   1. Environments: create `preview` and `production` (Settings → Environments).
 #   2. In `preview`, add variable PREVIEW_URL =
 #      https://bluepin-f8a09--bluepin-f8a09.us-east4.hosted.app
-#      (Variables tab — a URL is not a secret. No secrets needed by CI today.)
-#   3. Branch protection on `main`: require the `verify` job to pass.
-#   4. In Firebase console, confirm each backend tracks the intended branch.
+#      (Variables tab — a URL is not a secret.)
+#   3. In `preview`, add variable E2E_TEST_EMAIL + secret E2E_TEST_PASSWORD
+#      (the seeded e2e-test@bluepin.in account; secret tab for the password).
+#   4. Branch protection on `main`: require the `verify` job to pass.
+#   5. In Firebase console, confirm each backend tracks the intended branch.
 
 name: CI
 
@@ -69,3 +71,33 @@ jobs:
             sleep 20
           done
           echo "ERROR: preview backend did not report env=preview within 10 minutes"; exit 1
+
+  e2e-preview:
+    name: e2e on preview (playwright)
+    # Runs after the smoke test confirms the rollout landed, so specs never
+    # execute against a half-deployed backend. Push-to-main only: E2E writes
+    # real data to preview Firestore and burns minutes, so it stays off PRs.
+    # Secrets resolve here because this runs post-merge inside the base repo —
+    # fork PRs never reach this job and never see these values.
+    if: github.event_name == 'push'
+    needs: smoke-preview
+    runs-on: ubuntu-latest
+    environment: preview
+    env:
+      E2E_TEST_EMAIL: ${{ vars.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E slice against preview
+        run: npm run test:e2e
