@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.cjs",
     "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:tokens": "tsx scripts/test_lab_report_tokens.ts",
     "test:wa": "tsx scripts/test_whatsapp.ts",
     "start": "node dist/server.cjs"
@@ -67,6 +70,8 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.18",
     "@types/sharp": "^0.31.1",
-    "esbuild-register": "^3.6.0"
+    "@vitest/coverage-v8": "^5.0.4",
+    "esbuild-register": "^3.6.0",
+    "vitest": "^5.0.4"
   }
 }

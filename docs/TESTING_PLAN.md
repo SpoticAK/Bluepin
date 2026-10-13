@@ -73,6 +73,8 @@ Topology discovered 2026-10-13 (no new project needed): prod = `myhealthyfam-28c
 - [ ] **WhatsApp test sender revival (needs you, ~5 min in Meta dashboard):** see
   `docs/ENVIRONMENTS.md` "Test sender revival" checklist. Code side is ready (preview mode +
   separate verify token supported).
+  - **DONE 2026-10-13:** preview webhook verified against
+    `https://bluepin-f8a09--bluepin-f8a09.us-east4.hosted.app/api/whatsapp/webhook`.
 - [ ] Separate Gemini key + SMTP sender for preview (Secret Manager `*-preview` refs stubbed).
 - Gate: boot each env with its file, `GET /api/health` reports correct `ENV_NAME`, preview writes absent from prod.
   - Preview gate **PASSED** 2026-10-13: `https://bluepin-f8a09--bluepin-f8a09.us-east4.hosted.app/api/health`
@@ -81,6 +83,12 @@ Topology discovered 2026-10-13 (no new project needed): prod = `myhealthyfam-28c
 ## Phase 3 — Test setup
 
 Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config, `msw` (or `nock`), `playwright` (chromium only).
+- [x] Runner installed (`vitest@5` + `@vitest/coverage-v8` as devDeps; `test` / `test:watch` / `test:coverage` scripts).
+- [x] Unit batch 1+2 (86 tests, all green 2026-10-13): `server/utils` (cache/jsonparse/generateId),
+  `wa-bot/services/reminderSlots`, `src/careReminderRules`, `src/lib` (utils/goalUtils/biomarkerUtils/
+  registry/biomarkerLookup). Coverage: `server/utils` 94%, `src/lib` ~81% — gate (≥70%) PASSED.
+  Two tests caught real contract subtleties (clinical-override refs, glucose info suppression) —
+  tests encode actual behavior, not assumptions. Lint: still exactly the 11 pre-existing errors.
 
 - [ ] Unit (first): `src/lib/derivedMetrics.ts`, `src/lib/biomarkerUtils.ts`,
   `src/lib/registry/biomarkerLookup.ts`, `src/careReminderRules.ts`, `src/lib/goalUtils.ts`,
@@ -111,3 +119,5 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-13 | 1 | Deleted 26 dead top-level files (kept `test.pdf` as harness fixture); `@deprecated` headers on 4 unimported modules; `dist/` confirmed untracked; lint still exactly 11 errors. |
 | 2026-10-13 | 2 | Owner reported console keys for both projects. yamls rewritten additive-only (no `secret:` refs — console stays source of truth, rollout can't fail on missing secrets). Gaps documented in `docs/ENVIRONMENTS.md` (preview: verify token, app secret, cron secret, APP_URL, test-sender token swap). |
 | 2026-10-13 | 2 | Branch deployed to preview backend. `/api/health` first read `production`/`live` (base yaml won); fixed via explicit console `ENV_NAME`/`WHATSAPP_MODE`, now `preview`/`test`. Lesson recorded in `docs/ENVIRONMENTS.md`. Webhook verification unblocked. |
+| 2026-10-13 | 2 | Preview webhook verified. |
+| 2026-10-13 | 3 | Unit tests batch 1+2: 9 files, 86 tests green; coverage gate passed (server/utils 94%, src/lib ~81%). |
