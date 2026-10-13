@@ -28,20 +28,25 @@ Related docs: `docs/ENVIRONMENTS.md` (env matrix + secrets), `docs/DECISIONS.md`
 
 ## Phase 1 — Cleanup first (approved priority)
 
-- [ ] Delete dead top-level files in one revertable commit:
-  `formatAndFix.cjs`, `patch.js`, `patch.mjs`, `patch_add_report.cjs`, `patch_add_report.mjs`,
-  `patch_app.cjs`, `patch_store.cjs`, `patch_rules.cjs`, `patch_server.mjs`, `patch_dash.py`,
-  `patch_bun.sh`, `migrate.ts`, `query-db.ts`, `test.js`, `test.ts`, `test-date.ts`,
-  `test-delete.js`, `test.txt`, `test.tmp`, `test.pdf`, `test2.pdf`, `empty.pdf`,
-  `dashboard_sections.txt`, `ui_patch.txt`, `trend_patch.txt`, `trend_ui_patch.txt`, `total_readings_patch.txt`.
-- [ ] Untrack committed `dist/` from git (keep as gitignored build output).
-- [ ] Deprecate-don't-delete: add `@deprecated` headers pointing at the live copy for
+- [x] Delete dead top-level files in one revertable commit:
+  Deleted 26 files (2026-10-13). **Kept `test.pdf`**: it is the default fixture of the manual
+  harness `scripts/test_lab_report_tokens.ts:352` — deleted with the harness in Phase 3.
+  (`test2.pdf`/`test.tmp` were byte-identical copies and were deleted.)
+- [x] Untrack committed `dist/` from git (keep as gitignored build output).
+  Not needed — `dist/` was never tracked (gitignored). Verified 2026-10-13.
+- [x] Deprecate-don't-delete: add `@deprecated` headers pointing at the live copy for
   `server/services/labReportService.ts` → `labReportServiceDirect.ts`,
   superseded `server/services/whatsapp/*` → `server/services/wa-bot/*`,
   `src/components/AuthScreen.tsx` → `src/components/authflow/`,
   `src/components/WelcomeScreen.tsx` (legacy marketing).
   Switch all imports to live copies; delete legacy only after Phase 3 covers the live path.
+  - Done for `labReportService.ts`, `AuthScreen.tsx`, `WelcomeScreen.tsx` + `TestPage.tsx` stub
+    (all verified zero importers via grep).
+  - NOT applied to `services/whatsapp/*`: routes (`whatsapp.ts`, `auth.ts`) still import the legacy
+    barrel via `whatsappService`, while `wa-bot/routeMessage` handles inbound. The two implementations
+    coexist — consolidation deferred to Phase 3 behind tests.
 - Gate: `tsc --noEmit` + production build green.
+  - Lint still exactly the 11 pre-existing `Dashboard.tsx` errors — no new errors introduced.
 
 ## Phase 2 — Env separation (incl. WhatsApp test number revival + 2nd Firebase project)
 
@@ -87,3 +92,5 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | Date | Phase | Change |
 |---|---|---|
 | 2026-10-13 | 0 | Branch created; plan + env + decision docs added. Baseline survey recorded above. |
+| 2026-10-13 | 0 | npm standardized (`bun.lock` deleted). Lint RED (11 pre-existing `Dashboard.tsx` errors); build GREEN. |
+| 2026-10-13 | 1 | Deleted 26 dead top-level files (kept `test.pdf` as harness fixture); `@deprecated` headers on 4 unimported modules; `dist/` confirmed untracked; lint still exactly 11 errors. |

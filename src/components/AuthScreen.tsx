@@ -1,3 +1,8 @@
+/**
+ * @deprecated Legacy auth screen. Live path is `src/components/authflow/AuthScreen.tsx`
+ * (rendered by `src/App.tsx`). This file has zero importers. Do not add new imports —
+ * deletion tracked in docs/TESTING_PLAN.md Phase 1, after Phase 3 tests cover the live path.
+ */
 import React, { useState, useEffect } from "react";
 import { Sparkles } from "lucide-react";
 import { auth } from "../lib/firebase";

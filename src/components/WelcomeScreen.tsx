@@ -1,3 +1,8 @@
+/**
+ * @deprecated Legacy marketing welcome screen — now served by the separate site (bluepin.in).
+ * See comment in `src/App.tsx`. This file has zero importers. Deletion tracked in
+ * docs/TESTING_PLAN.md Phase 1, after Phase 3 tests cover the live path.
+ */
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { cn } from '../lib/utils';

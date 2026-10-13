@@ -1,3 +1,9 @@
+/**
+ * @deprecated Legacy lab-report extractor. Live path is `labReportServiceDirect.ts`
+ * (`extractLabReportFromUrl`), used by `server/upload.ts` and `wa-bot` handlers.
+ * This file has zero importers. Do not add new imports — deletion tracked in
+ * docs/TESTING_PLAN.md Phase 1, after Phase 3 tests cover the live path.
+ */
 import { Type } from "@google/genai";
 import pdfParse from "pdf-parse";
 import sharp from "sharp";
