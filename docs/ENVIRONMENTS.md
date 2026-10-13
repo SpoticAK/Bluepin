@@ -12,7 +12,7 @@ Resolved topology (2026-10-13, via Firebase MCP — no new project needed):
 | App Hosting config | `apphosting.preview.yaml` | `apphosting.yaml` (base) |
 | `ENV_NAME` | `development` (local) / `preview` | `production` |
 | `WHATSAPP_MODE` | `test` | `live` |
-| `APP_URL` / `FRONTEND_URL` | Preview Hosting URL | `https://app.bluepin.in` |
+| `APP_URL` / `FRONTEND_URL` | `https://bluepin-f8a09--bluepin-f8a09.us-east4.hosted.app` (confirmed 2026-10-13) | `https://app.bluepin.in` |
 | WhatsApp sender | Meta **test number**, preview webhook URL, preview `WHATSAPP_VERIFY_TOKEN` | Prod number, prod webhook URL, prod verify token |
 | `WHATSAPP_MODE` | `test` | `live` (guard: preview code must refuse prod `PHONE_NUMBER_ID`) |
 | `WHATSAPP_TOKEN` / `PHONE_NUMBER_ID` / `APP_SECRET` | Test-sender credentials | Prod credentials (Secret Manager / GitHub `production` env) |
@@ -29,6 +29,10 @@ Resolved topology (2026-10-13, via Firebase MCP — no new project needed):
    always win over files (`process.loadEnvFile()` never overrides real env).
 2. `apphosting.yaml` holds production defaults; `apphosting.preview.yaml` overrides for preview.
    Firebase console values take precedence over yaml; yaml takes precedence over dotenv files.
+   Lesson 2026-10-13: the preview backend initially served `env=production` (base yaml won —
+   backend not linked to an environment literally named `preview`). Fixed by setting
+   `ENV_NAME=preview` + `WHATSAPP_MODE=test` explicitly in the preview backend's console env.
+   Verified via `/api/health`. Prefer explicit console values for identity vars on every backend.
 3. `server/config.ts` validates at boot: throws on unknown `ENV_NAME` or `WHATSAPP_MODE=live`
    outside production; warns on missing integration keys. Strict required-keys arrive with Phase 4.
 4. Local `.env` already points at bluepin-f8a09 — do NOT point it at myhealthyfam except for

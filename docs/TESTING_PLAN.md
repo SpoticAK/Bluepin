@@ -75,6 +75,8 @@ Topology discovered 2026-10-13 (no new project needed): prod = `myhealthyfam-28c
   separate verify token supported).
 - [ ] Separate Gemini key + SMTP sender for preview (Secret Manager `*-preview` refs stubbed).
 - Gate: boot each env with its file, `GET /api/health` reports correct `ENV_NAME`, preview writes absent from prod.
+  - Preview gate **PASSED** 2026-10-13: `https://bluepin-f8a09--bluepin-f8a09.us-east4.hosted.app/api/health`
+    → `{env: preview, whatsappMode: test}` (after explicit console vars; base yaml had won initially).
 
 ## Phase 3 — Test setup
 
@@ -108,3 +110,4 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-13 | 0 | npm standardized (`bun.lock` deleted). Lint RED (11 pre-existing `Dashboard.tsx` errors); build GREEN. |
 | 2026-10-13 | 1 | Deleted 26 dead top-level files (kept `test.pdf` as harness fixture); `@deprecated` headers on 4 unimported modules; `dist/` confirmed untracked; lint still exactly 11 errors. |
 | 2026-10-13 | 2 | Owner reported console keys for both projects. yamls rewritten additive-only (no `secret:` refs — console stays source of truth, rollout can't fail on missing secrets). Gaps documented in `docs/ENVIRONMENTS.md` (preview: verify token, app secret, cron secret, APP_URL, test-sender token swap). |
+| 2026-10-13 | 2 | Branch deployed to preview backend. `/api/health` first read `production`/`live` (base yaml won); fixed via explicit console `ENV_NAME`/`WHATSAPP_MODE`, now `preview`/`test`. Lesson recorded in `docs/ENVIRONMENTS.md`. Webhook verification unblocked. |
