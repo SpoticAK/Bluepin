@@ -36,8 +36,17 @@ test.beforeEach(async ({ page }) => {
       .first()
       .textContent()
       .catch(() => null);
+    // On a hang (no banner), dump the UI state so CI logs show where it stuck.
+    const pageState = await page
+      .evaluate(() => ({
+        url: location.href,
+        title: document.title,
+        body: document.body.innerText.slice(0, 400).replace(/\s+/g, " "),
+      }))
+      .catch(() => null);
     throw new Error(
-      `E2E login failed${errText ? `: "${errText.trim()}"` : " (dashboard never appeared, no error banner)"}`,
+      `E2E login failed${errText ? `: "${errText.trim()}"` : " (dashboard never appeared, no error banner)"}` +
+        (pageState ? ` | page: ${JSON.stringify(pageState)}` : ""),
     );
   }
 });
