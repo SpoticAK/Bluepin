@@ -1,0 +1,71 @@
+# Bluepin CI — verification only; deploys stay with App Hosting.
+#
+# Deploys are NOT done here. Each App Hosting backend (prod: myhealthyfam-28c2c,
+# preview: bluepin-f8a09) auto-rolls out from its connected GitHub branch via the
+# Firebase console GitHub integration. This workflow only gates merges.
+#
+# MANUAL SETUP (once, in GitHub repo Settings — no MCP covers this):
+#   1. Environments: create `preview` and `production` (Settings → Environments).
+#   2. In `preview`, add variable PREVIEW_URL =
+#      https://bluepin-f8a09--bluepin-f8a09.us-east4.hosted.app
+#      (Variables tab — a URL is not a secret. No secrets needed by CI today.)
+#   3. Branch protection on `main`: require the `verify` job to pass.
+#   4. In Firebase console, confirm each backend tracks the intended branch.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop, chore/testing-foundation]
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    name: lint + test + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run lint
+
+      - name: Unit + API tests with coverage
+        run: npm run test:coverage
+
+      - name: Production build (vite + esbuild server)
+        run: npm run build
+
+  smoke-preview:
+    name: preview identity smoke test
+    # After a main push, App Hosting rolls the preview backend out on its own;
+    # this job polls its /api/health until the rollout lands (or times out) and
+    # asserts the backend still identifies as preview/test — catching exactly
+    # the base-yaml-wins misconfiguration seen on 2026-10-13.
+    if: github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: preview
+    env:
+      PREVIEW_URL: ${{ vars.PREVIEW_URL }}
+    steps:
+      - name: Wait for rollout + assert preview identity
+        run: |
+          for i in $(seq 1 30); do
+            BODY=$(curl -sf "$PREVIEW_URL/api/health" || true)
+            ENV_NAME=$(echo "$BODY" | grep -o '"env":"[a-z]*"' || true)
+            echo "attempt $i: $ENV_NAME"
+            if [ "$ENV_NAME" = '"env":"preview"' ]; then
+              echo "$BODY" | grep -q '"whatsappMode":"test"' && exit 0
+              echo "ERROR: preview backend is not in test mode"; exit 1
+            fi
+            sleep 20
+          done
+          echo "ERROR: preview backend did not report env=preview within 10 minutes"; exit 1

@@ -21,11 +21,16 @@ import { getDailyDashboardQuote } from './dailyThoughts';
 import { calculateGoalsStreak, getWeeklyActivity } from "../lib/goalUtils";
 
 export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => void }) {
- const { profile, glucoseReadings, labReports, weightEntries, goals, goalLogs, addWeightEntry, addGlucoseReading, familySummaries } = useAppStore();
+ const { profile, glucoseReadings, labReports, weightEntries, goals, goalLogs, addWeightEntry, addGlucoseReading } = useAppStore();
  const currentUserId = auth.currentUser?.uid;
    const isGlucoseTracking = true;
   
   const [pinnedSection, setPinnedSection] = useState<'health'|'glucose'|'weight'>(() => (localStorage.getItem('pinnedSection') as any) || 'health');
+  // Section blocks are duplicated per pin gate (pinned-first ordering), so a
+  // direct `pinnedSection === 'x'` comparison inside a gate narrows to a
+  // constant. Compare through this helper instead: identical at runtime,
+  // typechecks under narrowing.
+  const isPinned = (section: typeof pinnedSection) => pinnedSection === section;
 
   useEffect(() => {
     localStorage.setItem('pinnedSection', pinnedSection);
@@ -371,11 +376,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           onClick={(e) => { e.stopPropagation(); setPinnedSection('health'); }}
           className={cn(
             "absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors z-20",
-            pinnedSection === 'health' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+            isPinned('health') ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
           )}
           title="Pin to top"
         >
-          <Pin size={16} className={pinnedSection === 'health' ? "fill-current" : ""} />
+          <Pin size={16} className={isPinned('health') ? "fill-current" : ""} />
         </button>
 
  <div className="relative z-10 flex flex-col items-center">
@@ -438,11 +443,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
                 onClick={(e) => { e.stopPropagation(); setPinnedSection('glucose'); }}
                 className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
-                  pinnedSection === 'glucose' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+                  isPinned('glucose') ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
                 )}
                 title="Pin to top"
               >
-                <Pin size={16} className={pinnedSection === 'glucose' ? "fill-current" : ""} />
+                <Pin size={16} className={isPinned('glucose') ? "fill-current" : ""} />
               </button>
             </div>
             <div className="flex min-h-[120px] relative overflow-hidden -mx-2">
@@ -508,7 +513,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
             </div>
           </section>
             {/* WEIGHT CARD */}
-        <WeightCard isPinned={pinnedSection === 'weight'} onPin={() => setPinnedSection('weight')} />
+        <WeightCard isPinned={isPinned('weight')} onPin={() => setPinnedSection('weight')} />
           </>
         )}
         {pinnedSection === 'glucose' && (
@@ -524,11 +529,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
                 onClick={(e) => { e.stopPropagation(); setPinnedSection('glucose'); }}
                 className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
-                  pinnedSection === 'glucose' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+                  isPinned('glucose') ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
                 )}
                 title="Pin to top"
               >
-                <Pin size={16} className={pinnedSection === 'glucose' ? "fill-current" : ""} />
+                <Pin size={16} className={isPinned('glucose') ? "fill-current" : ""} />
               </button>
             </div>
             <div className="flex min-h-[120px] relative overflow-hidden -mx-2">
@@ -605,11 +610,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           onClick={(e) => { e.stopPropagation(); setPinnedSection('health'); }}
           className={cn(
             "absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors z-20",
-            pinnedSection === 'health' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+            isPinned('health') ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
           )}
           title="Pin to top"
         >
-          <Pin size={16} className={pinnedSection === 'health' ? "fill-current" : ""} />
+          <Pin size={16} className={isPinned('health') ? "fill-current" : ""} />
         </button>
 
  <div className="relative z-10 flex flex-col items-center">
@@ -661,13 +666,13 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
 </div>
  </section>
             {/* WEIGHT CARD */}
-        <WeightCard isPinned={pinnedSection === 'weight'} onPin={() => setPinnedSection('weight')} />
+        <WeightCard isPinned={isPinned('weight')} onPin={() => setPinnedSection('weight')} />
           </>
         )}
         {pinnedSection === 'weight' && (
           <>
             {/* WEIGHT CARD */}
-        <WeightCard isPinned={pinnedSection === 'weight'} onPin={() => setPinnedSection('weight')} />
+        <WeightCard isPinned={isPinned('weight')} onPin={() => setPinnedSection('weight')} />
             {careRemindersNode}
             {/* 2. HEALTH SNAPSHOT */}
  <section 
@@ -680,11 +685,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
           onClick={(e) => { e.stopPropagation(); setPinnedSection('health'); }}
           className={cn(
             "absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full transition-colors z-20",
-            pinnedSection === 'health' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+            isPinned('health') ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
           )}
           title="Pin to top"
         >
-          <Pin size={16} className={pinnedSection === 'health' ? "fill-current" : ""} />
+          <Pin size={16} className={isPinned('health') ? "fill-current" : ""} />
         </button>
 
  <div className="relative z-10 flex flex-col items-center">
@@ -746,11 +751,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: any) => vo
                 onClick={(e) => { e.stopPropagation(); setPinnedSection('glucose'); }}
                 className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
-                  pinnedSection === 'glucose' ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
+                  isPinned('glucose') ? "text-blue-500 bg-blue-500/10" : "text-theme-text-sec hover:text-theme-text hover:bg-theme-bg"
                 )}
                 title="Pin to top"
               >
-                <Pin size={16} className={pinnedSection === 'glucose' ? "fill-current" : ""} />
+                <Pin size={16} className={isPinned('glucose') ? "fill-current" : ""} />
               </button>
             </div>
             <div className="flex min-h-[120px] relative overflow-hidden -mx-2">

@@ -8,6 +8,9 @@ dist-ssr
 coverage
 *.log
 dist/
+test-results/
+.playwright-mcp/
+playwright-report/
 
 firebase-adminsdk.json
 dist/
