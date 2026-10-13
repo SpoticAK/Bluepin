@@ -1,0 +1,86 @@
+# Base App Hosting configuration = PRODUCTION defaults.
+# Preview overrides live in apphosting.preview.yaml (merged at build time,
+# preview wins). Firebase console values take precedence over both files.
+# Secrets live in Secret Manager — create them in the console, never here.
+
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 4
+  concurrency: 80
+
+env:
+  # --- environment identity (structural, safe everywhere) ---
+  - variable: ENV_NAME
+    value: production
+    availability: [BUILD, RUNTIME]
+  - variable: NODE_ENV
+    value: production
+    availability: [RUNTIME]
+  - variable: WHATSAPP_MODE
+    value: live
+    availability: [RUNTIME]
+  - variable: APP_TIMEZONE
+    value: Asia/Kolkata
+    availability: [RUNTIME]
+  - variable: META_BASE_URL
+    value: https://graph.facebook.com/v26.0
+    availability: [BUILD, RUNTIME]
+  - variable: WHATSAPP_TEMPLATE_LANG
+    value: en_US
+    availability: [BUILD, RUNTIME]
+
+  # --- production URLs / Firebase client config (public values, prod project) ---
+  - variable: APP_URL
+    value: https://app.bluepin.in
+    availability: [BUILD, RUNTIME]
+  - variable: VITE_FIREBASE_PROJECT_ID
+    value: myhealthyfam-28c2c
+    availability: [BUILD, RUNTIME]
+  - variable: VITE_FIREBASE_DATABASE_ID
+    value: ai-studio-411912a3-9066-443b-8806-f8c0885a496a
+    availability: [BUILD, RUNTIME]
+  - variable: VITE_FIREBASE_STORAGE_BUCKET
+    value: myhealthyfam-28c2c.firebasestorage.app
+    availability: [BUILD, RUNTIME]
+  - variable: VITE_FIREBASE_AUTH_DOMAIN
+    value: auth.bluepin.in
+    availability: [BUILD, RUNTIME]
+  # TODO(prod-web-app): fill from the Firebase console (which of the 6
+  # myhealthyfam web apps is the prod app?) or `firebase_get_sdk_config`.
+  # - variable: VITE_FIREBASE_APP_ID
+  #   value: 1:199815596902:web:REPLACE_ME
+  # - variable: VITE_FIREBASE_API_KEY
+  #   value: REPLACE_ME
+  # - variable: VITE_FIREBASE_MESSAGING_SENDER_ID
+  #   value: "199815596902"
+
+  # --- secrets (Secret Manager refs — create in console before first deploy) ---
+  - variable: GEMINI_API_KEY
+    secret: gemini-api-key-prod
+    availability: [RUNTIME]
+  - variable: WHATSAPP_TOKEN
+    secret: whatsapp-token-prod
+    availability: [RUNTIME]
+  - variable: WHATSAPP_PHONE_NUMBER_ID
+    secret: whatsapp-phone-number-id-prod
+    availability: [RUNTIME]
+  - variable: WHATSAPP_APP_SECRET
+    secret: whatsapp-app-secret
+    availability: [RUNTIME]
+  - variable: WHATSAPP_VERIFY_TOKEN
+    secret: whatsapp-verify-token-prod
+    availability: [RUNTIME]
+  - variable: CRON_SECRET
+    secret: cron-secret-prod
+    availability: [RUNTIME]
+  - variable: SMTP_HOST
+    secret: smtp-host
+    availability: [RUNTIME]
+  - variable: SMTP_USER
+    secret: smtp-user
+    availability: [RUNTIME]
+  - variable: SMTP_PASS
+    secret: smtp-pass
+    availability: [RUNTIME]

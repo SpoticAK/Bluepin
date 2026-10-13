@@ -10,3 +10,17 @@
    and not configurable via `apphosting.yaml`. `bun.lock` deleted in Phase 0; `patch_bun.sh` deleted in Phase 1.
 4. **Cleanup before tests.** Phase 1 (dead-file deletion + deprecation headers) lands before new test setup.
 5. **CI = GitHub Actions + Firebase preview channels.** `.github/workflows/ci.yml` with per-env secrets.
+
+## 2026-10-13 — Phase 2 (code side)
+
+6. **No new Firebase project.** Via Firebase MCP: prod = `myhealthyfam-28c2c` (ENTERPRISE
+   Firestore `ai-studio-…`, 6 web apps), dev/preview = `bluepin-f8a09` (`(default)` Firestore).
+   Local `.env` already targets bluepin-f8a09. Separation = `ENV_NAME` + App Hosting yaml/env.
+7. **No per-env dotenv files.** Single `.env` for local dev; preview/prod inject via App Hosting
+   (real env wins over files). Simpler than the planned `.env.preview/.production`.
+8. **MCP wiring:** `opencode.json` fixed (`playwright`, `whatsapp_business_tools` moved from
+   `mcp.servers` to top-level `mcp` — nesting prevented loading); `skills-lock.json` gained the
+   Firebase agent-skills pack. GitHub steps stay manual (no GitHub MCP) — CI yaml will be
+   committed for the user to wire (`preview`/`production` Environments + secrets).
+9. **Meta access model:** agent never needs Meta dashboard login — user pastes test-sender IDs +
+   token into Secret Manager; checklist in `docs/ENVIRONMENTS.md`.

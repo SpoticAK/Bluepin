@@ -50,17 +50,30 @@ Related docs: `docs/ENVIRONMENTS.md` (env matrix + secrets), `docs/DECISIONS.md`
 
 ## Phase 2 — Env separation (incl. WhatsApp test number revival + 2nd Firebase project)
 
-- [ ] Add `server/config.ts` (zod-validated, fail-fast): `ENV_NAME=development|preview|production` + all required keys.
-- [ ] Add `.env.development` / `.env.preview` / `.env.production` (gitignored) + extend `.env.example`;
-  add `dev` / `build:preview`+`start:preview` / `build`+`start` scripts.
-- [ ] Create `apphosting.yaml` (base defaults) + `apphosting.preview.yaml` (+ prod overrides) for run config + non-secret env.
-- [ ] Create **second Firebase project** for dev/preview (Auth/Firestore/Storage/FCM fully isolated).
-  Short-term fallback if delayed: namespace within the single project (separate `APP_URL`, separate
-  `VERIFY_TOKEN`/`APP_SECRET`, Storage prefix, `env` field on test writes).
-- [ ] **WhatsApp test sender revival:** register test number on preview webhook URL with preview
-  `VERIFY_TOKEN`; keep prod number on prod URL only; add `WHATSAPP_MODE=test|live` guard so preview
-  can never send via the prod `PHONE_NUMBER_ID`; add dry-run flag to `scripts/test_whatsapp.ts`.
-- [ ] Separate Gemini key/quota for preview; separate SMTP sender (or mailtrap) for non-prod.
+Topology discovered 2026-10-13 (no new project needed): prod = `myhealthyfam-28c2c`
+(ENTERPRISE Firestore `ai-studio-…`, `auth.bluepin.in`), dev/preview = `bluepin-f8a09`
+(`(default)` Firestore). Local `.env` already points at `bluepin-f8a09`. Model: single
+`.env` for local dev + `ENV_NAME` identity; App Hosting yaml/env supplies per-env values
+(real process env always wins over files). No per-env dotenv files.
+
+- [x] Add `server/config.ts` (zod-validated, fail-fast): `ENV_NAME=development|preview|production` + all required keys.
+  Warns on missing integration keys; **throws** on unknown `ENV_NAME` or
+  `WHATSAPP_MODE=live` outside production. Verified: boots `[env=development, whatsapp=test]`,
+  refuses `live` in preview.
+- [x] `GET /api/health` (version-free: `{status, env, whatsappMode, now}`, no secrets). Verified live.
+- [x] Create `apphosting.yaml` (production defaults, Secret Manager refs) +
+  `apphosting.preview.yaml` (bluepin-f8a09 values, `WHATSAPP_MODE=test`, smaller instances).
+  TODOs left in-file: prod `APP_URL` confirm, prod `VITE_FIREBASE_APP_ID/API_KEY` (which of the
+  6 myhealthyfam web apps is prod?), preview `APP_URL` (after backend exists), all Secret
+  Manager values (console, manual).
+- [x] Extend `.env.example` with `ENV_NAME` + `WHATSAPP_MODE`. Boot log in `server.ts`
+  prints `[env=…, whatsapp=…]` (no secrets).
+- [x] `WHATSAPP_MODE=test|live` guard in `wa-bot/wa-client/sender.ts:postMessage` (defense in
+  depth; Meta also rejects cross-sender sends server-side).
+- [ ] **WhatsApp test sender revival (needs you, ~5 min in Meta dashboard):** see
+  `docs/ENVIRONMENTS.md` "Test sender revival" checklist. Code side is ready (preview mode +
+  separate verify token supported).
+- [ ] Separate Gemini key + SMTP sender for preview (Secret Manager `*-preview` refs stubbed).
 - Gate: boot each env with its file, `GET /api/health` reports correct `ENV_NAME`, preview writes absent from prod.
 
 ## Phase 3 — Test setup
@@ -94,3 +107,4 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-13 | 0 | Branch created; plan + env + decision docs added. Baseline survey recorded above. |
 | 2026-10-13 | 0 | npm standardized (`bun.lock` deleted). Lint RED (11 pre-existing `Dashboard.tsx` errors); build GREEN. |
 | 2026-10-13 | 1 | Deleted 26 dead top-level files (kept `test.pdf` as harness fixture); `@deprecated` headers on 4 unimported modules; `dist/` confirmed untracked; lint still exactly 11 errors. |
+| 2026-10-13 | 2 | Code side done: `server/config.ts`, `/api/health`, `WHATSAPP_MODE` guard, `apphosting.yaml` + `.preview.yaml`, `.env.example`. Verified boot + health + guard. Awaiting: Meta test-sender values, Secret Manager values, prod web-app pick (see TODOs in yaml). |
