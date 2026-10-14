@@ -110,6 +110,11 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
     `insights` (validation/passthrough/500), `notifications` (CRUD + 7 AM default + uid-keyed docs),
     `feedback` (validation/storage/email-forward, SMTP mocked). All 8 routes now have API tests.
 - [ ] Rules tests: `firestore.rules`, `storage.rules` on emulator (`users/{uid}` isolation, `feedbacks` write).
+  - DONE 2026-10-14 (`tests/firestore.rules.test.ts`, 6/6 vs local emulator; `test:rules` script;
+    `rules-emulator` CI job): catch-all deny, owner isolation + list-denied, family read (not write),
+    public feedback create + admin-only read, limits-coupled batch write + increment-skip reject.
+    Kept OUT of default `npm test` (needs emulator) — hermetic suite stays 145/145.
+    Storage rules (7-line owner-only file) still untested — needs storage emulator; trivial follow-up.
 - [x] E2E thin slice (Playwright vs preview + seeded user): login → add glucose → upload report → reminders toggle.
   - DONE 2026-10-13 (`playwright.config.ts` + `e2e/preview.spec.ts`, `test:e2e` script, 3/3 green in ~36s):
     seeded `e2e-test@bluepin.in` via preview signup; covers login → glucose log + timeline →
@@ -166,4 +171,5 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-14 | 3 | CI-only E2E login hang diagnosed via trace: email fill silently dropped on slow loads (remount race). Fixed with verify-after-fill retry + proper `htmlFor`/`id` label association in auth forms (`auth-email`, `auth-password`, `auth-phone`); spec now uses `getByLabel`, proving the association every run. Docker parity (Ubuntu 24.04, `mcr.microsoft.com/playwright:v1.64.0-noble`) passes — hang is runner-network-specific, not platform. Added `E2E_BASE_URL` override for local runs. |
 | 2026-10-14 | 3 | True CI root cause: `E2E_TEST_EMAIL` was set-but-empty in the preview env — `"" ?? default` keeps `""`, fill passed vacuously, submit died on validation with no banner. Fixed with `?.trim() \|\| default` + `fillVerified` refusing empty values (verified locally with blank env: 3/3). Owner action: fill or delete the empty variable. |
 | 2026-10-14 | 3 | E2E green in CI (3/3 in ~9s on PR run — warm backend after smoke; speed is normal). Blank-env default confirmed as the fix. |
+| 2026-10-14 | 3 | Rules tests: 6/6 on emulator; `rules-emulator` CI job added. Suite total 151 (145 hermetic + 6 emulator). |
 | 2026-10-13 | 4 | Lint fixed to green (Dashboard `isPinned` helper + dropped unused destructure). `ci.yml` added (verify on PR, preview identity smoke on main). Owner to wire: GitHub Environments + PREVIEW_URL + branch protection. |

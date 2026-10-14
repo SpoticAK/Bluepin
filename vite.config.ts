@@ -36,7 +36,9 @@ export default defineConfig(() => {
     },
     test: {
       // Playwright specs live in e2e/ and run via `npm run test:e2e`, never vitest.
-      exclude: ['node_modules', 'dist', 'e2e/**'],
+      // Rules tests live in tests/ and need a running Firestore emulator
+      // (`npm run test:rules`), so they stay out of the default run too.
+      exclude: ['node_modules', 'dist', 'e2e/**', 'tests/**'],
     },
   };
 });

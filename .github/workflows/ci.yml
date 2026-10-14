@@ -110,3 +110,29 @@ jobs:
           name: e2e-failure-traces
           path: test-results/
           retention-days: 7
+
+  rules-emulator:
+    name: firestore rules on emulator
+    # Runs on PRs and pushes: hermetic (demo-rules project, local emulator),
+    # no secrets needed. Ubuntu runners ship Java, which the emulator needs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Start Firestore emulator
+        run: |
+          npx -y firebase-tools@latest emulators:start --only firestore --project demo-rules &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/ && break
+            sleep 10
+          done
+
+      - name: Run rules tests
+        run: npm run test:rules
