@@ -126,6 +126,12 @@ jobs:
 
       - run: npm ci
 
+      - name: Set up JDK 21 (emulator requires 21+; runner default is older)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Start Firestore emulator
         run: |
           npx -y firebase-tools@latest emulators:start --only firestore --project demo-rules &
