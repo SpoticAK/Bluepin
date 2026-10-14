@@ -22,9 +22,12 @@ export default function EmailPasswordFields({
   return (
     <>
       <div>
-        <label className="block text-xs font-bold text-theme-text mb-1">Email</label>
+        <label htmlFor="auth-email" className="block text-xs font-bold text-theme-text mb-1">Email</label>
         <input
+          id="auth-email"
+          name="email"
           type="email"
+          autoComplete="email"
           required
           value={email}
           onChange={(e) => onEmailChange(e.target.value)}
@@ -37,11 +40,14 @@ export default function EmailPasswordFields({
       </div>
 
       <div>
-        <label className="block text-xs font-bold text-theme-text mb-1">
+        <label htmlFor="auth-password" className="block text-xs font-bold text-theme-text mb-1">
           Password
         </label>
         <input
+          id="auth-password"
+          name="password"
           type="password"
+          autoComplete="current-password"
           required
           minLength={6}
           value={password}

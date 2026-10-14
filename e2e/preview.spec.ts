@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Thin E2E slice on preview: login → log glucose → verify timeline →
@@ -11,6 +11,26 @@ import { expect, test } from "@playwright/test";
 const EMAIL = process.env.E2E_TEST_EMAIL ?? "e2e-test@bluepin.in";
 const PASSWORD = process.env.E2E_TEST_PASSWORD ?? "";
 
+/**
+ * Fill + verify, retrying on remount. The auth form can re-render between
+ * actions (slow loads), silently dropping a filled value — verify turns that
+ * into a retry instead of a doomed submit with an empty field (seen in CI).
+ */
+async function fillVerified(page: Page, label: string, value: string) {
+  // getByLabel proves the htmlFor association; the verify loop covers
+  // remount races on slow loads (a fill landing on a replaced input).
+  const input = page.getByLabel(label, { exact: true });
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await input.fill(value);
+    try {
+      await expect(input).toHaveValue(value, { timeout: 2_000 });
+      return;
+    } catch {
+      if (attempt === 3) throw new Error(`E2E setup: "${label}" would not hold a value`);
+    }
+  }
+}
+
 test.beforeEach(async ({ page }) => {
   test.skip(!PASSWORD, "E2E_TEST_PASSWORD not set");
   await page.goto("/");
@@ -18,8 +38,8 @@ test.beforeEach(async ({ page }) => {
   const notNow = page.getByRole("button", { name: "Not Now" });
   if (await notNow.isVisible().catch(() => false)) await notNow.click();
 
-  await page.locator('input[type="email"]').fill(EMAIL);
-  await page.locator('input[type="password"]').fill(PASSWORD);
+  await fillVerified(page, "Email", EMAIL);
+  await fillVerified(page, "Password", PASSWORD);
   await page.getByRole("button", { name: "Sign In" }).click();
 
   // Cold starts on preview can be slow; wait generously, but if login itself
