@@ -8,7 +8,7 @@ import { expect, test, type Page } from "@playwright/test";
  * Upload is covered by API tests (server/routes/upload.test.ts).
  */
 
-const EMAIL = process.env.E2E_TEST_EMAIL ?? "e2e-test@bluepin.in";
+const EMAIL = process.env.E2E_TEST_EMAIL?.trim() || "e2e-test@bluepin.in";
 const PASSWORD = process.env.E2E_TEST_PASSWORD ?? "";
 
 /**
@@ -19,6 +19,9 @@ const PASSWORD = process.env.E2E_TEST_PASSWORD ?? "";
 async function fillVerified(page: Page, label: string, value: string) {
   // getByLabel proves the htmlFor association; the verify loop covers
   // remount races on slow loads (a fill landing on a replaced input).
+  // Refuse empty values: filling "" passes vacuously and submits a dead form
+  // (this exact misconfiguration hung CI when E2E_TEST_EMAIL was blank).
+  if (!value) throw new Error(`E2E setup: no value to fill into "${label}"`);
   const input = page.getByLabel(label, { exact: true });
   for (let attempt = 1; attempt <= 3; attempt++) {
     await input.fill(value);
