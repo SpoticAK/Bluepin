@@ -74,13 +74,14 @@ jobs:
 
   e2e-preview:
     name: e2e on preview (playwright)
-    # Runs after the smoke test confirms the rollout landed, so specs never
-    # execute against a half-deployed backend. Push-to-main only: E2E writes
-    # real data to preview Firestore and burns minutes, so it stays off PRs.
-    # Secrets resolve here because this runs post-merge inside the base repo —
-    # fork PRs never reach this job and never see these values.
-    if: github.event_name == 'push'
-    needs: smoke-preview
+    # Runs on same-repo PRs AND post-merge pushes. Same-repo PRs resolve the
+    # `preview` environment (secrets included); cross-fork PRs don't, and the
+    # specs skip cleanly there (green, 3 skipped) instead of failing.
+    # On main pushes it waits for smoke first so specs never run against a
+    # half-deployed rollout; on PRs smoke is skipped (no rollout coming) and
+    # E2E validates the live preview + the specs themselves.
+    needs: [verify, smoke-preview]
+    if: ${{ always() && needs.verify.result == 'success' && (needs.smoke-preview.result == 'success' || needs.smoke-preview.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: preview
     env:
