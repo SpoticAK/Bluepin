@@ -132,13 +132,16 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Start Firestore emulator
+      - name: Start Firestore + Storage emulators
         run: |
-          npx -y firebase-tools@latest emulators:start --only firestore --project demo-rules &
+          npx -y firebase-tools@latest emulators:start --only firestore,storage --project demo-rules &
           for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8080/ && break
+            STATUS=$(curl -sf http://127.0.0.1:4400/emulators || true)
+            echo "$STATUS" | grep -q firestore && echo "$STATUS" | grep -q storage && break
             sleep 10
           done
+          curl -sf http://127.0.0.1:4400/emulators | grep -q firestore
+          curl -sf http://127.0.0.1:4400/emulators | grep -q storage
 
       - name: Run rules tests
         run: npm run test:rules
