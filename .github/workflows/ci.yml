@@ -127,7 +127,7 @@ jobs:
       - run: npm ci
 
       - name: Set up JDK 21 (emulator requires 21+; runner default is older)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21

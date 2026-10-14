@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:rules": "vitest run tests/firestore.rules.test.ts",
+    "test:rules": "vitest run --config vitest.rules.config.ts",
     "start": "node dist/server.cjs"
   },
   "dependencies": {
