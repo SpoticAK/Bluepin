@@ -155,6 +155,12 @@ export class FakeFirestore {
       set: (ref: FakeDocRef, data: DocData, opts?: { merge?: boolean }) => {
         ops.push(() => ref.set(data, opts));
       },
+      update: (ref: FakeDocRef, data: DocData) => {
+        ops.push(() => ref.update(data));
+      },
+      delete: (ref: FakeDocRef) => {
+        ops.push(() => ref.delete());
+      },
       commit: async () => {
         for (const op of ops) await op();
       },
