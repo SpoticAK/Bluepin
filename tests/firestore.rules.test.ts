@@ -1,10 +1,10 @@
 /**
- * Firestore security-rules tests. Require a Firestore emulator:
+ * Firestore security-rules tests. Require emulators:
  *
- *   npx firebase-tools emulators:start --only firestore --project demo-rules
+ *   npx firebase-tools emulators:start --only firestore,storage --project demo-rules
  *
- * then `npm run test:rules` (runs only this file). Never run against a real
- * project — the suite wipes the database between cases.
+ * then `npm run test:rules` (runs every file under tests/). Never run
+ * against a real project — the suites wipe their corners of the database.
  */
 import fs from "fs";
 import {
