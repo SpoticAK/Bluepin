@@ -173,4 +173,5 @@ Install: `vitest`, `@vitest/coverage-v8`, `supertest`, Firestore emulator config
 | 2026-10-14 | 3 | E2E green in CI (3/3 in ~9s on PR run — warm backend after smoke; speed is normal). Blank-env default confirmed as the fix. |
 | 2026-10-14 | 3 | Rules tests: 6/6 on emulator; `rules-emulator` CI job added. Suite total 151 (145 hermetic + 6 emulator). |
 | 2026-10-14 | 3 | Storage rules too (owner read/write incl. nested paths; stranger+anon denied): 8/8 with both emulators. CI job starts firestore+storage, polls the hub, fails loudly. Suite total 153. |
+| 2026-10-16 | 4 | `chore/ci-e2e-on-pr` merged to fork `main`; preview rolled out, `/api/health` = `preview`/`test`. E2E_TEST_EMAIL moved to Variables. Upstream merge deliberately deferred (nothing pending depends on it). |
 | 2026-10-13 | 4 | Lint fixed to green (Dashboard `isPinned` helper + dropped unused destructure). `ci.yml` added (verify on PR, preview identity smoke on main). Owner to wire: GitHub Environments + PREVIEW_URL + branch protection. |
