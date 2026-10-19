@@ -1,0 +1,21 @@
+# Preview overrides — merged over apphosting.yaml at build time, this file wins.
+# Backend: bluepin-f8a09 (dev/preview project, isolated from prod myhealthyfam).
+#
+# Same additive-only rule as the base file: console-managed secrets are NOT
+# redeclared here. Create the missing preview secrets in the console
+# (see docs/ENVIRONMENTS.md "preview gaps").
+
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 80
+
+env:
+  - variable: ENV_NAME
+    value: preview
+    availability: [BUILD, RUNTIME]
+  - variable: WHATSAPP_MODE
+    value: test
+    availability: [RUNTIME]

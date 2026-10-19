@@ -1,0 +1,30 @@
+# Base App Hosting configuration = PRODUCTION defaults.
+# Preview overrides live in apphosting.preview.yaml (merged at build time,
+# preview wins). Firebase console values take precedence over both files.
+#
+# Deliberately ADDITIVE-ONLY: every secret/value already in the console stays
+# console-managed. This file only adds structural vars the console lacks
+# (ENV_NAME, WHATSAPP_MODE, NODE_ENV, APP_TIMEZONE). No `secret:` refs, so a
+# deploy can never fail on "secret not found".
+# Full key inventory per project: docs/ENVIRONMENTS.md.
+
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 4
+  concurrency: 80
+
+env:
+  - variable: ENV_NAME
+    value: production
+    availability: [BUILD, RUNTIME]
+  - variable: NODE_ENV
+    value: production
+    availability: [RUNTIME]
+  - variable: WHATSAPP_MODE
+    value: live
+    availability: [RUNTIME]
+  - variable: APP_TIMEZONE
+    value: Asia/Kolkata
+    availability: [RUNTIME]
