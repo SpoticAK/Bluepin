@@ -1,4 +1,5 @@
 import "./server/env";
+import { config } from "./server/config";
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -65,7 +66,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Server running on http://0.0.0.0:${PORT} [env=${config.envName}, whatsapp=${config.whatsapp.mode}]`);
   });
 }
 

@@ -158,7 +158,7 @@ export default function PhoneAuthFields({
       {step === "phone" ? (
         <form onSubmit={handlePhoneSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-theme-text mb-1.5">
+            <label htmlFor="auth-phone" className="block text-xs font-bold text-theme-text mb-1.5">
               WhatsApp Mobile Number
             </label>
             <div className="flex items-center gap-2">
@@ -167,6 +167,8 @@ export default function PhoneAuthFields({
                 <span>{countryCode}</span>
               </div>
               <input
+                id="auth-phone"
+                name="phone"
                 type="tel"
                 inputMode="numeric"
                 pattern="[0-9]*"

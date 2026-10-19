@@ -1,0 +1,100 @@
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * Thin E2E slice on preview: login → log glucose → verify timeline →
+ * WhatsApp-link prompt visible while unlinked → session persists on reload.
+ *
+ * Report upload is intentionally NOT here: it burns Gemini quota and is slow.
+ * Upload is covered by API tests (server/routes/upload.test.ts).
+ */
+
+const EMAIL = process.env.E2E_TEST_EMAIL?.trim() || "e2e-test@bluepin.in";
+const PASSWORD = process.env.E2E_TEST_PASSWORD ?? "";
+
+/**
+ * Fill + verify, retrying on remount. The auth form can re-render between
+ * actions (slow loads), silently dropping a filled value — verify turns that
+ * into a retry instead of a doomed submit with an empty field (seen in CI).
+ */
+async function fillVerified(page: Page, label: string, value: string) {
+  // getByLabel proves the htmlFor association; the verify loop covers
+  // remount races on slow loads (a fill landing on a replaced input).
+  // Refuse empty values: filling "" passes vacuously and submits a dead form
+  // (this exact misconfiguration hung CI when E2E_TEST_EMAIL was blank).
+  if (!value) throw new Error(`E2E setup: no value to fill into "${label}"`);
+  const input = page.getByLabel(label, { exact: true });
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await input.fill(value);
+    try {
+      await expect(input).toHaveValue(value, { timeout: 2_000 });
+      return;
+    } catch {
+      if (attempt === 3) throw new Error(`E2E setup: "${label}" would not hold a value`);
+    }
+  }
+}
+
+test.beforeEach(async ({ page }) => {
+  test.skip(!PASSWORD, "E2E_TEST_PASSWORD not set");
+  await page.goto("/");
+  // Dismiss the PWA install prompt if it appears.
+  const notNow = page.getByRole("button", { name: "Not Now" });
+  if (await notNow.isVisible().catch(() => false)) await notNow.click();
+
+  await fillVerified(page, "Email", EMAIL);
+  await fillVerified(page, "Password", PASSWORD);
+  await page.getByRole("button", { name: "Sign In" }).click();
+
+  // Cold starts on preview can be slow; wait generously, but if login itself
+  // fails, surface the form's error text instead of a bare timeout so CI logs
+  // distinguish a bad credential from a hang.
+  try {
+    await expect(page.getByRole("heading", { name: "Care Reminders" })).toBeVisible({
+      timeout: 30_000,
+    });
+  } catch {
+    const errText = await page
+      .locator("p")
+      .filter({ hasText: /Incorrect email|Too many attempts|Something went wrong|Network error/i })
+      .first()
+      .textContent()
+      .catch(() => null);
+    // On a hang (no banner), dump the UI state so CI logs show where it stuck.
+    const pageState = await page
+      .evaluate(() => ({
+        url: location.href,
+        title: document.title,
+        body: document.body.innerText.slice(0, 400).replace(/\s+/g, " "),
+      }))
+      .catch(() => null);
+    throw new Error(
+      `E2E login failed${errText ? `: "${errText.trim()}"` : " (dashboard never appeared, no error banner)"}` +
+        (pageState ? ` | page: ${JSON.stringify(pageState)}` : ""),
+    );
+  }
+});
+
+test("logs a glucose reading and shows it in the timeline", async ({ page }) => {
+  await page.getByRole("button", { name: "Glucose", exact: true }).click();
+  await page.getByRole("button", { name: "Add Reading" }).click();
+
+  // Unique-ish value so the assertion cannot match another run's data.
+  const value = String(130 + (Date.now() % 40));
+  await page.getByRole("spinbutton").fill(value);
+  await page.getByText("2–8 hours").click();
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.getByText("No readings logged yet.")).toBeHidden();
+  const timeline = page.getByRole("heading", { name: "Reading Timeline" }).locator("..");
+  await expect(timeline.getByText(value, { exact: true }).first()).toBeVisible();
+});
+
+test("shows the WhatsApp link prompt while unlinked", async ({ page }) => {
+  await page.getByRole("button", { name: "WhatsApp Sync" }).click();
+  await expect(page.getByRole("button", { name: "Generate Manual Code" })).toBeVisible();
+});
+
+test("session persists across reload", async ({ page }) => {
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Care Reminders" })).toBeVisible({ timeout: 30_000 });
+});

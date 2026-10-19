@@ -6,6 +6,7 @@ import feedbackRouter from "./feedback";
 import whatsappRouter from "./whatsapp";
 import authRouter from "./auth";
 import cronRouter from "./cron";
+import healthRouter from "./health";
 import remindersRouter from "./reminders";
 import notificationsRouter from "./notifications";
 
@@ -15,6 +16,9 @@ const apiRouter = Router();
 // looser budget (the Meta webhook, which is called from Meta's IPs) install
 // their own limiter on the router itself.
 apiRouter.use(globalIpLimiter);
+
+// Health check (no auth, cheap enough to sit behind the global limiter)
+apiRouter.use(healthRouter);
 
 // Mount WhatsApp webhook & integration routes
 apiRouter.use(whatsappRouter);

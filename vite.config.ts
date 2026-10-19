@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig(() => {
   return {
@@ -33,6 +33,12 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    test: {
+      // Playwright specs live in e2e/ and run via `npm run test:e2e`, never vitest.
+      // Rules tests live in tests/ and need a running Firestore emulator
+      // (`npm run test:rules`), so they stay out of the default run too.
+      exclude: ['node_modules', 'dist', 'e2e/**', 'tests/**'],
     },
   };
 });
