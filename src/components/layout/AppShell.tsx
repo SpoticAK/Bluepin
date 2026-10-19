@@ -9,12 +9,17 @@ import { DesktopHeaderButtons, MobileHeader } from "./AppHeaders";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { AppFooter } from "./AppFooter";
 
+import { Trophy, Inbox } from "lucide-react";
+
 // Lazy-loaded heavy components (reduces initial JS bundle from ~2MB to <200KB)
 const Dashboard = React.lazy(() => import("../Dashboard"));
 const GlucoseTab = React.lazy(() => import("../GlucoseTab"));
 const BiomarkersTab = React.lazy(() => import("../BiomarkersTab"));
 const AdminFeedbackView = React.lazy(
   () => import("../AdminFeedbackView"),
+);
+const AdminReferralView = React.lazy(
+  () => import("../AdminReferralView"),
 );
 const ProfileModal = React.lazy(() =>
   import("../ProfileModal").then((m) => ({
@@ -34,13 +39,38 @@ const LegalDocsModal = React.lazy(() =>
 
 export type TabType = "dashboard" | "glucose" | "biomarkers" | "admin";
 
+const ADMIN_EMAILS_CLIENT = new Set([
+  "sparsh@bluepin.in",
+  ...(import.meta.env.VITE_ADMIN_EMAILS
+    ? String(import.meta.env.VITE_ADMIN_EMAILS)
+        .split(",")
+        .map((e: string) => e.trim().toLowerCase())
+        .filter(Boolean)
+    : []),
+]);
+
+const REFERRAL_VIEWER_EMAILS_CLIENT = new Set([
+  "sparsh@bluepin.in",
+  ...(import.meta.env.VITE_REFERRAL_VIEWER_EMAILS
+    ? String(import.meta.env.VITE_REFERRAL_VIEWER_EMAILS)
+        .split(",")
+        .map((e: string) => e.trim().toLowerCase())
+        .filter(Boolean)
+    : []),
+]);
+
 export function AppShell() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
+  const [adminSubTab, setAdminSubTab] = useState<"feedback" | "referrals">("referrals");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocType | null>(null);
-  const isAdmin = auth.currentUser?.email === "sparsh@bluepin.in";
+
+  const userEmail = auth.currentUser?.email?.toLowerCase() || "";
+  const isAdmin = ADMIN_EMAILS_CLIENT.has(userEmail);
+  const canViewReferrals = isAdmin || REFERRAL_VIEWER_EMAILS_CLIENT.has(userEmail);
+  const hasAdminAccess = isAdmin || canViewReferrals;
 
   return (
     <div
@@ -55,7 +85,7 @@ export function AppShell() {
         onTabChange={setActiveTab}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        isAdmin={isAdmin}
+        isAdmin={hasAdminAccess}
       />
 
       {/* Main Content */}
@@ -89,7 +119,42 @@ export function AppShell() {
           {activeTab === "glucose" && <GlucoseTab />}
           {activeTab === "biomarkers" && <BiomarkersTab />}
 
-          {activeTab === "admin" && isAdmin && <AdminFeedbackView />}
+          {activeTab === "admin" && hasAdminAccess && (
+            <div className="space-y-4">
+              {isAdmin && canViewReferrals && (
+                <div className="flex items-center gap-2 max-w-6xl mx-auto px-4 sm:px-6">
+                  <button
+                    onClick={() => setAdminSubTab("referrals")}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2",
+                      adminSubTab === "referrals"
+                        ? "bg-theme-card text-blue-600 shadow-sm border border-theme-border"
+                        : "text-theme-text-sec hover:text-theme-text hover:bg-theme-card/50",
+                    )}
+                  >
+                    <Trophy className="w-4 h-4 text-amber-500" />
+                    Referrals & Leaderboard
+                  </button>
+                  <button
+                    onClick={() => setAdminSubTab("feedback")}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2",
+                      adminSubTab === "feedback"
+                        ? "bg-theme-card text-blue-600 shadow-sm border border-theme-border"
+                        : "text-theme-text-sec hover:text-theme-text hover:bg-theme-card/50",
+                    )}
+                  >
+                    <Inbox className="w-4 h-4 text-blue-500" />
+                    User Feedbacks
+                  </button>
+                </div>
+              )}
+
+              {adminSubTab === "referrals" && canViewReferrals && <AdminReferralView />}
+              {adminSubTab === "feedback" && isAdmin && <AdminFeedbackView />}
+            </div>
+          )}
+
           {showProfile && (
             <ProfileModal onClose={() => setShowProfile(false)} />
           )}
@@ -114,7 +179,7 @@ export function AppShell() {
       <MobileBottomNav
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        isAdmin={isAdmin}
+        isAdmin={hasAdminAccess}
       />
       <InstallPWAPrompt />
     </div>

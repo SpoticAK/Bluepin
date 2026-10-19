@@ -58,7 +58,16 @@ export class FakeDocRef {
   }
   async update(data: DocData) {
     if (!this.store.has(this.path)) throw new Error("not found");
-    this.store.set(this.path, { ...this.store.get(this.path)!, ...data });
+    const prev = this.store.get(this.path)!;
+    const next: DocData = { ...prev };
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === "object" && "operand" in (val as Record<string, unknown>)) {
+        next[key] = (Number(prev[key]) || 0) + Number((val as Record<string, unknown>).operand);
+      } else {
+        next[key] = val;
+      }
+    }
+    this.store.set(this.path, next);
   }
   async delete() {
     this.store.delete(this.path);
@@ -72,6 +81,9 @@ class FakeQuery {
     private readonly store: Map<string, DocData>,
     private readonly prefix: string,
   ) {}
+  select(..._fields: string[]) {
+    return this;
+  }
   where(field: string, op: string, val: unknown) {
     if (op !== "==") throw new Error(`FakeFirestore: unsupported op ${op}`);
     this.filters.push({ field, val });
@@ -79,6 +91,9 @@ class FakeQuery {
   }
   limit(n: number) {
     this.limitN = n;
+    return this;
+  }
+  orderBy(_field: string, _dir?: "asc" | "desc") {
     return this;
   }
   async get() {
@@ -102,11 +117,17 @@ class FakeCollection {
     private readonly store: Map<string, DocData>,
     private readonly path: string,
   ) {}
+  select(...fields: string[]) {
+    return new FakeQuery(this.store, `${this.path}/`).select(...fields);
+  }
   where(field: string, op: string, val: unknown) {
     return new FakeQuery(this.store, `${this.path}/`).where(field, op, val);
   }
   limit(n: number) {
     return new FakeQuery(this.store, `${this.path}/`).limit(n);
+  }
+  orderBy(field: string, dir?: "asc" | "desc") {
+    return new FakeQuery(this.store, `${this.path}/`).orderBy(field, dir);
   }
   async get() {
     return new FakeQuery(this.store, `${this.path}/`).get();

@@ -24,6 +24,16 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Referral Attribution & Scoring (Server-managed via Admin SDK)
+    match /referral_codes/{code} {
+      allow read, write: if false;
+    }
+
+    match /referral_events/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
     match /families/{familyId} {
       allow get: if isSignedIn();
       allow list: if false;

@@ -1,4 +1,5 @@
 import express from "express";
+import { FieldValue } from "firebase-admin/firestore";
 import { getAdminFirestore } from "../firebase";
 import {
   sendWhatsAppUtilityTemplate,
@@ -6,6 +7,7 @@ import {
   maskPhone,
 } from "../services/whatsapp/client";
 import { sendGlucosePushNudges } from "../services/notifications";
+import { scoreReferralEvent, type ReferralEvent } from "../services/referralScorer";
 
 const router = express.Router();
 
@@ -177,6 +179,105 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
   } catch (err: any) {
     console.error("[Cron] Error running whatsapp reminders:", err);
     return res.status(500).json({ error: "Failed to process reminders" });
+  }
+});
+
+/**
+ * Triggered nightly by Google Cloud Scheduler or admin trigger.
+ * Evaluates progressive engagement milestones for referred users.
+ * Example URL: POST /api/cron/referral-scoring
+ */
+router.post("/cron/referral-scoring", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const expectedSecret = process.env.CRON_SECRET || "default_cron_secret";
+
+    if (
+      authHeader !== `Bearer ${expectedSecret}` &&
+      process.env.NODE_ENV === "production"
+    ) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const db = getAdminFirestore();
+    const forceAll = req.query.force === "true";
+    const now = Date.now();
+    const twentyHoursAgo = now - 20 * 60 * 60 * 1000;
+
+    const eventsSnap = await db.collection("referral_events").get();
+
+    let processedCount = 0;
+    let pointsAwardedTotal = 0;
+    let newlyOnboardedTotal = 0;
+
+    let batch = db.batch();
+    let opCount = 0;
+
+    for (const doc of eventsSnap.docs) {
+      const event = doc.data() as ReferralEvent;
+      // Skip users who have achieved the maximum possible score (9)
+      if (Number(event.score || 0) >= 9) {
+        continue;
+      }
+
+      // Skip if scored recently, unless forced
+      if (!forceAll && event.lastScoredAt && event.lastScoredAt > twentyHoursAgo) {
+        continue;
+      }
+
+      processedCount++;
+      const result = await scoreReferralEvent(event, db);
+
+      const eventRef = db.doc(`referral_events/${event.uid}`);
+      const updatedMilestones = {
+        ...(event.milestones || {}),
+        ...result.newMilestones,
+      };
+
+      batch.update(eventRef, {
+        score: result.newTotalScore,
+        milestones: updatedMilestones,
+        lastScoredAt: now,
+      });
+      opCount++;
+
+      if (result.pointsEarned > 0 || result.isNewlyOnboarded) {
+        pointsAwardedTotal += result.pointsEarned;
+        if (result.isNewlyOnboarded) newlyOnboardedTotal++;
+
+        const codeRef = db.doc(`referral_codes/${event.refCode}`);
+        const codeUpdates: Record<string, any> = {};
+        if (result.pointsEarned > 0) {
+          codeUpdates.totalScore = FieldValue.increment(result.pointsEarned);
+        }
+        if (result.isNewlyOnboarded) {
+          codeUpdates.qualifiedSignups = FieldValue.increment(1);
+        }
+        batch.update(codeRef, codeUpdates);
+        opCount++;
+      }
+
+      if (opCount >= 400) {
+        await batch.commit();
+        batch = db.batch();
+        opCount = 0;
+      }
+    }
+
+    if (opCount > 0) {
+      await batch.commit();
+    }
+
+    return res.json({
+      success: true,
+      processed: processedCount,
+      totalEvents: eventsSnap.size,
+      pointsAwardedTotal,
+      newlyOnboardedTotal,
+    });
+  } catch (err: any) {
+    console.error("[Cron] Error running referral scoring:", err);
+    return res.status(500).json({ error: "Failed to process referral scoring" });
   }
 });
 

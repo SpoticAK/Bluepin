@@ -12,6 +12,7 @@ import {
 } from "firebase/auth";
 import { auth } from "../lib/firebase";
 import { getFriendlyAuthError } from "../lib/friendlyAuthError";
+import { attributeReferral } from "../lib/referral";
 
 interface UseFirebaseAuthResult {
   loading: boolean;
@@ -74,8 +75,13 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
   );
 
   const signUpWithEmail = useCallback(
-    (email: string, password: string) =>
-      runEmailAuth(createUserWithEmailAndPassword, email, password),
+    async (email: string, password: string) => {
+      const cred = await runEmailAuth(createUserWithEmailAndPassword, email, password);
+      if (cred?.user) {
+        cred.user.getIdToken().then((token) => attributeReferral(token)).catch(() => {});
+      }
+      return cred;
+    },
     [runEmailAuth],
   );
 
@@ -86,6 +92,9 @@ export function useFirebaseAuth(): UseFirebaseAuthResult {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
+      if (isNewUser && result.user) {
+        result.user.getIdToken().then((token) => attributeReferral(token)).catch(() => {});
+      }
       return { result, isNewUser };
     } catch (err) {
       setError(mapFirebaseError(err));
