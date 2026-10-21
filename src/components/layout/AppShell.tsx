@@ -122,11 +122,11 @@ export function AppShell() {
           {activeTab === "admin" && hasAdminAccess && (
             <div className="space-y-4">
               {isAdmin && canViewReferrals && (
-                <div className="flex items-center gap-2 max-w-6xl mx-auto px-4 sm:px-6">
+                <div className="flex w-full items-center gap-2 overflow-x-auto pb-1">
                   <button
                     onClick={() => setAdminSubTab("referrals")}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2",
+                      "px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap",
                       adminSubTab === "referrals"
                         ? "bg-theme-card text-blue-600 shadow-sm border border-theme-border"
                         : "text-theme-text-sec hover:text-theme-text hover:bg-theme-card/50",
@@ -138,7 +138,7 @@ export function AppShell() {
                   <button
                     onClick={() => setAdminSubTab("feedback")}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2",
+                      "px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap",
                       adminSubTab === "feedback"
                         ? "bg-theme-card text-blue-600 shadow-sm border border-theme-border"
                         : "text-theme-text-sec hover:text-theme-text hover:bg-theme-card/50",
@@ -150,7 +150,9 @@ export function AppShell() {
                 </div>
               )}
 
-              {adminSubTab === "referrals" && canViewReferrals && <AdminReferralView />}
+              {adminSubTab === "referrals" && canViewReferrals && (
+                <AdminReferralView />
+              )}
               {adminSubTab === "feedback" && isAdmin && <AdminFeedbackView />}
             </div>
           )}

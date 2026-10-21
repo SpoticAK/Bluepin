@@ -7,6 +7,8 @@ export interface ReferralMilestone {
 export interface ReferralEvent {
   uid: string;
   refCode: string;
+  /** Email of the referred user (shown to referral viewers/admins). */
+  referredEmail?: string | null;
   attributedAt: number;
   signupMethod: "Email" | "Google";
   lastScoredAt: number;
@@ -55,6 +57,17 @@ export async function scoreReferralEvent(
   let pointsEarned = 0;
   const now = Date.now();
   let isNewlyOnboarded = false;
+
+  // Accounts flagged by anti-abuse checks never earn points. The event is kept
+  // so the admin UI can still show the signup and the reason it was flagged.
+  if (event._disqualifyReason) {
+    return {
+      pointsEarned: 0,
+      newMilestones: {},
+      newTotalScore: Number(event.score || 0),
+      isNewlyOnboarded: false,
+    };
+  }
 
   // 1. Fetch user profile
   const userRef = db.doc(`users/${event.uid}`);

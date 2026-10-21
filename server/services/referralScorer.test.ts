@@ -137,6 +137,33 @@ describe("referralScorer service", () => {
     expect(result.newMilestones.whatsappLinked).toBeDefined();
   });
 
+  it("awards no points for anti-abuse flagged accounts", async () => {
+    const fakeDb = new FakeFirestore();
+    fakeDb.seed({
+      "users/user-1": { name: "Aarav Sharma", whatsappPhone: "919876543210" },
+      "users/user-1/glucoseReadings/r1": { date: "2026-10-01" },
+      "users/user-1/glucoseReadings/r2": { date: "2026-10-02" },
+      "users/user-1/glucoseReadings/r3": { date: "2026-10-03" },
+    });
+
+    const event: ReferralEvent = {
+      uid: "user-1",
+      refCode: "TESTCODE",
+      attributedAt: Date.now(),
+      signupMethod: "Email",
+      lastScoredAt: 0,
+      score: 0,
+      milestones: {},
+      _disqualifyReason: "ip_cluster",
+    };
+
+    const result = await scoreReferralEvent(event, fakeDb as any);
+    expect(result.pointsEarned).toBe(0);
+    expect(result.newTotalScore).toBe(0);
+    expect(result.newMilestones).toEqual({});
+    expect(result.isNewlyOnboarded).toBe(false);
+  });
+
   it("awards max score (9 points) when all 5 milestones are completed", async () => {
     const fakeDb = new FakeFirestore();
     fakeDb.seed({

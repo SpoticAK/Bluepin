@@ -5,6 +5,19 @@
 const PENDING_REF_KEY = "pending_ref";
 
 /**
+ * sessionStorage can throw in privacy modes / blocked-cookie contexts.
+ * Always degrade to a no-op rather than breaking signup.
+ */
+function getStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Captures referral parameters from URL search query on application load.
  * Stores normalized code in sessionStorage to preserve it across sign-up steps in the tab.
  */
@@ -16,7 +29,7 @@ export function captureReferralCode(): void {
     const ref = params.get("ref");
     if (ref && typeof ref === "string" && ref.trim()) {
       const cleanCode = ref.trim().toUpperCase();
-      sessionStorage.setItem(PENDING_REF_KEY, cleanCode);
+      getStorage()?.setItem(PENDING_REF_KEY, cleanCode);
     }
   } catch (err) {
     console.warn("[Referral] Failed to capture ref code from URL:", err);
@@ -27,16 +40,18 @@ export function captureReferralCode(): void {
  * Returns the currently pending referral code, if any.
  */
 export function consumeReferralCode(): string | null {
-  if (typeof window === "undefined" || !window.sessionStorage) return null;
-  return sessionStorage.getItem(PENDING_REF_KEY);
+  return getStorage()?.getItem(PENDING_REF_KEY) ?? null;
 }
 
 /**
  * Clears the stored referral code once attribution succeeds.
  */
 export function clearReferralCode(): void {
-  if (typeof window === "undefined" || !window.sessionStorage) return;
-  sessionStorage.removeItem(PENDING_REF_KEY);
+  try {
+    getStorage()?.removeItem(PENDING_REF_KEY);
+  } catch (err) {
+    console.warn("[Referral] Failed to clear pending ref code:", err);
+  }
 }
 
 /**
@@ -59,12 +74,22 @@ export async function attributeReferral(idToken: string): Promise<void> {
 
     if (res.ok) {
       clearReferralCode();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      // If already attributed or account not new, clear code so we don't retry endlessly
-      if (data?.alreadyAttributed || data?.code === "ACCOUNT_NOT_NEW") {
-        clearReferralCode();
-      }
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+
+    // Terminal responses mean retrying can never succeed. Transient failures
+    // (network, 429, 5xx) keep the code so it can be retried after the next
+    // auth state change instead of silently losing the attribution.
+    const isTerminal =
+      res.status === 400 ||
+      res.status === 404 ||
+      res.status === 410 ||
+      Boolean(data?.alreadyAttributed);
+
+    if (isTerminal) {
+      clearReferralCode();
     }
   } catch (err) {
     // Non-blocking fire-and-forget: network errors shouldn't crash the UI
