@@ -293,6 +293,8 @@ describe("Referrals API Routes", () => {
         .send({
           applicantName: "Priya Sharma",
           applicantEmail: "Priya@Example.com",
+          applicantAge: 29,
+          applicantLinkedinUrl: "linkedin.com/in/priya-sharma",
         });
 
       expect(res.status).toBe(200);
@@ -303,6 +305,10 @@ describe("Referrals API Routes", () => {
       expect(res.body.reused).toBe(false);
       expect(res.body.isActive).toBe(true);
       expect(res.body.applicantEmail).toBe("priya@example.com");
+      expect(res.body.applicantAge).toBe(29);
+      expect(res.body.applicantLinkedinUrl).toBe(
+        "https://linkedin.com/in/priya-sharma",
+      );
       expect(res.body.referralUrl).toBe(
         `https://app.bluepin.in/?ref=${res.body.code}`,
       );
@@ -312,6 +318,8 @@ describe("Referrals API Routes", () => {
         code: res.body.code,
         applicantName: "Priya Sharma",
         applicantEmail: "priya@example.com",
+        applicantAge: 29,
+        applicantLinkedinUrl: "https://linkedin.com/in/priya-sharma",
         createdBy: "applicant-portal",
         isActive: true,
         totalSignups: 0,
@@ -440,6 +448,84 @@ describe("Referrals API Routes", () => {
         });
       expect(disposable.status).toBe(400);
       expect(disposable.body.code).toBe("DISPOSABLE_EMAIL");
+    });
+
+    it("rejects invalid age and non-LinkedIn profile URLs", async () => {
+      const invalidAge = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Candidate",
+          applicantEmail: "candidate@example.com",
+          applicantAge: 12,
+        });
+      expect(invalidAge.status).toBe(400);
+
+      const invalidAgeType = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Candidate",
+          applicantEmail: "candidate@example.com",
+          applicantAge: "twenty",
+        });
+      expect(invalidAgeType.status).toBe(400);
+
+      const invalidLinkedin = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Candidate",
+          applicantEmail: "candidate@example.com",
+          applicantLinkedinUrl: "https://example.com/in/candidate",
+        });
+      expect(invalidLinkedin.status).toBe(400);
+
+      const nonProfileLinkedin = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Candidate",
+          applicantEmail: "candidate@example.com",
+          applicantLinkedinUrl: "https://linkedin.com/company/bluepin",
+        });
+      expect(nonProfileLinkedin.status).toBe(400);
+      expect(fakeDb.read("referral_events/candidate")).toBeUndefined();
+    });
+
+    it("adds profile details when a pre-seeded code is first claimed", async () => {
+      fakeDb.seed({
+        "referral_codes/SEEDED99": {
+          code: "SEEDED99",
+          applicantName: "Seed Candidate",
+          applicantEmail: "seed99@example.com",
+          createdAt: 123,
+          createdBy: "import-script",
+          isActive: true,
+          totalSignups: 4,
+          qualifiedSignups: 2,
+          totalScore: 3,
+        },
+      });
+
+      const res = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Seed Candidate",
+          applicantEmail: "seed99@example.com",
+          applicantAge: 41,
+          applicantLinkedinUrl: "https://www.linkedin.com/in/seed-candidate/",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.code).toBe("SEEDED99");
+      expect(res.body.reused).toBe(true);
+
+      const saved = fakeDb.read("referral_codes/SEEDED99");
+      expect(saved?.totalSignups).toBe(4);
+      expect(saved?.qualifiedSignups).toBe(2);
+      expect(saved?.totalScore).toBe(3);
+      expect(saved?.isActive).toBe(true);
+      expect(saved?.applicantAge).toBe(41);
+      expect(saved?.applicantLinkedinUrl).toBe(
+        "https://www.linkedin.com/in/seed-candidate/",
+      );
     });
 
     it("accepts the shorter name/email field aliases used by forms", async () => {
