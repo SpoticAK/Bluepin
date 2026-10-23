@@ -17,11 +17,20 @@ No authentication is required. The endpoint is rate-limited per IP.
 ```json
 {
   "applicantName": "Priya Sharma",
-  "applicantEmail": "priya@example.com"
+  "applicantEmail": "priya@example.com",
+  "applicantAge": 29,
+  "applicantLinkedinUrl": "https://www.linkedin.com/in/priya-sharma"
 }
 ```
 
-`name` / `email` are also accepted as aliases for convenience.
+`name` / `email` are also accepted as aliases for convenience. Age and
+LinkedIn are optional for backwards compatibility, but the applicant form
+collects them. When supplied:
+
+- `applicantAge` must be an integer between 13 and 120.
+- `applicantLinkedinUrl` must be a LinkedIn profile (`linkedin.com/in/...` or
+  `linkedin.com/pub/...`). A missing protocol is accepted and normalized to
+  `https://`.
 
 ### Response
 
@@ -34,7 +43,9 @@ No authentication is required. The endpoint is rate-limited per IP.
   "created": true,
   "reused": false,
   "applicantName": "Priya Sharma",
-  "applicantEmail": "priya@example.com"
+  "applicantEmail": "priya@example.com",
+  "applicantAge": 29,
+  "applicantLinkedinUrl": "https://www.linkedin.com/in/priya-sharma"
 }
 ```
 
@@ -52,7 +63,7 @@ No authentication is required. The endpoint is rate-limited per IP.
 
 | Status | Meaning |
 | --- | --- |
-| `400` | Missing/invalid name or email, or a disposable email domain |
+| `400` | Missing/invalid name, email, age, or LinkedIn URL; or a disposable email domain |
 | `429` | Too many requests from this IP; retry after the window |
 | `500` | Server/Firestore failure |
 
@@ -62,11 +73,16 @@ No authentication is required. The endpoint is rate-limited per IP.
 const API_URL = "https://app.bluepin.in/api/referrals/applicant";
 const STORAGE_KEY = "bluepin_referral";
 
-async function registerApplicant(applicantName, applicantEmail) {
+async function registerApplicant(applicantName, applicantEmail, applicantAge, applicantLinkedinUrl) {
   const response = await fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ applicantName, applicantEmail }),
+    body: JSON.stringify({
+      applicantName,
+      applicantEmail,
+      applicantAge,
+      applicantLinkedinUrl,
+    }),
   });
 
   const data = await response.json();

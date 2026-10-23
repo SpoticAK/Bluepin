@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   Circle,
   Copy,
+  ExternalLink,
   RefreshCw,
   Search,
   Trophy,
@@ -21,6 +22,8 @@ interface ReferralCodeItem {
   code: string;
   applicantName: string;
   applicantEmail?: string | null;
+  applicantAge?: number | null;
+  applicantLinkedinUrl?: string | null;
   isActive: boolean;
   totalSignups: number;
   qualifiedSignups: number;
@@ -539,6 +542,25 @@ export default function AdminReferralView() {
                           title={activeCodeObj.applicantEmail}
                         >
                           {activeCodeObj.applicantEmail}
+                        </p>
+                      )}
+                      {(activeCodeObj.applicantAge ||
+                        activeCodeObj.applicantLinkedinUrl) && (
+                        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-theme-text-sec">
+                          {activeCodeObj.applicantAge ? (
+                            <span>Age {activeCodeObj.applicantAge}</span>
+                          ) : null}
+                          {activeCodeObj.applicantLinkedinUrl ? (
+                            <a
+                              href={activeCodeObj.applicantLinkedinUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-medium text-blue-600 hover:underline"
+                            >
+                              LinkedIn
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : null}
                         </p>
                       )}
                     </div>

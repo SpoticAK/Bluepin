@@ -16,6 +16,8 @@ interface ApplicantMapping {
   email: string;
   code: string;
   applicantName: string;
+  applicantAge?: number | null;
+  applicantLinkedinUrl?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -26,6 +28,36 @@ export function normalizeApplicantEmail(email: string): string {
 
 export function normalizeApplicantName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
+}
+
+/**
+ * Accepts a LinkedIn profile URL with or without a protocol. Only LinkedIn
+ * hosts and profile paths are allowed so the field cannot be used to store an
+ * arbitrary link. The result is always https.
+ */
+export function normalizeApplicantLinkedinUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const withProtocol = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const url = new URL(withProtocol);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+
+    const host = url.hostname.toLowerCase();
+    if (host !== "linkedin.com" && !host.endsWith(".linkedin.com")) {
+      return null;
+    }
+    if (!/^\/(in|pub)\//i.test(url.pathname)) return null;
+
+    url.protocol = "https:";
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -63,15 +95,40 @@ export function buildReferralUrl(appUrl: string, code: string): string {
   return url.toString();
 }
 
+interface ApplicantProfileInput {
+  applicantAge?: number;
+  applicantLinkedinUrl?: string;
+}
+
+function profileFields(input: ApplicantProfileInput) {
+  return {
+    applicantAge: input.applicantAge ?? null,
+    applicantLinkedinUrl: input.applicantLinkedinUrl ?? null,
+  };
+}
+
+function profilePatch(input: ApplicantProfileInput): Partial<ReferralCode> {
+  const patch: Partial<ReferralCode> = {};
+  if (typeof input.applicantAge === "number") {
+    patch.applicantAge = input.applicantAge;
+  }
+  if (input.applicantLinkedinUrl) {
+    patch.applicantLinkedinUrl = input.applicantLinkedinUrl;
+  }
+  return patch;
+}
+
 function newCodeDoc(
   code: string,
   applicantName: string,
   applicantEmail: string,
+  input: ApplicantProfileInput = {},
 ): ReferralCode {
   return {
     code,
     applicantName,
     applicantEmail,
+    ...profileFields(input),
     createdAt: Date.now(),
     createdBy: "applicant-portal",
     isActive: true,
@@ -85,12 +142,14 @@ function mappingData(
   applicantName: string,
   applicantEmail: string,
   code: string,
+  input: ApplicantProfileInput = {},
 ): ApplicantMapping {
   const now = Date.now();
   return {
     email: applicantEmail,
     code,
     applicantName,
+    ...profileFields(input),
     createdAt: now,
     updatedAt: now,
   };
@@ -140,7 +199,10 @@ async function findCodeByEmail(
  */
 export async function issueApplicantReferralCode(
   db: Firestore,
-  input: { applicantName: string; applicantEmail: string },
+  input: ApplicantProfileInput & {
+    applicantName: string;
+    applicantEmail: string;
+  },
 ): Promise<ApplicantReferralResult> {
   const applicantName = normalizeApplicantName(input.applicantName);
   const applicantEmail = normalizeApplicantEmail(input.applicantEmail);
@@ -154,9 +216,15 @@ export async function issueApplicantReferralCode(
   if (mapping?.code) {
     const codeSnap = await db.doc(`referral_codes/${mapping.code}`).get();
     if (codeSnap.exists) {
+      const codeDoc = codeSnap.data() as ReferralCode;
+      const patch = profilePatch(input);
+      if (Object.keys(patch).length > 0) {
+        await db.doc(`referral_codes/${mapping.code}`).set(patch, { merge: true });
+        Object.assign(codeDoc, patch);
+      }
       return {
         code: mapping.code,
-        codeDoc: codeSnap.data() as ReferralCode,
+        codeDoc,
         created: false,
       };
     }
@@ -181,9 +249,15 @@ export async function issueApplicantReferralCode(
         const codeSnap = await tx.get(codeRef);
 
         if (codeSnap.exists) {
+          const codeDoc = codeSnap.data() as ReferralCode;
+          const patch = profilePatch(input);
+          if (Object.keys(patch).length > 0) {
+            tx.set(codeRef, patch, { merge: true });
+            Object.assign(codeDoc, patch);
+          }
           return {
             code: map.code,
-            codeDoc: codeSnap.data() as ReferralCode,
+            codeDoc,
             created: false,
           };
         }
@@ -194,11 +268,12 @@ export async function issueApplicantReferralCode(
           map.code,
           applicantName,
           applicantEmail,
+          input,
         );
         tx.set(codeRef, codeDoc);
         tx.set(
           mappingRef,
-          mappingData(applicantName, applicantEmail, map.code),
+          mappingData(applicantName, applicantEmail, map.code, input),
           { merge: true },
         );
         return { code: map.code, codeDoc, created: true };
@@ -211,25 +286,36 @@ export async function issueApplicantReferralCode(
         // Reusing an admin/seed code is intentional. A collision with a random
         // candidate is not, so ask the caller to retry with another suffix.
         if (preferredCode && candidate === preferredCode) {
+          const codeDoc = codeSnap.data() as ReferralCode;
+          const patch = profilePatch(input);
+          if (Object.keys(patch).length > 0) {
+            tx.set(codeRef, patch, { merge: true });
+            Object.assign(codeDoc, patch);
+          }
           tx.set(
             mappingRef,
-            mappingData(applicantName, applicantEmail, candidate),
+            mappingData(applicantName, applicantEmail, candidate, input),
             { merge: true },
           );
           return {
             code: candidate,
-            codeDoc: codeSnap.data() as ReferralCode,
+            codeDoc,
             created: false,
           };
         }
         return null;
       }
 
-      const codeDoc = newCodeDoc(candidate, applicantName, applicantEmail);
+      const codeDoc = newCodeDoc(
+        candidate,
+        applicantName,
+        applicantEmail,
+        input,
+      );
       tx.set(codeRef, codeDoc);
       tx.set(
         mappingRef,
-        mappingData(applicantName, applicantEmail, candidate),
+        mappingData(applicantName, applicantEmail, candidate, input),
         { merge: true },
       );
       return { code: candidate, codeDoc, created: true };

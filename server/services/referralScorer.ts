@@ -29,6 +29,9 @@ export interface ReferralCode {
   code: string;
   applicantName: string;
   applicantEmail: string | null;
+  /** Optional profile details captured by the public applicant form. */
+  applicantAge?: number | null;
+  applicantLinkedinUrl?: string | null;
   createdAt: number;
   createdBy: string;
   isActive: boolean;

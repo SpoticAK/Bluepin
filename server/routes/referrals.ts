@@ -10,6 +10,7 @@ import {
   buildReferralUrl,
   issueApplicantReferralCode,
   normalizeApplicantEmail,
+  normalizeApplicantLinkedinUrl,
 } from "../services/applicantReferral";
 import type { ReferralCode, ReferralEvent } from "../services/referralScorer";
 import {
@@ -228,6 +229,46 @@ router.post(
           .json({ error: "A valid applicantEmail is required" });
       }
 
+      const rawAge = req.body?.applicantAge ?? req.body?.age;
+      let applicantAge: number | undefined;
+      if (rawAge !== undefined && rawAge !== null && rawAge !== "") {
+        const parsedAge =
+          typeof rawAge === "number" ? rawAge : Number(String(rawAge).trim());
+        if (
+          !Number.isInteger(parsedAge) ||
+          parsedAge < 13 ||
+          parsedAge > 120
+        ) {
+          return res.status(400).json({
+            error: "applicantAge must be an integer between 13 and 120",
+          });
+        }
+        applicantAge = parsedAge;
+      }
+
+      const rawLinkedin =
+        req.body?.applicantLinkedinUrl ?? req.body?.linkedinUrl;
+      let applicantLinkedinUrl: string | undefined;
+      if (
+        rawLinkedin !== undefined &&
+        rawLinkedin !== null &&
+        rawLinkedin !== ""
+      ) {
+        if (typeof rawLinkedin !== "string") {
+          return res.status(400).json({
+            error: "applicantLinkedinUrl must be a LinkedIn profile URL",
+          });
+        }
+        const normalizedLinkedin = normalizeApplicantLinkedinUrl(rawLinkedin);
+        if (!normalizedLinkedin) {
+          return res.status(400).json({
+            error:
+              "applicantLinkedinUrl must be a valid LinkedIn profile URL",
+          });
+        }
+        applicantLinkedinUrl = normalizedLinkedin;
+      }
+
       if (isDisposableEmail(applicantEmail)) {
         return res.status(400).json({
           error: "Disposable email addresses are not eligible for a referral code",
@@ -239,6 +280,8 @@ router.post(
       const result = await issueApplicantReferralCode(db, {
         applicantName,
         applicantEmail,
+        applicantAge,
+        applicantLinkedinUrl,
       });
 
       res.set("Cache-Control", "no-store");
@@ -251,6 +294,8 @@ router.post(
         reused: !result.created,
         applicantName: result.codeDoc.applicantName,
         applicantEmail,
+        applicantAge: result.codeDoc.applicantAge ?? null,
+        applicantLinkedinUrl: result.codeDoc.applicantLinkedinUrl ?? null,
       });
     } catch (err: any) {
       console.error("[Referrals] Error issuing applicant referral code:", err);
