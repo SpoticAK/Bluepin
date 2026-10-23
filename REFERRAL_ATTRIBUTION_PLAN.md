@@ -11,7 +11,7 @@
 
 We are running a paid hiring assessment where **200+ applicants** bring real, legitimate users to the Bluepin health application.
 Each applicant receives a unique referral link formatted like:
-`https://yourapp.com/?ref=CODE&utm_source=applicant&utm_medium=referral&utm_campaign=hiring_test`
+`https://yourapp.com/?ref=CODE`
 
 ### Core Objectives
 1. **Accurate Attribution:** Attribute every new signup (Email/Password or Google OAuth) to the referring applicant's code.

@@ -2,8 +2,15 @@ import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
+import { config } from "../config";
 import { getAdminAuth, getAdminFirestore, requireAuth } from "../firebase";
+import { applicantReferralLimiter } from "../middleware/security";
 import { requireAdmin, requireReferralAccess } from "../middleware/requireAdmin";
+import {
+  buildReferralUrl,
+  issueApplicantReferralCode,
+  normalizeApplicantEmail,
+} from "../services/applicantReferral";
 import type { ReferralCode, ReferralEvent } from "../services/referralScorer";
 import {
   rebuildReferralCodeTotals,
@@ -178,7 +185,83 @@ router.post("/referrals/attribute", requireAuth, express.json(), async (req, res
   }
 });
 
-// ─── 2. Admin / Dev Summary & Leaderboard ─────────────────────────────────────
+// ─── 2. Applicant Portal: Issue or Reuse a Referral Code (Public) ─────────────
+// Called by the bluepin.in applicant form. No authentication is required by
+// design: the email is the idempotency key, so re-registering returns the same
+// code. The endpoint is IP-rate-limited and never touches user data or events.
+router.post(
+  "/referrals/applicant",
+  applicantReferralLimiter,
+  express.json(),
+  async (req, res) => {
+    try {
+      const rawName = req.body?.applicantName ?? req.body?.name;
+      const rawEmail = req.body?.applicantEmail ?? req.body?.email;
+
+      if (typeof rawName !== "string" || rawName.trim().length === 0) {
+        return res.status(400).json({ error: "applicantName is required" });
+      }
+
+      const applicantName = rawName.trim().replace(/\s+/g, " ");
+      if (applicantName.length > 80) {
+        return res
+          .status(400)
+          .json({ error: "applicantName must be 80 characters or fewer" });
+      }
+      if (/[\u0000-\u001F\u007F]/.test(applicantName)) {
+        return res
+          .status(400)
+          .json({ error: "applicantName contains invalid characters" });
+      }
+
+      if (typeof rawEmail !== "string" || rawEmail.trim().length === 0) {
+        return res.status(400).json({ error: "applicantEmail is required" });
+      }
+
+      const applicantEmail = normalizeApplicantEmail(rawEmail);
+      if (
+        applicantEmail.length > 254 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(applicantEmail)
+      ) {
+        return res
+          .status(400)
+          .json({ error: "A valid applicantEmail is required" });
+      }
+
+      if (isDisposableEmail(applicantEmail)) {
+        return res.status(400).json({
+          error: "Disposable email addresses are not eligible for a referral code",
+          code: "DISPOSABLE_EMAIL",
+        });
+      }
+
+      const db = getAdminFirestore();
+      const result = await issueApplicantReferralCode(db, {
+        applicantName,
+        applicantEmail,
+      });
+
+      res.set("Cache-Control", "no-store");
+      return res.json({
+        success: true,
+        code: result.code,
+        referralUrl: buildReferralUrl(config.appUrl, result.code),
+        isActive: result.codeDoc.isActive === true,
+        created: result.created,
+        reused: !result.created,
+        applicantName: result.codeDoc.applicantName,
+        applicantEmail,
+      });
+    } catch (err: any) {
+      console.error("[Referrals] Error issuing applicant referral code:", err);
+      return res
+        .status(500)
+        .json({ error: "Failed to issue referral code" });
+    }
+  },
+);
+
+// ─── 3. Admin / Dev Summary & Leaderboard ─────────────────────────────────────
 router.get("/referrals/admin/summary", requireAuth, requireReferralAccess, async (req, res) => {
   try {
     const db = getAdminFirestore();
@@ -300,7 +383,7 @@ router.get("/referrals/admin/summary", requireAuth, requireReferralAccess, async
   }
 });
 
-// ─── 3. Admin: Create a Single New Code Dynamically ───────────────────────────
+// ─── 4. Admin: Create a Single New Code Dynamically ───────────────────────────
 router.post("/referrals/admin/codes", requireAuth, requireAdmin, express.json(), async (req, res) => {
   try {
     const { code, applicantName, applicantEmail } = req.body || {};
@@ -324,7 +407,9 @@ router.post("/referrals/admin/codes", requireAuth, requireAdmin, express.json(),
     const newCodeDoc: ReferralCode = {
       code: cleanCode,
       applicantName: String(applicantName).trim(),
-      applicantEmail: applicantEmail ? String(applicantEmail).trim() : null,
+      applicantEmail: applicantEmail
+        ? String(applicantEmail).trim().toLowerCase()
+        : null,
       createdAt: Date.now(),
       createdBy: adminUser?.uid || adminUser?.email || "admin",
       isActive: true,
@@ -341,7 +426,7 @@ router.post("/referrals/admin/codes", requireAuth, requireAdmin, express.json(),
   }
 });
 
-// ─── 4. Referral dashboard: Trigger an Immediate Scoring Sweep ────────────────
+// ─── 5. Referral dashboard: Trigger an Immediate Scoring Sweep ────────────────
 // The Cloud Scheduler route is protected by CRON_SECRET, which must never be
 // shipped to the browser. Referral viewers/admins use this authenticated route
 // instead. Re-scoring only recomputes referral counters; it never edits codes
@@ -363,7 +448,7 @@ router.post(
   },
 );
 
-// ─── 5. Admin: Rebuild Denormalized Code Totals From Events ───────────────────
+// ─── 6. Admin: Rebuild Denormalized Code Totals From Events ───────────────────
 // Repair path for historical counter drift (e.g. the pre-fix seed script that
 // reset counters on every re-run). Safe to run repeatedly.
 router.post(
@@ -382,7 +467,7 @@ router.post(
   },
 );
 
-// ─── 6. Admin: Toggle Referral Code Status (Active / Inactive) ────────────────
+// ─── 7. Admin: Toggle Referral Code Status (Active / Inactive) ────────────────
 router.patch("/referrals/admin/codes/:code/status", requireAuth, requireAdmin, express.json(), async (req, res) => {
   try {
     const { code } = req.params;

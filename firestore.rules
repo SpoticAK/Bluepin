@@ -29,6 +29,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Server-side email → code idempotency map for the applicant portal.
+    match /referral_applicants/{applicantId} {
+      allow read, write: if false;
+    }
+
     match /referral_events/{userId} {
       allow read: if isOwner(userId);
       allow write: if false;

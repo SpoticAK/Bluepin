@@ -291,8 +291,11 @@ export default function AdminReferralView() {
   );
 
   const copyReferralLink = async (code: string) => {
-    const baseUrl = window.location.origin;
-    const link = `${baseUrl}/?ref=${code}&utm_source=applicant&utm_medium=referral&utm_campaign=hiring_test`;
+    const configuredAppUrl = (import.meta.env.VITE_APP_URL as string | undefined)
+      ?.trim()
+      .replace(/\/$/, "");
+    const baseUrl = configuredAppUrl || window.location.origin;
+    const link = `${baseUrl}/?ref=${code}`;
     try {
       await navigator.clipboard.writeText(link);
       setCopiedCode(code);

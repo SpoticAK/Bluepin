@@ -63,7 +63,7 @@ function parseCsv(content: string): ApplicantRow[] {
     const code = String(record[codeKey] ?? "").trim().toUpperCase();
     const applicantName = String(record[nameKey] ?? "").trim();
     const applicantEmail = emailKey
-      ? String(record[emailKey] ?? "").trim()
+      ? String(record[emailKey] ?? "").trim().toLowerCase()
       : "";
 
     if (!code || !applicantName) continue;

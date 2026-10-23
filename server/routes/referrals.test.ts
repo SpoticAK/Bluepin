@@ -14,6 +14,10 @@ const fakeUsers = new Map<string, {
   providerData: Array<{ providerId: string }>;
 }>();
 
+vi.mock("../config", () => ({
+  config: { appUrl: "https://app.bluepin.in" },
+}));
+
 vi.mock("../firebase", () => ({
   requireAuth: (
     req: { headers: Record<string, string>; user?: unknown },
@@ -276,6 +280,176 @@ describe("Referrals API Routes", () => {
       // Counter should NOT have incremented again
       const codeDoc = fakeDb.read("referral_codes/VALID2026");
       expect(codeDoc?.totalSignups).toBe(1);
+    });
+  });
+
+  describe("POST /referrals/applicant", () => {
+    const emailKey = (email: string) =>
+      crypto.createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+
+    it("creates an active code, stores the email mapping, and returns the app link", async () => {
+      const res = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Priya Sharma",
+          applicantEmail: "Priya@Example.com",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.code).toMatch(/^[A-Z0-9_-]{2,30}$/);
+      expect(res.body.code.startsWith("PRIYA")).toBe(true);
+      expect(res.body.created).toBe(true);
+      expect(res.body.reused).toBe(false);
+      expect(res.body.isActive).toBe(true);
+      expect(res.body.applicantEmail).toBe("priya@example.com");
+      expect(res.body.referralUrl).toBe(
+        `https://app.bluepin.in/?ref=${res.body.code}`,
+      );
+
+      const saved = fakeDb.read(`referral_codes/${res.body.code}`);
+      expect(saved).toMatchObject({
+        code: res.body.code,
+        applicantName: "Priya Sharma",
+        applicantEmail: "priya@example.com",
+        createdBy: "applicant-portal",
+        isActive: true,
+        totalSignups: 0,
+        qualifiedSignups: 0,
+        totalScore: 0,
+      });
+
+      const mapping = fakeDb.read(
+        `referral_applicants/${emailKey("priya@example.com")}`,
+      );
+      expect(mapping?.code).toBe(res.body.code);
+
+      // Applicants are not referred users; they must not create events.
+      expect(fakeDb.read("referral_events/priya")).toBeUndefined();
+    });
+
+    it("returns the same code for the same email in any case or whitespace", async () => {
+      const first = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Priya Sharma",
+          applicantEmail: "Priya@Example.com",
+        });
+
+      const second = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Priya S.",
+          applicantEmail: "  priya@example.com  ",
+        });
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(second.body.code).toBe(first.body.code);
+      expect(second.body.created).toBe(false);
+      expect(second.body.reused).toBe(true);
+
+      const codes = await fakeDb.collection("referral_codes").get();
+      expect(codes.size).toBe(1);
+    });
+
+    it("reuses a seeded/admin-created code without resetting its counters", async () => {
+      fakeDb.seed({
+        "referral_codes/SEEDED42": {
+          code: "SEEDED42",
+          applicantName: "Seed Candidate",
+          applicantEmail: "seed@example.com",
+          createdAt: 123,
+          createdBy: "import-script",
+          isActive: true,
+          totalSignups: 7,
+          qualifiedSignups: 3,
+          totalScore: 5,
+        },
+      });
+
+      const res = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Seed Candidate",
+          applicantEmail: "SEED@example.com",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.code).toBe("SEEDED42");
+      expect(res.body.created).toBe(false);
+      expect(res.body.reused).toBe(true);
+
+      const saved = fakeDb.read("referral_codes/SEEDED42");
+      expect(saved?.totalSignups).toBe(7);
+      expect(saved?.qualifiedSignups).toBe(3);
+      expect(saved?.totalScore).toBe(5);
+      expect(saved?.isActive).toBe(true);
+
+      const mapping = fakeDb.read(
+        `referral_applicants/${emailKey("seed@example.com")}`,
+      );
+      expect(mapping?.code).toBe("SEEDED42");
+    });
+
+    it("returns the existing code as inactive if an admin paused it", async () => {
+      fakeDb.seed({
+        "referral_codes/PAUSED42": {
+          code: "PAUSED42",
+          applicantName: "Paused Candidate",
+          applicantEmail: "paused@example.com",
+          createdAt: 123,
+          createdBy: "admin",
+          isActive: false,
+          totalSignups: 2,
+          qualifiedSignups: 1,
+          totalScore: 1,
+        },
+      });
+
+      const res = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Paused Candidate",
+          applicantEmail: "paused@example.com",
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.code).toBe("PAUSED42");
+      expect(res.body.isActive).toBe(false);
+      expect(fakeDb.read("referral_codes/PAUSED42")?.isActive).toBe(false);
+      expect(fakeDb.read("referral_codes/PAUSED42")?.totalSignups).toBe(2);
+    });
+
+    it("rejects missing or invalid applicant details", async () => {
+      const missingName = await request(app)
+        .post("/api/referrals/applicant")
+        .send({ applicantEmail: "candidate@example.com" });
+      expect(missingName.status).toBe(400);
+
+      const invalidEmail = await request(app)
+        .post("/api/referrals/applicant")
+        .send({ applicantName: "Candidate", applicantEmail: "not-an-email" });
+      expect(invalidEmail.status).toBe(400);
+
+      const disposable = await request(app)
+        .post("/api/referrals/applicant")
+        .send({
+          applicantName: "Candidate",
+          applicantEmail: "candidate@mailinator.com",
+        });
+      expect(disposable.status).toBe(400);
+      expect(disposable.body.code).toBe("DISPOSABLE_EMAIL");
+    });
+
+    it("accepts the shorter name/email field aliases used by forms", async () => {
+      const res = await request(app)
+        .post("/api/referrals/applicant")
+        .send({ name: "Alias Candidate", email: "alias@example.com" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.code).toMatch(/^ALIAS/);
+      expect(res.body.applicantEmail).toBe("alias@example.com");
     });
   });
 

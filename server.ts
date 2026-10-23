@@ -2,11 +2,15 @@ import "./server/env";
 import { config } from "./server/config";
 import express from "express";
 import helmet from "helmet";
-import cors from "cors";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 
 import { helmetConfig, apiErrorHandler } from "./server/middleware/security";
+import {
+  APPLICANT_REFERRAL_PATH,
+  corsMiddleware,
+  requireAllowedOrigin,
+} from "./server/middleware/cors";
 import apiRouter from "./server/routes";
 
 // Re-export requireAuth for backward compatibility
@@ -19,7 +23,11 @@ async function startServer() {
   app.set('trust proxy', 1);
 
   // Security & Core Middleware
-  app.use(cors());
+  // Only the public applicant endpoint is origin-restricted. Every other API
+  // keeps the previous permissive CORS behaviour so core app features and
+  // future public APIs are not affected.
+  app.use(APPLICANT_REFERRAL_PATH, requireAllowedOrigin);
+  app.use(corsMiddleware);
   app.use(helmet(helmetConfig));
   app.use(
     express.json({
