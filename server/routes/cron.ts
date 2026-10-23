@@ -6,6 +6,7 @@ import {
   maskPhone,
 } from "../services/whatsapp/client";
 import { sendGlucosePushNudges } from "../services/notifications";
+import { runReferralScoring } from "../services/referralScoring";
 
 const router = express.Router();
 
@@ -177,6 +178,39 @@ router.post("/cron/whatsapp-reminders", async (req, res) => {
   } catch (err: any) {
     console.error("[Cron] Error running whatsapp reminders:", err);
     return res.status(500).json({ error: "Failed to process reminders" });
+  }
+});
+
+/**
+ * Triggered nightly by Google Cloud Scheduler.
+ * Evaluates progressive engagement milestones for referred users.
+ * Admins use POST /api/referrals/admin/rescore instead (no shared secret in
+ * the browser).
+ * Example URL: POST /api/cron/referral-scoring
+ */
+router.post("/cron/referral-scoring", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const expectedSecret = process.env.CRON_SECRET;
+    const hasValidSecret =
+      Boolean(expectedSecret) && authHeader === `Bearer ${expectedSecret}`;
+    // Local development may run without a secret configured; every deployed
+    // environment must present the real secret.
+    const isLocalWithoutSecret =
+      !expectedSecret && process.env.NODE_ENV !== "production";
+
+    if (!hasValidSecret && !isLocalWithoutSecret) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const db = getAdminFirestore();
+    const forceAll = req.query.force === "true";
+
+    const result = await runReferralScoring(db, { force: forceAll });
+    return res.json(result);
+  } catch (err: any) {
+    console.error("[Cron] Error running referral scoring:", err);
+    return res.status(500).json({ error: "Failed to process referral scoring" });
   }
 });
 

@@ -60,6 +60,20 @@ export const globalIpLimiter = rateLimit({
   message: { error: "Too many requests from this IP, please try again after 15 minutes" }
 });
 
+// Public applicant form on bluepin.in. Deliberately stricter than the global
+// API budget because each request can create a referral code, but loose enough
+// for a group of candidates behind one office/campus NAT.
+export const applicantReferralLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error:
+      "Too many referral code requests from this IP. Please try again in a few minutes.",
+  },
+});
+
 export const aiUserLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 60,

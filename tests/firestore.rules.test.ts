@@ -13,7 +13,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, collection, addDoc, getDocs, writeBatch } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, addDoc, getDocs, writeBatch } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const PROJECT_ID = "demo-rules";
@@ -105,6 +105,32 @@ describe("feedbacks", () => {
       const snap = await getDoc(doc(adminDb, `feedbacks/${ref.id}`));
       expect(snap.exists()).toBe(true);
     });
+  });
+});
+
+describe("referral collections", () => {
+  it("locks referral_codes to the Admin SDK", async () => {
+    await seedAdmin({ "referral_codes/CODE1": { code: "CODE1" } });
+    const user = testEnv.authenticatedContext("u1").firestore();
+    const anon = testEnv.unauthenticatedContext().firestore();
+
+    await assertFails(getDoc(doc(user, "referral_codes/CODE1")));
+    await assertFails(getDoc(doc(anon, "referral_codes/CODE1")));
+    await assertFails(setDoc(doc(user, "referral_codes/CODE1"), { code: "CODE1" }));
+  });
+
+  it("lets users read only their own referral event and never write it", async () => {
+    await seedAdmin({
+      "referral_events/u1": { uid: "u1", refCode: "CODE1", score: 0 },
+      "referral_events/u2": { uid: "u2", refCode: "CODE1", score: 0 },
+    });
+    const owner = testEnv.authenticatedContext("u1").firestore();
+    const stranger = testEnv.authenticatedContext("u2").firestore();
+
+    await assertSucceeds(getDoc(doc(owner, "referral_events/u1")));
+    await assertFails(getDoc(doc(stranger, "referral_events/u1")));
+    await assertFails(setDoc(doc(owner, "referral_events/u1"), { score: 9 }));
+    await assertFails(deleteDoc(doc(owner, "referral_events/u1")));
   });
 });
 

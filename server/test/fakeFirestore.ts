@@ -58,7 +58,16 @@ export class FakeDocRef {
   }
   async update(data: DocData) {
     if (!this.store.has(this.path)) throw new Error("not found");
-    this.store.set(this.path, { ...this.store.get(this.path)!, ...data });
+    const prev = this.store.get(this.path)!;
+    const next: DocData = { ...prev };
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === "object" && "operand" in (val as Record<string, unknown>)) {
+        next[key] = (Number(prev[key]) || 0) + Number((val as Record<string, unknown>).operand);
+      } else {
+        next[key] = val;
+      }
+    }
+    this.store.set(this.path, next);
   }
   async delete() {
     this.store.delete(this.path);
@@ -66,19 +75,27 @@ export class FakeDocRef {
 }
 
 class FakeQuery {
-  private filters: Array<{ field: string; val: unknown }> = [];
+  private filters: Array<{ field: string; op: string; val: unknown }> = [];
   private limitN: number | null = null;
   constructor(
     private readonly store: Map<string, DocData>,
     private readonly prefix: string,
   ) {}
+  select(..._fields: string[]) {
+    return this;
+  }
   where(field: string, op: string, val: unknown) {
-    if (op !== "==") throw new Error(`FakeFirestore: unsupported op ${op}`);
-    this.filters.push({ field, val });
+    if (!["==", "<", "<=", ">", ">="].includes(op)) {
+      throw new Error(`FakeFirestore: unsupported op ${op}`);
+    }
+    this.filters.push({ field, op, val });
     return this;
   }
   limit(n: number) {
     this.limitN = n;
+    return this;
+  }
+  orderBy(_field: string, _dir?: "asc" | "desc") {
     return this;
   }
   async get() {
@@ -88,7 +105,23 @@ class FakeQuery {
       return !path.slice(this.prefix.length).includes("/");
     });
     for (const f of this.filters) {
-      entries = entries.filter(([, d]) => d[f.field] === f.val);
+      entries = entries.filter(([, d]) => {
+        const value = d[f.field];
+        switch (f.op) {
+          case "==":
+            return value === f.val;
+          case "<":
+            return (value as number) < (f.val as number);
+          case "<=":
+            return (value as number) <= (f.val as number);
+          case ">":
+            return (value as number) > (f.val as number);
+          case ">=":
+            return (value as number) >= (f.val as number);
+          default:
+            return false;
+        }
+      });
     }
     if (this.limitN !== null) entries = entries.slice(0, this.limitN);
     return new FakeQuerySnap(
@@ -102,11 +135,17 @@ class FakeCollection {
     private readonly store: Map<string, DocData>,
     private readonly path: string,
   ) {}
+  select(...fields: string[]) {
+    return new FakeQuery(this.store, `${this.path}/`).select(...fields);
+  }
   where(field: string, op: string, val: unknown) {
     return new FakeQuery(this.store, `${this.path}/`).where(field, op, val);
   }
   limit(n: number) {
     return new FakeQuery(this.store, `${this.path}/`).limit(n);
+  }
+  orderBy(field: string, dir?: "asc" | "desc") {
+    return new FakeQuery(this.store, `${this.path}/`).orderBy(field, dir);
   }
   async get() {
     return new FakeQuery(this.store, `${this.path}/`).get();
@@ -136,6 +175,10 @@ export class FakeFirestore {
   }
   doc(path: string) {
     return new FakeDocRef(this.store, path);
+  }
+
+  async getAll(...refs: FakeDocRef[]) {
+    return Promise.all(refs.map((ref) => ref.get()));
   }
 
   /** Runs fn immediately against the live store (tests are sequential). */

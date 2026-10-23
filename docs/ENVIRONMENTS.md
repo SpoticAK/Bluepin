@@ -62,10 +62,36 @@ Do NOT share your Meta password. I only need pasted values afterwards.
 `VITE_FIREBASE_*`, `GEMINI_API_KEY`, `VITE_RECAPTCHA_SITE_KEY`, `SMTP_HOST/PORT/USER/PASS/FROM_EMAIL`,
 `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WABA_ID`, `META_BASE_URL`, `WHATSAPP_VERIFY_TOKEN`,
 `WHATSAPP_APP_SECRET`, `WHATSAPP_BUSINESS_PHONE`, `WHATSAPP_TEMPLATE_LANG`, `WHATSAPP_OTP_TEMPLATE_NAME`,
-`OTP_SECRET`, `APP_URL`/`FRONTEND_URL`, `WHATSAPP_MAGIC_TOKEN_TTL_MINUTES`,
+`OTP_SECRET`, `APP_URL`/`FRONTEND_URL`, `VITE_APP_URL`, `CORS_ALLOWED_ORIGINS`,
+`WHATSAPP_MAGIC_TOKEN_TTL_MINUTES`,
 `WHATSAPP_MEDIA_*`, `FIREBASE_PROJECT_ID`, `VITE_FIREBASE_DATABASE_ID`, `FIREBASE_STORAGE_BUCKET`,
-`CRON_SECRET`, `PDF_MARKDOWN_FUNCTION_URL`, `HEALTH_PROFILE_HEADER_IMAGE_URL`, `APP_TIMEZONE`, `NODE_ENV`
+`CRON_SECRET`, `PDF_MARKDOWN_FUNCTION_URL`, `HEALTH_PROFILE_HEADER_IMAGE_URL`, `APP_TIMEZONE`, `NODE_ENV`,
+`ADMIN_EMAILS`, `REFERRAL_VIEWER_EMAILS`, `VITE_ADMIN_EMAILS`, `VITE_REFERRAL_VIEWER_EMAILS`
 plus files `firebase-adminsdk.json`, `firebase-applet-config.json`.
+
+## Referral dashboard access
+
+`ADMIN_EMAILS` / `REFERRAL_VIEWER_EMAILS` control API authorization (server). The
+`VITE_*` mirrors are baked into the frontend bundle at build time and decide whether
+the admin/referral tab renders. Both sets must contain the same emails; otherwise the
+tab is either hidden or every API call returns `403`. The referral dashboard itself
+lives behind server endpoints, so `referral_codes` / `referral_events` stay fully
+locked to the client SDK.
+
+Applicant code issuance is exposed at public, IP-rate-limited
+`POST /api/referrals/applicant`; the `bluepin.in` form calls it and stores the
+returned `https://app.bluepin.in/?ref=CODE` link locally. Only this applicant
+endpoint uses a CORS allowlist (`bluepin.in`, `www.bluepin.in`,
+`app.bluepin.in`, `APP_URL`, and localhost outside production); add
+preview/custom hosts with `CORS_ALLOWED_ORIGINS`. Other API routes keep their
+previous permissive CORS behaviour. See `docs/APPLICANT_REFERRAL_API.md`.
+
+Referral scoring is exposed at `POST /api/cron/referral-scoring` for Cloud Scheduler
+(bearer `CRON_SECRET`) and `POST /api/referrals/admin/rescore` for referral viewers and
+admins. Configure a nightly scheduler job against the cron endpoint; otherwise scores
+only update when someone presses the re-score button. If counters were ever reset by the old seed script,
+run `POST /api/referrals/admin/rebuild-totals` once to recompute every code's counters
+from `referral_events`.
 
 ## Console state (reported by owner, 2026-10-13 — normalized names)
 

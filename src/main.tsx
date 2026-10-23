@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { registerServiceWorker } from './registerServiceWorker.ts';
+import { captureReferralCode } from './lib/referral.ts';
 
 const originalError = console.error;
 console.error = (...args) => {
@@ -11,6 +12,9 @@ console.error = (...args) => {
   }
   originalError(...args);
 };
+
+// Capture referral parameter from URL before any render/auth initialization
+captureReferralCode();
 
 // Register PWA service worker
 registerServiceWorker();

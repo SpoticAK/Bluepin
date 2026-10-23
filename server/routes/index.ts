@@ -9,6 +9,7 @@ import cronRouter from "./cron";
 import healthRouter from "./health";
 import remindersRouter from "./reminders";
 import notificationsRouter from "./notifications";
+import referralsRouter from "./referrals";
 
 const apiRouter = Router();
 
@@ -26,6 +27,7 @@ apiRouter.use(authRouter);
 apiRouter.use(cronRouter);
 apiRouter.use(remindersRouter);
 apiRouter.use(notificationsRouter);
+apiRouter.use(referralsRouter);
 
 // Mount feature routes
 apiRouter.use(uploadRouter);

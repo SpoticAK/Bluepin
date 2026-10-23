@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
+import { attributeReferral } from "../lib/referral";
 
 export function useSession() {
   const [sessionUser, setSessionUser] = useState<any>(undefined);
@@ -95,6 +96,14 @@ export function useSession() {
         if (u) {
           exchangeInFlight = false;
           setIsExchangingMagicLink(false);
+
+          // Retry a pending referral attribution that failed at signup time
+          // (network blip, 429, server restart). No-op when no code is pending.
+          // The server rejects existing accounts, so signing in normally is safe.
+          u.getIdToken()
+            .then((token) => attributeReferral(token))
+            .catch(() => {});
+
           try {
             localStorage.setItem("bluepin_welcome_seen", "true");
           } catch {}
